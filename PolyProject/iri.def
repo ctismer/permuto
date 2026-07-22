@@ -1,0 +1,25 @@
+DEFINITION MODULE Iri ;
+
+TYPE
+  Label = ARRAY[0..3] OF CHAR ;
+
+PROCEDURE Built() : BOOLEAN ;
+
+PROCEDURE NewNode() ;
+
+PROCEDURE NumToLabel(num : CARDINAL) : Label ;
+
+PROCEDURE KillNode(name : Label) ;
+
+PROCEDURE SeekNode(name : Label) : INTEGER ;
+
+PROCEDURE Transmit (from, to : Label ; repeat: CARDINAL) ;
+
+PROCEDURE Repeat () ;  (* repeat all stored messages *)
+
+PROCEDURE Step () ;
+
+PROCEDURE Reset() ;    (* remove any states from the network *)
+
+END Iri.
+

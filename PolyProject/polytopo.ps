@@ -1,0 +1,84 @@
+% 22.01.92: DefAttributes
+% Version fÅr hohle Kreise als Knoten
+% ist leider etwas aufwendiger.
+% Um sauber die Kreise zu fÅllen, mÅssen sie
+% am Schlu· ausgegeben werden.
+% Das Åbernimmt die Funktion Finish.
+%
+% PrÑambel zur Postscript-Ausgabe von Polytopen.
+% (C) YCHI 08.02.91
+%
+%
+% Definiert werden
+% SetDimension, DefNode, DefEdge, Finish
+%
+% In dieser Version werden die Knoten und Kanten sofort geplottet.
+% Die Koordinaten ergeben sich aus den Knoten. Kanten werden aus
+% Knotennamen gebildet.
+
+/SetDimension {/Dimension exch def} def
+
+/xorg 300 def
+/yorg 500 def
+
+/disksize 10 def
+
+/PlotNode {      % Name
+  cvx exec     % jetzt Array da
+  dup
+  0 get xorg add /xpos exch def
+  1 get yorg add /ypos exch def
+  newpath
+  xpos disksize add ypos moveto
+  xpos ypos disksize 0 360 arc
+  currentgray    % auf stack
+  1 setgray      % weiss
+  fill
+  setgray
+  newpath
+  xpos disksize add ypos moveto
+  xpos ypos disksize 0 360 arc
+  stroke
+} def
+
+% dummerweise wei· ich hier die Anzahl der Knoten nicht.
+% mache ich spÑter anders. Vorerst gilt
+% hier als Default 1000 Knoten maximal
+
+
+/NodeDict 1000 dict def
+
+/DefNode {      % Name
+                % braucht nichts zu tun au·er den Knoten ins Nodes-Dict zu bringen
+  NodeDict exch 0 put   % dict key val
+} def
+
+/DefAttributes {    % array with label, name-str, perm-str, colornum
+  pop               % forget it for this time
+} def
+
+/DefEdge {     % Name1 Name2
+               % nur plotten
+  cvx exec     % habe Array
+  dup
+  0 get xorg add /xpos exch def
+  1 get yorg add /ypos exch def
+  newpath
+  xpos ypos moveto
+  cvx exec     % habe Array
+  dup
+  0 get xorg add /xpos exch def
+  1 get yorg add /ypos exch def
+  xpos ypos lineto stroke
+} def
+
+/Finish   { % in dieser Version druckt Finish das NodeDict
+  NodeDict
+  {
+    pop       % Value kann weg, benutze den key
+    PlotNode  % der verarbeitet genau einen Key, das war's.
+  }
+  forall      % tue voriges fÅr jedes Element aus NodeDict
+  showpage
+} def
+

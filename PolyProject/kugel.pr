@@ -1,0 +1,8 @@
+#system auto exe
+#model compact jpi
+#pragma debug(line_num=>on)
+
+#compile %main
+#link %prjname
+
+

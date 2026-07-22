@@ -1,0 +1,21 @@
+(**********************************************************
+ TextPlot
+ Prototype Version for very small text in Graphics. Has
+ to be developed further before it will get into LIB.
+ 20.12.91
+***********************************************************)
+
+DEFINITION MODULE TextPlot ;
+
+PROCEDURE PlotChar(x, y : INTEGER ; c : CHAR ; Color : CARDINAL) ;
+
+PROCEDURE PlotCenteredStr(x, y : INTEGER ;
+                             s : ARRAY OF CHAR ;
+                          Color : CARDINAL) ;
+  (* Plots string x-y-centered at (x,y) *)
+
+END TextPlot.
+
+
+
+

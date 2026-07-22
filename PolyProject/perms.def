@@ -1,0 +1,10 @@
+DEFINITION MODULE perms;
+PROCEDURE NextPerm(n:CARDINAL; VAR s:ARRAY OF BYTE;
+                   VAR wrap:BOOLEAN);
+(* This procedure updates s to the next permutation of the
+   first n bytes of s. The sequence of permutations generated
+   by successive calls is in 'dictionary' order. If s is the
+   last string in the sequence, the first is returned. The
+   boolean result wrap is used to indicate this event *)
+END perms.
+

@@ -1,0 +1,40 @@
+SalzDemo
+
+a)
+Verallgemeinerte Operatoren:
+Platz - und Wertkontexturen
+Generierung der Knoten ber die Operatoren.
+Erster Schritt in Richtung Keno-Operator:
+Zwei Knoten sind verbunden, wenn es zwischen beiden einen bestimmten
+String-Match gibt.
+
+Neue Visualisierung:
+Zoom - Funktion. Berechnung nur auf Anforderung. Ausblenden
+beliebiger Operatoren.
+
+b)
+Katzenminze
+Zeigen, wie man lokale nahezu optimale Wege findet, auch wenn St”rungen
+vorliegen. Allgemeines Konzept: Wege haben eine Qualit„t zwischen 0 und 1.
+Die beste Verbindung hat 1. 0 ist unterbrochen. Dazwischen codiert man
+Dinge wie beschr„nkte Verfgbarkeit.
+Angenommen, wir haben den SPTA. Dieser kann aufgrund der Netzwerkstruktur
+lokal krzeste Wege finden. Zus„tzlich wird nun der Verfgbarkeitscode
+mit bercksichtigt.
+Alle Knoten erfragen periodisch die Verfgbarkeitscodes ihrer Nachbarn.
+Zerst”rte Knoten antworten dabei garnicht, was als eine Verfgbarkeit
+von 0 gerechnet wird.
+Informationsbertragung:
+Hinweis von Jeff: Priorit„t bercksichtigen, Sigmoid function.
+Depending on the priority of a message, it will take the availability code
+into account more or less. Urgent messages will take the shortest paths
+whenever possible. Less urgent messages try to avoid areas of low
+availability. That increases the overall availability and avoids local
+overloading. This can be enhanced by the following:
+Each time a link is used, it's availability decreases. The availability
+also increases automatically, like the charging of a capacitor.
+Furthermore, the availability of a node always takes into account the
+availabilities of its neighbours by some small factor. That means, that
+a broken node for example, smears it unavailability out into it's
+neighbourship, and an information packet will be refracted on it's route
+to walk around this area, before it reaches the broken node.

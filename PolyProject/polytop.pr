@@ -1,0 +1,9 @@
+#system auto exe
+#model mthread jpi
+
+#compile iri -- /debug(vid=>full)
+
+#compile %main -- /debug (vid => full)
+#link %prjname
+
+

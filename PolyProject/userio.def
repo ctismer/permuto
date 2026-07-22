@@ -1,0 +1,45 @@
+(**********************************************************
+
+   User Dialog
+
+***********************************************************)
+
+DEFINITION MODULE UserIO ;
+
+IMPORT KEY ;
+
+PROCEDURE UserWantsToExit() : BOOLEAN ;
+
+PROCEDURE EscapePressed() : BOOLEAN ;
+
+PROCEDURE InputStr ( VAR S : ARRAY OF CHAR ;     (* the string *)
+                     allowed : KEY.CharSet ;   (* what may appear.
+                                                    "" means all. *)
+                     exit : KEY.CodeSet        (* which keys exit *)
+                   ) ;
+    (* all other keys will vanish *)
+
+PROCEDURE ReadLong (min, max : LONGINT) : LONGINT ;
+    (* reads a number in range. will simply be clipped into range.
+       return keys are return and escape. the caller can inspect
+       the code in KEY.Code to check for escape.
+    *)
+
+PROCEDURE ReadInt (min, max : INTEGER) : INTEGER ;
+
+PROCEDURE ReadLongReal (min, max : LONGREAL ; prec : INTEGER) : LONGREAL ;
+    (* reads a number in range. will simply be clipped into range.
+       return keys are return and escape. the caller can inspect
+       the code in KEY.Code to check for escape.
+    *)
+PROCEDURE ReadReal (min, max : REAL ; prec : INTEGER) : REAL ;
+
+PROCEDURE SelectCard(VAR a : ARRAY OF CARDINAL; len : INTEGER) : INTEGER ;
+    (* selects an integer from a list. User presses space until he is
+       satisfied. on return, the index is the result.
+       Return value is with index origin 1.
+    *)
+
+END UserIO.
+
+

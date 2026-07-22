@@ -1,0 +1,33 @@
+(*************************************************************
+
+   Permutographic Programs
+
+*************************************************************)
+
+DEFINITION MODULE PmProgs ;
+
+TYPE
+  ProgramType = (P_Idle, P_SPA, P_PARSUM, P_SPTA) ;
+                                          (* use this for Iridium here *)
+
+PROCEDURE ResetMachine() ;
+  (* erases all program-specific machine states *)
+
+PROCEDURE InitSPA(StartNode : CARDINAL) ;
+
+  (* ShortestPath performs one parallel step each time
+     it is called. So, it can be watched easily.
+  *)
+
+PROCEDURE ShortestPath() : BOOLEAN ;
+
+PROCEDURE InitParSum() : BOOLEAN ;
+  (* we require SPA to run first. Here, we seek for the sinks, the nodes
+     with largest "step" from SPA and make them active.
+     Also, all 'sum' fields are initialized to 1
+  *)
+
+PROCEDURE ParSum() : BOOLEAN ;
+
+END PmProgs.
+

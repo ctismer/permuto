@@ -1,0 +1,120 @@
+15.08.92       kr0te
+
+Gedanken zu Permutographen
+
+Es geht hier um Linienpermutographen mit Negation.
+
+Basiskreise:
+6er entstehen durch benachbarte Operatoren.
+4er entstehen durch nicht benachbarte Operatoren.
+
+Beim 24er :    12 23 34
+gibt es folgende Typen von Kanten:
+12-Kanten und 34-Kanten haben genau einen 6er und einen 4er.
+23-Kanten haben genau 2 6er.
+
+Beim 120er :   12 23 34 45
+gibt es folgende Typen von Kanten:
+12-Kanten und 45-Kanten haben genau einen 6er und zwei 4er.
+23-Kanten und 34-Kanten haben genau zwei 6er und einen 4er.
+
+Beim 720er :   12 23 34 45 56
+gibt es folgende Typen von Kanten:
+12-Kanten und 56-Kanten haben genau einen 6er und drei 4er.
+23-Kanten, 34-Kanten und 45-Kanten haben genau zwei 6er und zwei 4er.
+
+Allgemein gilt bei Linienkontextur:
+Eine Kante hat mindestens einen 6er, aber hoechstens zwei 6er.
+Der Rest besteht aus 4ern.
+Sei g der Grad des Permutographen (n=24: g=4).
+Dann gehen durch jede Kante genau g-2 Basiskreise.
+Durch jeden Knoten gehen (g-1 ueber 2) Basiskreise, weil jedes Paar
+von Operatoren eines Knotens einen Basiskreis generiert.
+
+Definition:
+Ich will alle Kanten mit 2 6ern innere Kanten nennen, weil sie im Innern
+der Kontextur liegen.
+
+Uebergang von g auf g+1:
+Die Kontextur wird an einem Ende verlaengert.
+Nehmen wir an, die Kantentypen bzw. Operatoren heiszen k(1)..k(g).
+Die Kanten k(1)..k(g-1) bekommen genau einen 4er hinzu.
+Kante k(g) bekommt einen 6er hinzu und wird dadurch innere Kante.
+
+Sechsecke:
+Folgende Beobachtung ist wichtig.
+Alle Linienpermutographen werden zusammenhaengend von 6ern ueberdeckt.
+Das heiszt: Alle Konten und Kanten werden erreicht, wenn man nur 6er
+zulaeszt. Zwei 6er sind zusammenhaengend, wenn sie eine gemeinsame Kante
+haben.
+Der Beweis ist trivial, denn jede Kante hat mindestens einen 6er.
+Die 6er sind die benachbarten Operatorenpaare in der Kontextur.
+Die g-1 derartigen Paare ueberlappen sich paarweise und ueberdecken
+dabei die Kontextur, erzeugen also den ganzen Graphen.
+
+Beim 24er: Es gibt genau 2 disjunkte Zerlegungen in 6er. Zieht man eine
+solche zusammen, sodasz die 6er zu einem Punkt werden, dann ergibt sich
+ein Tetraeder. Die geht fuer beide Zerlegungen. Die Punkte beider
+Tetraeder bilden einen Wuerfel. Dieser ergibt sich ebenso, wenn man
+nicht disjunkt zerlegt, sondern jedem der 8 6er einen Punkt zuordnet.
+Nimmt man alle 6er und 4er als Punkte, so erhaelt man den dualen Graph,
+er besteht aus 24 Dreiecken, wird allerdings nicht so schoen rund wie das
+Ikosaeder. Was bei hoeheren Frequenzen entsteht, ist noch zu untersuchen.
+
+Vierecke:
+g=3 : Es gibt keine 4er, nur einen 6er.
+g=4 : 12 23 34 45
+      Die 4er (12-34 und 23-45) sind disjunkt.
+g=5 : 12 23 34 45 56
+      Die 4er bilden eine Ueberdeckung, es besteht folgender Zusammenhang:
+      12-34 12-45 12-56
+      23-45 23-56
+      34-56
+
+
+Zerlegung in Subpermutographen:
+Der 6er ist ein PGL mit g=2, der 24er ein PGL mit g=3.
+Der 24er zerfaellt auf zwei Arten in 4 disjunkte 6er.
+Genauso zerfaellt der 120er auf 2 Arten in 5 disjunkte 24er.
+Allgemein gilt:
+Seien P1=PGL(g1) und P2=PGL(g2) gegeben, g2<=g1.
+Die Anzahl "Arten", wie eine Struktur in Substrukturen zerfaellt,
+ergibt sich daraus, wie oft man die Kontextur von P2 in der Kontextur
+von P1 wiederfindet. Im Falle g2=g1-1 (siehe Beispiel g1=5, g2=4) gibt
+es zwei Arten. Allgemein gibt es  g2-g1+1 Arten.
+Die Anzahl der Substrukturen einer Art ist dabei g1! / g2! .
+Beispiel:
+6er im 120er.
+g1=5, g2=3,   g1!/g2! = 20 Substrukturen. g2-g1+1 = 3 Arten,
+also hat PGL(5) genau 60 6er.
+
+Ziehen wir das Beispiel der Subpermutographen fuer g1=5 ganz durch:
+g2    g1!/g2!     g2-g1+1    Ergebnis    Kommentar
+ 1    120           5          600       undefiniert!
+ 2     60           4          240       enthaelt 240 Kanten
+ 3     20           3           60       enthaelt 60 6er
+ 4      5           2           10       enthaelt 10 24er
+ 5      1           1            1       enthaelt sich 1 mal
+
+Der Fall g2=1 ist mir unklar. Er ist rechnerisch moeglich, aber
+vermutlich sinnlos, weil ein Permutograph mit g=1 nur ein Punkt
+ist, also keine Operatoren besitzt. Jeder der 120 Punkte besitzt
+anscheinend auf 5 Arten keinen Operator. Ziemlich sinnlos.
+
+Die Strukturzerlegung geht auch fuer andere Objekte.
+Sechseckige Saeule:
+n = 12, 120/12 = 10, es gibt 2 Arten: 12 23 45 und 12 34 45,
+also 20 Saeulen.
+Die Saeulen ueberdecken den 120er auf schoene Weise:
+Jede Saeule der Art 1 haengt mit einer der Art 2 ueber einen
+12-45 - 4er zusammen. Man kann also den 120er wabenartig aus
+dreidimensionalen Objekten aufbauen.
+Jede Saeule haengt mit 6 weiteren zusammen, eben genau ueber ihre
+4er Flaechen.
+Allgemein scheint das mit jeder Ueberdeckung der Kontextur
+mit Subkontexturen zu gehen, wenn alle Subkontexturen Objekte
+gleicher Dimension d erzeugen die Subkontexturen in d-1 Dimensionen
+zusammenhaengen.
+Das bedeutet: Jede Subkontextur (SK) hat d Operatoren, und zu jeder
+SK s1 existiert eine SK s2 mit d-1 gleichen Operatoren.
+Verbindung zu einem anderen

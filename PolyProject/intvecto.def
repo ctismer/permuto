@@ -1,0 +1,50 @@
+(***********************************************************
+
+   Vector Operations
+
+
+  20.02.92: rewrote this with no vector results. is slightly
+            quicker when target is supplied by caller.
+***********************************************************)
+
+DEFINITION MODULE IntVector ;
+
+(*# call (o_a_copy => off) *)
+
+TYPE VecType = INTEGER ;
+
+CONST
+  Norm = 4096 ;  (* this is treated as "1" *)
+
+  (* so we can sum up 8 vectors without scaling *)
+
+PROCEDURE SetDimensions (dim : INTEGER) ;
+
+PROCEDURE GetDimensions () : INTEGER ;
+
+PROCEDURE ZeroVector (VAR vec : ARRAY OF VecType) ;
+
+PROCEDURE RandomVector (VAR vec : ARRAY OF VecType; range : INTEGER) ;
+
+PROCEDURE ScaleVector (VAR vec : ARRAY OF VecType ; mul, div : INTEGER) ;
+
+PROCEDURE DotProdukt (VAR vec : ARRAY OF VecType; w : ARRAY OF VecType) ;
+
+PROCEDURE AddVector (VAR vec : ARRAY OF VecType ; w : ARRAY OF VecType) ;
+
+PROCEDURE SubVector (VAR vec : ARRAY OF VecType ; w : ARRAY OF VecType) ;
+
+PROCEDURE VectorLength (VAR v : ARRAY OF VecType) : INTEGER ;
+
+PROCEDURE NormVector (VAR v : ARRAY OF VecType) ;
+
+PROCEDURE Sqr(x: INTEGER) : LONGINT ;
+
+PROCEDURE Sqrt(x: LONGINT) : INTEGER ;
+
+PROCEDURE Scale(x: INTEGER; mul, div: INTEGER) : INTEGER ;
+  (* fast routine with macros, but no check for overflow! *)
+
+END IntVector.
+
+

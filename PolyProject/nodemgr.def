@@ -1,0 +1,127 @@
+(**********************************************************
+
+   Node Management
+
+***********************************************************)
+
+DEFINITION MODULE NodeMgr ;
+
+CONST
+  MaxDimen    = 8 ;
+  MaxLinks    = 12 ;
+  MaxNodesTot = 2000 ;   (* aber weniger k”nnte allokiert werden (19.09.95) *)
+  MaxSequence = 36 ;
+  (* maximum sequence of operators to reach each node from node 1.
+     this is worst case, because when using transpositions, the number
+     of steps to sort a permstr, is n*(n+1)/2 .
+  *)
+
+VAR
+  MaxNodes : CARDINAL ;
+
+TYPE
+  Vector = ARRAY[1..MaxDimen] OF INTEGER ;
+
+  PermStr = ARRAY[0..MaxDimen] OF CHAR ;
+
+  LinkArray = ARRAY[1..MaxLinks] OF CARDINAL ;
+
+  OpArray = ARRAY[1..MaxLinks] OF SHORTCARD ;
+
+  LineStatus = (L_free, L_input, L_output, L_locked) ;
+
+  NodeStatus = RECORD
+    dead    : BOOLEAN ;
+    active  : BOOLEAN ;   (* node is to do something next time *)
+    display : INTEGER ;   (* value to be shown in a node, prog mode *)
+    step    : INTEGER ;   (* step of a program *)
+    sum     : CARDINAL ;  (* eg for ParSum *)
+    lines   : ARRAY[1..MaxLinks] OF LineStatus ;
+    broken  : BITSET ;    (* broken lines *) ;
+  END ;
+
+  IriStatus = RECORD
+    avail  : CARDINAL ;
+    avbak  : CARDINAL ;
+    target : CARDINAL ;
+    tarbak : CARDINAL ;
+    message : RECORD
+      num   : CARDINAL ;
+      color : CARDINAL ;
+    END ;
+    sender : RECORD
+      repeat : CARDINAL ;
+      target : CARDINAL ;
+      color  : CARDINAL ;
+    END ;
+  END ;
+
+  NodeType = RECORD
+    pos   : Vector ;
+    old   : Vector ;
+    color : CARDINAL ;
+    num   : CARDINAL ;
+    nlink : CARDINAL ;
+    links : LinkArray ;
+    opno  : OpArray ;
+    state : NodeStatus ;
+    iri   : IriStatus ;
+    perm  : PermStr ;
+  END ;
+
+  NodePtr = POINTER TO NodeType ;
+
+(* Description of NodeType structure:
+   pos      the actual position of the node in space
+   old      copy of last computed pos. calculations do always
+            refer to this, so we don't depend on the order
+            of computations
+   color    color of this node, if it is shown normally. at this
+            time, only 7 colors make sense. black/white are necessary
+            for text. color should therefore take values 1 to 7, for
+            we use highlighting for the illusion of fore/background.
+   name     actually the node number, same as index into array.
+   nlink    number of links in links array
+   links    the array of links. these are indices into NodeTable.
+   perm     the permutation that belongs to this node. it is derived
+            from the base permutation string by applying all the
+            operators that lead to this node.
+*)
+
+  NodeTable = ARRAY[0..MaxNodesTot] OF NodePtr ;
+
+VAR
+  nnodes   : INTEGER ;
+  lastnode : CARDINAL ;   (* at this time, always adjusted to nnodes *)
+  Nodes    : NodeTable ;  (* Knoten 0 zur Sicherheit *)
+
+  Dimensions : CARDINAL ;
+
+PROCEDURE LimitCheck (txt : ARRAY OF CHAR ; arg, min, max : CARDINAL) ;
+
+PROCEDURE CompareLinkList (a, b : CARDINAL) : BOOLEAN ;
+
+PROCEDURE SwapLinkList (a, b : CARDINAL) ;
+
+PROCEDURE MoveNode(from, to : CARDINAL) ;
+
+PROCEDURE ResetNodes() ;
+
+PROCEDURE PackNodes() ;
+
+PROCEDURE ReadNodes(name : ARRAY OF CHAR) ;
+
+PROCEDURE SavePicture() ;
+  (* Output of picture as postscript program.
+     All nodes will be defined and named.
+     22.01.92: Color and more.
+     19.09.95: Operator output
+   *)
+
+PROCEDURE LoadPoly(VAR x : ARRAY OF BYTE) ;
+
+PROCEDURE SavePoly(x : ARRAY OF BYTE) ;
+
+END NodeMgr.
+
+

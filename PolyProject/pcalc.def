@@ -1,0 +1,42 @@
+(*************************************************************
+
+   Polytope Calculations
+
+*************************************************************)
+
+DEFINITION MODULE PCalc ;
+
+TYPE
+  AlgType = (a_Rubber,
+             a_Rubber2,
+             a_Ribbon,
+             a_Mean,
+             a_New ) ;
+
+  _names = ARRAY AlgType OF ARRAY [0..7] OF CHAR ;
+
+CONST
+  AlgNames = _names(
+    "Rubber ",
+    "Rubber2",
+    "Ribbon ",
+    "Mean   ",
+    "New    "    ) ;
+
+PROCEDURE Normalize() ;    (* centralize picture coordinates and
+                              bring picture to maximum size *)
+
+PROCEDURE Backup() ;       (* copy "pos" into "old" *)
+
+PROCEDURE Spin() ;         (* rotate it a bit *)
+
+PROCEDURE Squeeze() ;      (* get it closer to a sphere *)
+
+PROCEDURE Punish() ;       (* shift away from high dimensions *)
+
+PROCEDURE Contract(Algorithm: AlgType) ;    (* try to optimize the shape *)
+
+PROCEDURE CanShrink() : BOOLEAN ;
+
+END PCalc.
+

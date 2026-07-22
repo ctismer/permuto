@@ -1,0 +1,15 @@
+(**********************************************************
+   Utilities
+   perhaps to be extracted into a Module, when more
+***********************************************************)
+
+DEFINITION MODULE Utilities ;
+
+PROCEDURE SetZero(VAR obj : ARRAY OF BYTE) ;
+
+CONST nl = CHR(13)+CHR(10) ;
+
+END Utilities.
+
+
+

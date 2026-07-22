@@ -1,0 +1,69 @@
+% Postscript-Output from POLYTOP
+% needs a prelude with the functions 
+% SetDimension, DefNode, DefEdge,
+% DefAttributes and Finish.
+
+3 SetDimension
+
+% Node Positions:
+/N1 dup [-817 -3543 -1564  ] def DefNode
+/N2 dup [-3882 -1275 242  ] def DefNode
+/N3 dup [-2253 20 -3201  ] def DefNode
+/N4 dup [-706 -3030 2378  ] def DefNode
+/N5 dup [2977 -2720 245  ] def DefNode
+/N6 dup [2254 -17 3201  ] def DefNode
+/N7 dup [2072 -877 -3201  ] def DefNode
+/N8 dup [-2977 2722 -244  ] def DefNode
+/N9 dup [-2071 879 3201  ] def DefNode
+/N10 dup [3883 1281 -241  ] def DefNode
+/N11 dup [707 3033 -2378  ] def DefNode
+/N12 dup [818 3546 1564  ] def DefNode
+
+% Node Attributes:
+[ /N1 (1) (1233) 1 ] DefAttributes
+[ /N2 (2) (1323) 1 ] DefAttributes
+[ /N3 (3) (1332) 1 ] DefAttributes
+[ /N4 (4) (2133) 2 ] DefAttributes
+[ /N5 (5) (2313) 2 ] DefAttributes
+[ /N6 (6) (2331) 2 ] DefAttributes
+[ /N7 (7) (3123) 3 ] DefAttributes
+[ /N8 (8) (3132) 3 ] DefAttributes
+[ /N9 (9) (3213) 3 ] DefAttributes
+[ /N10 (10) (3231) 3 ] DefAttributes
+[ /N11 (11) (3312) 3 ] DefAttributes
+[ /N12 (12) (3321) 3 ] DefAttributes
+
+% List of Links:
+ /N1 /N7 DefEdge
+ /N1 /N2 DefEdge
+ /N1 /N4 DefEdge
+ /N1 /N3 DefEdge
+ /N1 /N5 DefEdge
+ /N2 /N4 DefEdge
+ /N2 /N3 DefEdge
+ /N2 /N8 DefEdge
+ /N2 /N9 DefEdge
+ /N3 /N8 DefEdge
+ /N3 /N7 DefEdge
+ /N3 /N11 DefEdge
+ /N4 /N9 DefEdge
+ /N4 /N5 DefEdge
+ /N4 /N6 DefEdge
+ /N5 /N6 DefEdge
+ /N5 /N10 DefEdge
+ /N5 /N7 DefEdge
+ /N6 /N10 DefEdge
+ /N6 /N9 DefEdge
+ /N6 /N12 DefEdge
+ /N7 /N11 DefEdge
+ /N7 /N10 DefEdge
+ /N8 /N11 DefEdge
+ /N8 /N9 DefEdge
+ /N8 /N12 DefEdge
+ /N9 /N12 DefEdge
+ /N10 /N12 DefEdge
+ /N10 /N11 DefEdge
+ /N11 /N12 DefEdge
+
+% Generate the Picture:
+Finish

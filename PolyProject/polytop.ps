@@ -1,0 +1,54 @@
+% 22.01.92: DefAttributes
+% Version fÅr mit ohne Scheiben
+%
+% PrÑambel zur Postscript-Ausgabe von Polytopen.
+% (C) YCHI 08.02.91
+%
+%
+% Definiert werden
+% SetDimension, DefNode, DefEdge, Finish
+%
+% In dieser Version werden die Knoten und Kanten sofort geplottet.
+% Die Koordinaten ergeben sich aus den Knoten. Kanten werden aus
+% Knotennamen gebildet.
+
+/SetDimension {/Dimension exch def} def
+
+/xorg 300 def
+/yorg 500 def
+
+/disksize currentlinewidth 2 div def
+
+/DefNode {      % Name
+                % braucht nichts zu tun au·er zu plotten
+  cvx exec     % jetzt Array da
+  dup
+  0 get xorg add /xpos exch def
+  1 get yorg add /ypos exch def
+  newpath
+  xpos ypos moveto
+  xpos ypos disksize 0 360 arc
+  fill
+} def
+
+/DefAttributes {    % array with label, name-str, perm-str, colornum
+  pop               % forget it for this time
+} def
+
+/DefEdge {     % Name1 Name2
+               % nur plotten
+  cvx exec     % habe Array
+  dup
+  0 get xorg add /xpos exch def
+  1 get yorg add /ypos exch def
+  newpath
+  xpos ypos moveto
+  cvx exec     % habe Array
+  dup
+  0 get xorg add /xpos exch def
+  1 get yorg add /ypos exch def
+  xpos ypos lineto stroke
+} def
+
+/Finish   { showpage } def
+

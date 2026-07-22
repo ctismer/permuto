@@ -1,0 +1,63 @@
+(*************************************************************
+
+   Graphic Output
+
+*************************************************************)
+
+DEFINITION MODULE PmDisp ;
+
+IMPORT Window ;
+
+IMPORT PmProgs ;
+
+FROM NodeMgr IMPORT NodeTable ;
+
+CONST
+
+  AspectX = 350 ;
+  AspectY = 480 ;
+
+  _textheight = 14 ;
+  _scanlines = 350 ;
+  _textlines = (_scanlines+_textheight-1) DIV _textheight ;
+  _box_x1 = 0 ;
+  _box_y1 = _textheight ;             (* leave one line below and above *)
+  _box_x2 = _scanlines * AspectY DIV AspectX ;
+  _box_y2 = _scanlines-_textheight-1 ;
+  _pic_x1 = _box_x1+1 ;
+  _pic_y1 = _box_y1+1 ;
+  _pic_x2 = _box_x2-1 ;
+  _pic_y2 = _box_y2-1 ;
+
+  _pic_width  = _pic_x2-_pic_x1+1 ;
+  _pic_height = _pic_y2-_pic_y1+1 ;
+
+  (* center of picture *)
+  _pic_x0 = _pic_x1 + _pic_width  DIV 2 ;
+  _pic_y0 = _pic_y1 + _pic_height DIV 2 ;
+
+  (* squeeze the picture a bit, to make it nicer. We leave 5% for the eye *)
+  Scale_X = _pic_width  DIV 2   * 95 DIV 100 ;
+  Scale_Y = _pic_height DIV 2   * 95 DIV 100 ;
+
+  FrameColor = ORD(Window.LightGray) ;
+  BackColor  = ORD(Window.DarkGray) ;
+
+  MenuLine_1 = 1 ;
+  MenuLine_2 = _textlines ;
+
+PROCEDURE DrawPicFrame() ;
+
+PROCEDURE WipeOldPicture() ;
+
+PROCEDURE SetPicClipping() ;
+
+PROCEDURE ResetClipping() ;
+
+PROCEDURE DrawEdges (VAR Nodes : NodeTable ; names : CARDINAL;
+                     progsel : PmProgs.ProgramType ) ;
+
+PROCEDURE DrawNodes (VAR Nodes : NodeTable ; names : CARDINAL;
+                     displ: BOOLEAN ; progsel : PmProgs.ProgramType) ;
+END PmDisp.
+

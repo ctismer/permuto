@@ -1,0 +1,96 @@
+(*************************************************************
+
+   Permutographs
+
+*************************************************************)
+
+DEFINITION MODULE PM ;
+
+FROM NodeMgr IMPORT PermStr ;
+
+  VAR Order : CARDINAL ;
+
+  (* this nice procedure was taken from the examples directory
+     of the TopSpeed environment and fitted nicely in here.
+  *)
+  PROCEDURE NextPerm(n:CARDINAL ; VAR s:ARRAY OF BYTE ;
+                     VAR wrap:BOOLEAN) ;
+
+  (* extension, 22.03.92:
+     a mask is given, that determines, which places are taken
+     to be equivalent. This is a trial, to factorize out subgroups.
+     So, nextperm takes an additional parameter now.
+  *)
+  PROCEDURE ToLastInClass(VAR s : ARRAY OF CHAR ; equiv : ARRAY OF CHAR) ;
+
+  (* Brute Force : find the Name of a given Permutation.
+     We simply permute until we reached the goal.
+   *)
+  (* 22.02.92: enhancement. permutations are now stored in a cache
+               and sought there by bisection.
+               PermBasisValid builds this table.
+     NOT EXPORTED
+  *)
+
+  PROCEDURE PermName (Order: CARDINAL ; Base, Perm: ARRAY OF CHAR) : CARDINAL ;
+
+  PROCEDURE PermBasisValid (perm : ARRAY OF CHAR) : BOOLEAN ;
+  (* permute around, and when there is not more than MaxNodes,
+     the string is ok.
+     We don't allow more places than Dimensions of our Polytopes.
+     22.02.92: as as side effect, this procedure also computes
+               the PermCache.
+  *)
+
+  PROCEDURE FindBase(VAR perm : ARRAY OF CHAR) ;
+    (* find the lexicographic smallest representation for perm. *)
+
+  PROCEDURE ValidCycle (order : CARDINAL ; cyc : ARRAY OF CHAR) : BOOLEAN ;
+    (* a cycle operator has to consist of the characters
+       "1".."8", if MaxDimen is 8 *)
+
+  PROCEDURE CyclicOperate (VAR perm : ARRAY OF CHAR ; op : ARRAY OF CHAR) ;
+    (* lets a validated cyclic operator work on perm. *)
+
+  CONST
+    MaxOps = 6 ; (* should be MaxLinks / 2, each op has max 2 arms *)
+    MaxCyc = 3 ;
+
+  VAR
+    BasePerm : PermStr ;
+    OpTable : ARRAY[1..MaxOps] OF ARRAY[1..MaxCyc] OF PermStr ;
+
+    LastEditLine : CARDINAL ;
+
+  PROCEDURE EditDisplay(row, col : INTEGER ; edit : BOOLEAN ) ;
+
+  PROCEDURE PolytopFilter(perm: ARRAY OF CHAR) : BOOLEAN ;
+    (* says if perm is valid or not *)
+    (* disabled for now *)
+
+  PROCEDURE NewPermutograph(reset : BOOLEAN) ;
+
+  PROCEDURE EdPermuto(edit : BOOLEAN) ;
+    (* edit base and cyclic operators, then generate the Permutograph *)
+
+PROCEDURE FindLink (n1, n2: CARDINAL) : CARDINAL ;
+
+PROCEDURE IsLinked(n1, n2: CARDINAL) : BOOLEAN ;
+
+PROCEDURE LinksAvail(n1, n2: CARDINAL) : BOOLEAN ;
+  (* check if both have an empty slot *)
+
+PROCEDURE Disconnect (n1, n2 : CARDINAL) ;
+
+PROCEDURE ExecOperator(n1 : CARDINAL ; op : CARDINAL) : CARDINAL ;
+
+PROCEDURE WhichOperator (n1, n2 : CARDINAL) : SHORTCARD ;
+
+PROCEDURE Connect (n1, n2 : CARDINAL) ;
+
+PROCEDURE Collapse (n1, n2 : CARDINAL) ;
+
+PROCEDURE Uncollapse (n1 : CARDINAL) ;
+
+END PM.
+

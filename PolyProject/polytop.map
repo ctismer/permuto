@@ -1,0 +1,699 @@
+__open_max is duplicated, files involved are corefile.obj and rt_com.lib
+__iob is duplicated, files involved are corefile.obj and rt_com.lib
+__openfd is duplicated, files involved are corefile.obj and rt_com.lib
+_BufInf is duplicated, files involved are corefile.obj and rt_com.lib
+__tmpfiles is duplicated, files involved are corefile.obj and rt_com.lib
+__tmpfptrs is duplicated, files involved are corefile.obj and rt_com.lib
+
+ Start  Stop   Length Name               Class              Group
+
+ 00000H 00001H 00001H IOctl_TEXT         CODE               (none)
+ 00010H 00011H 00001H DosUtil_TEXT       CODE               (none)
+ 00020H 00021H 00001H MATHLIB_TEXT       CODE               (none)
+ 00030H 00036H 00006H SIG_TEXT           CODE               (none)
+ 00040H 00054H 00014H Utilities_TEXT     CODE               (none)
+ 00060H 00074H 00014H Process_TEXT       CODE               (none)
+ 00080H 00095H 00015H SYSTEM_TEXT        CODE               (none)
+ 000A0H 000E1H 00041H KEY_TEXT           CODE               (none)
+ 000F0H 00171H 00081H ENTERCODE          CODE               (none)
+ 00180H 0027EH 000FEH Lib1_TEXT          CODE               (none)
+ 00280H 003A8H 00128H MiniFont_TEXT      CODE               (none)
+ 003B0H 004DDH 0012DH Graph_TEXT         CODE               (none)
+ 004E0H 0061DH 0013DH TextPlot_TEXT      CODE               (none)
+ 00620H 00769H 00149H BiosIO_TEXT        CODE               (none)
+ 00770H 009A5H 00235H IntVector_TEXT     CODE               (none)
+ 009B0H 00C6DH 002BDH PROC_TEXT          CODE               (none)
+ 00C70H 00F82H 00312H ScreenHandler_TEXT CODE               (none)
+ 00F90H 01309H 00379H CORE_TEXT          CODE               (none)
+ 01310H 016E5H 003D5H Lib_TEXT           CODE               (none)
+ 016F0H 01B61H 00471H PROCESS_TEXT       CODE               (none)
+ 01B70H 0200BH 0049BH UserIO_TEXT        CODE               (none)
+ 02010H 024FFH 004EFH PmDisp_TEXT        CODE               (none)
+ 02500H 02A2DH 0052DH PmProgs_TEXT       CODE               (none)
+ 02A30H 02FB2H 00582H Storage_TEXT       CODE               (none)
+ 02FC0H 03545H 00585H IO_TEXT            CODE               (none)
+ 03550H 03AFAH 005AAH STR_TEXT           CODE               (none)
+ 03B00H 04458H 00958H _TEXT              CODE               (none)
+ 04460H 04EE2H 00A82H Iri_TEXT           CODE               (none)
+ 04EF0H 05993H 00AA3H PCalc_TEXT         CODE               (none)
+ 059A0H 066ABH 00D0BH NodeMgr_TEXT       CODE               (none)
+ 066B0H 07691H 00FE1H PM_TEXT            CODE               (none)
+ 076A0H 088DEH 0123EH FIO_TEXT           CODE               (none)
+ 088E0H 09DD9H 014F9H Polytop_TEXT       CODE               (none)
+ 09DE0H 0B5BAH 017DAH Window_TEXT        CODE               (none)
+ 0B5C0H 0D554H 01F94H Graphics_TEXT      CODE               (none)
+ 0D560H 0F5FAH 0209AH GRAPHICS_TEXT      CODE               (none)
+ 0F600H 0F946H 00346H SIG_TEXT           SIG_CODE           (none)
+ 0F950H 0F9BCH 0006CH MP_CODE            MP_CODE            (none)
+ 0F9C0H 0F9EAH 0002AH _INIT              INIT_CODE          (none)
+ 0F9F0H 0F9F2H 00002H EMU_STATE          DATA               DGROUP 
+ 0F9F2H 0FC24H 00232H _DATA              DATA               DGROUP 
+ 0FC24H 0FC25H 00001H BSS_START          BSS                DGROUP 
+ 0FC25H 0FC25H 00000H CONST              CONST              DGROUP 
+ 0FC25H 0FC25H 00000H _CONST             DATA               DGROUP 
+ 0FC25H 11107H 014E2H _BSS               BSS                DGROUP 
+ 11107H 11107H 00000H BSS_END            BSS                DGROUP 
+ 11107H 11108H 00001H NEAR_STACK         BSS                DGROUP 
+ 11108H 11108H 00000H NEAR_HEAP          BSS                DGROUP 
+ 11110H 11112H 00002H IntVector_BSS      FAR_DATA           IntVectorDGROUP 
+ 11120H 11122H 00002H SYSTEM_BSS         FAR_DATA           SYSTEMDGROUP 
+ 11130H 11133H 00003H BiosIO_BSS         FAR_DATA           BiosIODGROUP 
+ 11140H 11143H 00003H KEY_BSS            FAR_DATA           KEYDGROUP 
+ 11150H 11154H 00004H TextPlot_BSS       FAR_DATA           TextPlotDGROUP 
+ 11160H 11169H 00009H Iri_BSS            FAR_DATA           IriDGROUP 
+ 11170H 1117EH 0000EH Storage_BSS        FAR_DATA           StorageDGROUP 
+ 11180H 11199H 00019H ScreenHandler_BSS  FAR_DATA           ScreenHandlerDGROUP 
+ 111A0H 111DBH 0003BH Window_BSS         FAR_DATA           WindowDGROUP 
+ 111E0H 1122CH 0004CH Graph_BSS          FAR_DATA           GraphDGROUP 
+ 11230H 112AEH 0007EH Lib_BSS            FAR_DATA           LibDGROUP 
+ 112B0H 11359H 000A9H FIO_BSS            FAR_DATA           FIODGROUP 
+ 11360H 114B6H 00156H IO_BSS             FAR_DATA           IODGROUP 
+ 114C0H 116C0H 00200H Lib1_BSS           FAR_DATA           Lib1DGROUP 
+ 116C0H 11914H 00254H _INIT_DATA_CONST   FAR_DATA           _INIT_DATADGROUP 
+ 11920H 11929H 00009H Polytop_DATA       FAR_DATA           PolytopDGROUP 
+ 11929H 11B7AH 00251H Polytop_BSS        FAR_DATA           PolytopDGROUP 
+ 11B80H 13ACEH 01F4EH NodeMgr_BSS        FAR_DATA           NodeMgrDGROUP 
+ 13AD0H 181DAH 0470AH PM_BSS             FAR_DATA           PMDGROUP 
+ 181E0H 1C1E0H 04000H STACK              STACK              (none)
+
+  Address         Publics by Value
+
+ 0003:0000       Lib$EnableBreakCheck
+ 0004:0002       Utilities$SetZero
+ 000A:0010       KEY$Pressed
+ 000A:0016       KEY$Stroke
+ 0018:0006       Lib1$BitsUsed
+ 0018:002C       Lib1$BitsUsedLC
+ 0018:0048       Lib1$Root
+ 0028:0002       MiniFont$Attach
+ 004E:0012       TextPlot$PlotChar
+ 004E:00B2       TextPlot$PlotCenteredStr
+ 0062:0005       BiosIO$KeyPressed
+ 0062:004B       BiosIO$RdKey
+ 0077:000C       IntVector$SetDimensions
+ 0077:0020       IntVector$ZeroVector
+ 0077:004A       IntVector$RandomVector
+ 0077:009A       IntVector$ScaleVector
+ 0077:00EA       IntVector$DotProdukt
+ 0077:013C       IntVector$AddVector
+ 0077:017E       IntVector$SubVector
+ 0077:01C0       IntVector$VectorLength
+ 0077:021E       IntVector$Sqr
+ 0077:0224       IntVector$Sqrt
+ 0077:022A       IntVector$Scale
+ 009B:0000       __set_machine_id
+ 009B:000E       @MachineId
+ 009B:000F       @Save8087
+ 009B:0011       @CurrentProcess
+ 009B:0034       _new_priority
+ 009B:0041       SYSTEM$Listen
+ 009B:00D8       SYSTEM$TRANSFER
+ 009B:00D8       CoreProc$TRANSFER
+ 009B:0105       SYSTEM$IOTRANSFER
+ 009B:0105       CoreProc$IOTRANSFER
+ 009B:019F       SYSTEM$NEWPROCESS
+ 009B:019F       CoreProc$NEWPROCESS
+ 009B:026A       SYSTEM$NewPriority
+ 009B:026A       CoreProc$NewPriority
+ 009B:0276       SYSTEM$CurrentPriority
+ 009B:0276       CoreProc$CurrentPriority
+ 009B:027A       SYSTEM$InterruptRegisters
+ 009B:0292       SYSTEM$initprocess
+ 009B:0292       CoreProc$initprocess
+ 009B:02B5       SYSTEM$CurrentProcess
+ 009B:02B5       CoreProc$CurrentProcess
+ 00C7:0034       ScreenHandler$GotoXY
+ 00C7:006E       ScreenHandler$WhereX
+ 00C7:00A4       ScreenHandler$WhereY
+ 00C7:00DA       ScreenHandler$ClrEol
+ 00C7:015C       ScreenHandler$TextColor
+ 00C7:0186       ScreenHandler$SetupGraph
+ 00C7:0256       ScreenHandler$SetupGraph2
+ 00C7:026E       ScreenHandler$CloseGraph
+ 00F9:0000       F$SgnMol
+ 00F9:0000       F$UnsMol
+ 00F9:005F       F$SgnDiv
+ 00F9:011A       F$UnsDiv
+ 00F9:01A3       F$UnsRem
+ 00F9:0232       F$UnsMul
+ 00F9:0276       F$LngShl
+ 00F9:0281       F$LngShr
+ 00F9:028C       F$ULngShr
+ 00F9:0297       F$EquByte
+ 00F9:02D1       F$NotEquByte
+ 00F9:030A       F$CnsStk
+ 00F9:0310       F$CnsPtr
+ 00F9:0316       F$CnsIdx
+ 00F9:031C       F$CnsOvr
+ 00F9:0322       F$CnsRng
+ 00F9:0328       F$CnsRet
+ 00F9:032E       F$CnsCase
+ 00F9:0334       F$CnsDiv
+ 00F9:033A       F$CnsPVC
+ 0131:0000       Lib$Terminate
+ 0131:0029       Lib$Fill
+ 0131:003B       Lib$WordFill
+ 0131:0046       Lib$FarWordFill
+ 0131:0051       Lib$InternalDelay
+ 0131:0057       Lib$InternalEnableBreakCheck
+ 0131:005D       Lib$FarFastMove
+ 0131:005D       Lib$FastMove
+ 0131:0087       Lib$FarMove
+ 0131:0087       Lib$Move
+ 0131:016C       Lib$HSort
+ 0131:0217       Lib$RANDOM
+ 0131:0287       Lib$RANDOMIZE
+ 0131:02AD       Lib$ParamStr
+ 0131:02E6       Lib$SysErrno
+ 0131:02F7       Lib$FatalError
+ 0131:0310       Lib$Delay
+ 016F:0105       Process$StopScheduler
+ 016F:0134       Process$StartProcess
+ 016F:01E8       Process$Delay
+ 016F:029E       Process$Lock
+ 016F:02AC       Process$Unlock
+ 016F:02DB       Process$Idler
+ 01B7:0002       UserIO$UserWantsToExit
+ 01B7:006E       UserIO$EscapePressed
+ 01B7:0080       UserIO$InputStr
+ 01B7:0290       UserIO$ReadLong
+ 01B7:03F6       UserIO$ReadInt
+ 01B7:041C       UserIO$SelectCard
+ 0201:0002       PmDisp$DrawPicFrame
+ 0201:0022       PmDisp$WipeOldPicture
+ 0201:0044       PmDisp$SetPicClipping
+ 0201:005E       PmDisp$ResetClipping
+ 0201:0080       PmDisp$DrawEdges
+ 0201:02E6       PmDisp$DrawNodes
+ 0250:0002       PmProgs$ResetMachine
+ 0250:005C       PmProgs$InitSPA
+ 0250:00C4       PmProgs$ShortestPath
+ 0250:01FA       PmProgs$InitParSum
+ 0250:0274       PmProgs$ParSum
+ 02A3:004B       Storage$FarAllocate
+ 02A3:00BD       Storage$FarAvailable
+ 02A3:0101       Storage$FarMakeHeap
+ 02A3:0172       Storage$FarHeapAllocate
+ 02A3:02A5       Storage$FarHeapAvail
+ 02FC:0084       IO$WrChar
+ 02FC:00B1       IO$WrInt
+ 02FC:0106       IO$WrCard
+ 02FC:0157       IO$WrLngCard
+ 02FC:01A3       IO$WrCharRep
+ 02FC:01F7       IO$WrStr
+ 02FC:0216       IO$WrStrAdj
+ 02FC:02ED       IO$WrLn
+ 02FC:0317       IO$RdItem
+ 02FC:03D9       IO$RdLn
+ 02FC:03E9       IO$RdKey
+ 0355:0000       Str$Caps
+ 0355:001D       Str$Length
+ 0355:0035       Str$Compare
+ 0355:0082       Str$Append
+ 0355:00B5       Str$Copy
+ 0355:00FB       Str$Pos
+ 0355:0165       Str$Insert
+ 0355:01ED       Str$Delete
+ 0355:0238       Str$IntToStr
+ 0355:0334       Str$CardToStr
+ 0355:03E5       Str$StrToInt
+ 0355:042E       Str$StrToCard
+ 03B0:0006       _exit
+ 03B0:002D       __InitLoop
+ 03B0:00B2       __Term2
+ 03B0:00FB       __cleanup
+ 03B0:0131       __InitLink
+ 03B0:0150       __InitReset
+ 03B0:016E       __InitSetup
+ 03B0:01D5       __getheapbase
+ 03B0:0206       __osversion
+ 03B0:023A       __setargv
+ 03B0:02F2       __exit
+ 03B0:033E       __real_pdef
+ 03B0:033E       __real_sdef
+ 03B0:0350       __startup
+ 03B0:03EE       $Stage2
+ 03B0:0435       __fp_0
+ 03B0:0447       __errno__
+ 03B0:0464       __ioerr
+ 03B0:048D       __FatalErrorPos
+ 03B0:0497       __FatalError
+ 03B0:05B6       __initm
+ 03B0:05C9       $initm
+ 03B0:05D0       $initm2
+ 03B0:0630       $go
+ 03B0:06DA       __initio
+ 03B0:076E       __creat
+ 03B0:076E       __creat_trunc
+ 03B0:0788       __open
+ 03B0:07A4       __read
+ 03B0:07C0       __write
+ 03B0:07DC       __dos_close
+ 03B0:07DC       __close
+ 03B0:07F6       _isatty
+ 03B0:0811       _lseek
+ 03B0:082C       _tell
+ 03B0:0857       __getTID
+ 03B0:0869       __restore_mode
+ 03B0:08A3       Standard$HALT
+ 03B0:08DA       __exit1
+ 03B0:08DA       __init_dummy
+ 03B0:08DA       __initwin
+ 03B0:08DA       __initmt
+ 03B0:08DA       __setvideomode
+ 03B0:08DB       __initgraph
+ 03B0:08DC       _AdjustMem
+ 03B0:090B       __getheapmem
+ 03B0:093F       __FloatInit
+ 03B0:0949       __FloatLoadCW
+ 03B0:0949       __FloatFinish
+ 03B0:0949       __FloatStoreCW
+ 03B0:0949       __FloatJmpSave
+ 03B0:0949       __FloatStoreSW
+ 03B0:0949       __FloatJmpRestore
+ 03B0:0949       __FloatExecRestore
+ 03B0:0949       __FloatMathExcepDos
+ 03B0:0949       __FloatExecSave
+ 03B0:0949       __FloatSave
+ 03B0:0949       __FloatInitInstance
+ 03B0:0949       __FloatRestore
+ 03B0:094E       __FloatMathExcepOs2
+ 0446:0024       Iri$Built
+ 0446:0036       Iri$NewNode
+ 0446:01F4       Iri$NumToLabel
+ 0446:025A       Iri$KillNode
+ 0446:02A6       Iri$SeekNode
+ 0446:02FA       Iri$Transmit
+ 0446:03D0       Iri$Repeat
+ 0446:0478       Iri$Step
+ 0446:057C       Iri$Reset
+ 04EF:0002       PCalc@AlgNames
+ 04EF:002A       PCalc$Normalize
+ 04EF:0196       PCalc$Backup
+ 04EF:01D2       PCalc$Spin
+ 04EF:02A4       PCalc$Squeeze
+ 04EF:0384       PCalc$Punish
+ 04EF:0422       PCalc$Contract
+ 04EF:09FE       PCalc$CanShrink
+ 059A:000C       NodeMgr$LimitCheck
+ 059A:00A0       NodeMgr$CompareLinkList
+ 059A:00D2       NodeMgr$SwapLinkList
+ 059A:0104       NodeMgr$MoveNode
+ 059A:01C2       NodeMgr$ResetNodes
+ 059A:020C       NodeMgr$PackNodes
+ 059A:0292       NodeMgr$ReadNodes
+ 059A:04BC       NodeMgr$SavePicture
+ 059A:08A0       NodeMgr$LoadPoly
+ 059A:095E       NodeMgr$SavePoly
+ 066B:0070       PM$NextPerm
+ 066B:00F0       PM$PermName
+ 066B:01AE       PM$PermBasisValid
+ 066B:02B2       PM$FindBase
+ 066B:0314       PM$ValidCycle
+ 066B:037C       PM$CyclicOperate
+ 066B:0412       PM$EditDisplay
+ 066B:0626       PM$PolytopFilter
+ 066B:064A       PM$NewPermutograph
+ 066B:09C4       PM$EdPermuto
+ 066B:0AC0       PM$FindLink
+ 066B:0AFE       PM$IsLinked
+ 066B:0B16       PM$LinksAvail
+ 066B:0B4A       PM$Disconnect
+ 066B:0BC2       PM$ExecOperator
+ 066B:0C3E       PM$WhichOperator
+ 066B:0C70       PM$Connect
+ 066B:0CDE       PM$Collapse
+ 066B:0D46       PM$Uncollapse
+ 076A:0094       FIO$Open
+ 076A:010C       FIO$Create
+ 076A:016E       FIO$Close
+ 076A:01F1       FIO$GetPos
+ 076A:0335       FIO$Seek
+ 076A:0415       FIO$Flush
+ 076A:04CB       FIO$WrInt
+ 076A:0529       FIO$WrCard
+ 076A:0581       FIO$WrStr
+ 076A:05AC       FIO$WrStrAdj
+ 076A:068F       FIO$WrLn
+ 076A:06A6       FIO$WrCharRep
+ 076A:06FB       FIO$WrBin
+ 076A:0994       FIO$RdChar
+ 076A:0ADC       FIO$RdCard
+ 076A:0B4C       FIO$RdItem
+ 076A:0C01       FIO$RdBin
+ 076A:0E11       FIO$ThreadOK
+ 09DE:0000       __ScrnAddr
+ 09DE:0004       __ActPag
+ 09DE:0005       __IsColor
+ 09DE:0006       __IsSnow
+ 09DE:0007       __bufferwrite
+ 09DE:002A       __getscreendepth
+ 09DE:0044       __palxlat
+ 09DE:008E       __buffertoscreen
+ 09DE:00E9       __screentobuffer
+ 09DE:013E       __activepage
+ 09DE:0144       __initscreentype
+ 09DE:02F6       Window@FullScreenDef
+ 09DE:030F       Window$Open
+ 09DE:03DB       Window$SetFrame
+ 09DE:044E       Window$Use
+ 09DE:052F       Window$PutOnTop
+ 09DE:05E3       Window$SnapShot
+ 09DE:0670       Window$Used
+ 09DE:0697       Window$ObscuredAt
+ 09DE:0742       Window$GotoXY
+ 09DE:0797       Window$WhereX
+ 09DE:07C5       Window$WhereY
+ 09DE:07F3       Window$Clear
+ 09DE:0896       Window$CursorOn
+ 09DE:08FA       Window$CursorOff
+ 09DE:0939       Window$ClrEol
+ 09DE:09C1       Window$TextColor
+ 09DE:09F2       Window$Info
+ 0B5C:0000       $OutWord
+ 0B5C:0009       __pixeladdrEGA
+ 0B5C:002F       __pixeladdrEGA2
+ 0B5C:0056       __pixeladdrHerc
+ 0B5C:0097       __pixeladdr320x200
+ 0B5C:00A7       __pixeladdr640x200
+ 0B5C:00B9       __hclip
+ 0B5C:00EA       __lclip
+ 0B5C:025F       __CGA640HLine
+ 0B5C:02DD       __CGA320HLine
+ 0B5C:035D       __HercHLine
+ 0B5C:03DB       __EGAHLine
+ 0B5C:049D       __EGA2HLine
+ 0B5C:0521       __VGAHLine
+ 0B5C:05FA       __VGALine
+ 0B5C:0681       __VGAleftscan
+ 0B5C:069B       __VGArightscan
+ 0B5C:080C       __CGA640Line
+ 0B5C:09FA       __CGA320Line
+ 0B5C:0B7C       __HercLine
+ 0B5C:0D7C       __EGALine
+ 0B5C:1037       __EGA2Line
+ 0B5C:10E5       __VGAPoint
+ 0B5C:10FB       __VGAGet
+ 0B5C:114F       __VGAPut
+ 0B5C:120C       __EGAGet
+ 0B5C:12C0       __EGAPoint
+ 0B5C:1328       __EGA2Point
+ 0B5C:135D       __EGAxlat
+ 0B5C:1375       __EGAPlot1
+ 0B5C:1378       __EGAPlot
+ 0B5C:13DA       __EGA2Plot
+ 0B5C:1410       __EGAPut
+ 0B5C:15C9       __EGAleftscan
+ 0B5C:162E       __EGArightscan
+ 0B5C:16AD       __CGA320Get
+ 0B5C:16EC       __CGA640Get
+ 0B5C:1897       __CGA320Put
+ 0B5C:18A8       __CGA640Put
+ 0B5C:1927       __CGA320leftscan
+ 0B5C:196A       __CGA320rightscan
+ 0B5C:19E0       __CGA640leftscan
+ 0B5C:1A1C       __CGA640rightscan
+ 0B5C:1A90       __HercGet
+ 0B5C:1C71       __HercPut
+ 0B5C:1D02       __txt_out
+ 0B5C:1D37       __gcur
+ 0B5C:1D4D       __setbiosmode
+ 0B5C:1D59       __getvideomode
+ 0B5C:1D60       __FindPS2
+ 0B5C:1DB5       __FindEGA
+ 0B5C:1DE1       __FindCGA
+ 0B5C:1DF1       __FindMono
+ 0B5C:1EAE       __getsystem
+ 0B5C:1EF7       __getmemory
+ 0B5C:1F06       __clear_blink
+ 0B5C:1F0E       __gdummy
+ 0B5C:1F0F       __setcur
+ 0B5C:1F1A       __resetEGA
+ 0B5C:1F84       __setbc
+ 0B5C:1F89       __setr10
+ 0D56:004B       Graph$GraphMode
+ 0D56:00E6       Graph$Plot
+ 0D56:0127       Graph$Line
+ 0D56:017A       Graph$TrueCircle
+ 0D56:01D5       Graph$TrueDisc
+ 0D56:0230       Graph$Ellipse
+ 0D56:0256       Graph$InitGraph
+ 0D56:03F6       Graph$GetVideoConfig
+ 0D56:041E       Graph$SetClipRgn
+ 0D56:045F       Graph$GetTextColor
+ 0D56:0469       Graph$GetTextPosition
+ 0D56:04A3       Graph$SetTextColor
+ 0D56:04B6       Graph$SetTextPosition
+ 0D56:0509       Graph$Wrapon
+ 0D56:051C       Graph$OutText
+ 0D56:05EC       Graph$SetVideoMode
+ 0D56:0748       Graph$SetActivePage
+ 0D56:0770       Graph$SetVisualPage
+ 0D56:07D7       Graph$Rectangle
+ 0F60:0000       @InProgramFlag
+ 0F60:0001       @StopProgramFlag
+ 0F60:0002       @DosInterrupt
+ 0F60:009D       @ResetBreakInterrupt
+ 0F60:00C7       @SetBreakInterrupt
+ 0F60:0139       @UserBreak
+ 0F60:015C       _EnableBreakCheck
+ 0F60:0162       _DisableBreakCheck
+ 0F60:018C       __SigInit
+ 0F60:01A7       __DelayFactor
+ 0F60:01A9       __Iter
+ 0F60:01AB       __Count
+ 0F60:0230       _delay
+ 0F60:025D       @LoadRegisters
+ 0F60:027A       @SaveRegisters
+ 0F60:02A3       Lib$Dos
+ 0F60:02FD       Lib$Intr
+ 0F9F:000A       __open_max
+ 0F9F:000C       @InitCalled
+ 0F9F:000E       @InitGrandTotal
+ 0F9F:0010       @InitCurrent
+ 0F9F:0012       @InitRecPointer
+ 0F9F:0016       @InitPointer
+ 0F9F:001A       @StackContextSP
+ 0F9F:001C       @StackContextBP
+ 0F9F:001E       @StackContextSS
+ 0F9F:0020       @InitPriority
+ 0F9F:0021       __exit_ptr
+ 0F9F:0025       __exit_top
+ 0F9F:0029       standard@haltChain
+ 0F9F:002D       __farstack
+ 0F9F:002F       __sp_temp
+ 0F9F:0031       __ss_temp
+ 0F9F:0033       _x_initx
+ 0F9F:0037       _x_bss_end
+ 0F9F:0039       _x_bss_start
+ 0F9F:003B       __psp
+ 0F9F:003D       __env
+ 0F9F:003F       __heap_base
+ 0F9F:0041       __main_args
+ 0F9F:0043       __env_init
+ 0F9F:0045       __arg_init
+ 0F9F:0047       STKHQQ
+ 0F9F:0047       __stklen
+ 0F9F:0049       __SSisDS
+ 0F9F:004B       __far_ss
+ 0F9F:004D       __x_near_stack_start
+ 0F9F:004F       __heap_size
+ 0F9F:0051       __osmode
+ 0F9F:0053       _x_main
+ 0F9F:0057       __stk_base
+ 0F9F:0059       @InitChain
+ 0F9F:005D       __argc
+ 0F9F:00DD       __iosetup
+ 0F9F:00DF       __doserrno
+ 0F9F:00E3       __DelayTag
+ 0F9F:00E7       __wfu
+ 0F9F:00EB       __ProcIds
+ 0F9F:012D       __core_lock
+ 0F9F:0131       __core_unlock
+ 0F9F:0135       __core_delay
+ 0F9F:0139       __SchedStack
+ 0F9F:013F       __get
+ 0F9F:0143       __put
+ 0F9F:0147       __hscan
+ 0F9F:014B       __plot
+ 0F9F:014F       __point
+ 0F9F:0153       __hline
+ 0F9F:0157       __line
+ 0F9F:015B       __text_br
+ 0F9F:015F       __fill_mask
+ 0F9F:0167       __current_linestyle
+ 0F9F:0169       __EGAScreen
+ 0F9F:016D       __EGAStartPlane
+ 0F9F:016F       __EGAPlaneShift
+ 0F9F:01F4       __TestSequence
+ 0F9F:01F7       __EGAflag
+ 0F9F:01FA       __CGAflag
+ 0F9F:01FD       __Monoflag
+ 0F9F:0220       __defaultmode
+ 0F9F:0226       SPAWN$
+ 0F9F:0234       __bss_start
+ 0F9F:0234       _edata
+ 0F9F:0235       __iob
+ 0F9F:06E5       __openfd
+ 0F9F:0749       _BufInf
+ 0F9F:0811       __argbuf
+ 0F9F:08D1       __hugeshift
+ 0F9F:08D3       __osmajor
+ 0F9F:08D5       __osminor
+ 0F9F:08D7       __exit_stk
+ 0F9F:0957       @ExitCode
+ 0F9F:0959       __exit_io
+ 0F9F:095D       __exit_file
+ 0F9F:0961       __exit_tmp
+ 0F9F:0965       __exit_proc
+ 0F9F:0969       __real_in
+ 0F9F:096B       __real_out
+ 0F9F:096D       __sigsetup
+ 0F9F:096F       __exitbreak
+ 0F9F:0973       __exitsig
+ 0F9F:0977       __exitgraph
+ 0F9F:097B       __fmodmemsetup
+ 0F9F:097C       __fmemsetup
+ 0F9F:097D       __res_mem
+ 0F9F:0981       __fix_mem
+ 0F9F:0985       __shr_mem
+ 0F9F:0989       __argv
+ 0F9F:0A09       CoreSig@CnsHandler
+ 0F9F:0A0D       @RecursiveExit
+ 0F9F:0A0F       __pmd_stub
+ 0F9F:1013       __fullscreen
+ 0F9F:1017       __uselist
+ 0F9F:101B       __windowstack
+ 0F9F:101F       __cursorstack
+ 0F9F:1023       __multip
+ 0F9F:1024       __winsetup
+ 0F9F:1025       __cursorlines
+ 0F9F:1027       __threadTable
+ 0F9F:16A7       __cp
+ 0F9F:16AB       __dq
+ 0F9F:16AF       __wq
+ 0F9F:16B3       __SchedProc
+ 0F9F:16B7       __Started
+ 0F9F:16B8       __Continue
+ 0F9F:16BC       _Stop
+ 0F9F:16BD       __LockNestMonster
+ 0F9F:16BF       __SchedTime
+ 0F9F:16C1       __NextThread
+ 0F9F:16C3       __proc_init
+ 0F9F:16C4       __lastmode
+ 0F9F:16C6       __depth
+ 0F9F:16C8       __width
+ 0F9F:16CA       __current_video
+ 0F9F:16E0       __origin
+ 0F9F:16E4       __clip_tl
+ 0F9F:16E8       __clip_br
+ 0F9F:16EC       __current_graph
+ 0F9F:16F0       __text_tl
+ 0F9F:16F4       __current_text
+ 0F9F:16F8       __active_page
+ 0F9F:16FA       __visual_page
+ 0F9F:16FC       __page_size
+ 0F9F:16FE       __fgcolor
+ 0F9F:1700       __mode_changed
+ 0F9F:1702       __txcolor
+ 0F9F:1704       __cursor_lock
+ 0F9F:1706       __scr_attr
+ 0F9F:1708       __current_mask
+ 0F9F:170C       __EGA64K
+ 0F9F:170D       __cursor_state
+ 0F9F:170E       __wrap_state
+ 0F9F:170F       __display_state
+ 0F9F:1710       __EGAtranslate
+ 0F9F:1712       __bkcolor
+ 0F9F:1717       __near_stack_start
+ 0F9F:1717       __bss_end
+ 0F9F:1717       _end
+ 1112:0000       SYSTEM@HeapBase
+ 1113:0000       BiosIO@LastChar
+ 1113:0001       BiosIO@LastScan
+ 1113:0002       BiosIO@EnhancedBIOS
+ 1114:0000       KEY@Code
+ 1114:0002       KEY@Char
+ 1117:0000       Storage@MainHeap
+ 1117:0004       Storage@NearHeap
+ 1117:0006       Storage@ClearOnAllocate
+ 1117:0007       Storage@Check
+ 1118:0000       ScreenHandler@MaxX
+ 1118:0002       ScreenHandler@MaxY
+ 1118:0004       ScreenHandler@MaxTextLine
+ 1118:0006       ScreenHandler@MaxTextCol
+ 1118:0008       ScreenHandler@InGraphic
+ 1118:0009       ScreenHandler@TwoPages
+ 1118:000A       ScreenHandler@MaxColor
+ 111A:0000       Window@FullScreen
+ 111A:0004       Window@CurrentScreenDepth
+ 111E:0000       Graph@Width
+ 111E:0002       Graph@Depth
+ 111E:0004       Graph@NumColor
+ 111E:0006       Graph@FillState
+ 1123:0000       Lib@NilStr
+ 1123:0001       Lib@RunTimeError
+ 1123:0005       Lib@ExecSearchPath
+ 1123:0006       Lib@PSP
+ 1123:0008       Lib@CommandLine
+ 112B:0000       FIO@IOcheck
+ 112B:0001       FIO@EOF
+ 112B:0002       FIO@ShareMode
+ 112B:0004       FIO@Separators
+ 112B:0024       FIO@OK
+ 112B:0025       FIO@ChopOff
+ 112B:0026       FIO@Eng
+ 112B:0027       FIO@PrefixChar
+ 112B:0028       FIO@SuffixChar
+ 1136:0000       IO@RdLnOnWr
+ 1136:0001       IO@Prompt
+ 1136:0002       IO@InputRedirected
+ 1136:0003       IO@OutputRedirected
+ 1136:0004       IO@WrStrRedirect
+ 1136:0008       IO@RdStrRedirect
+ 1136:000C       IO@Separators
+ 1136:002C       IO@OK
+ 1136:002D       IO@ChopOff
+ 1136:002E       IO@Eng
+ 1136:002F       IO@PrefixChar
+ 1136:0030       IO@SuffixChar
+ 116C:0000       Iri$
+ 116C:001A       _main
+ 116C:0074       NodeMgr$
+ 116C:0096       IntVector$
+ 116C:00A4       Utilities$
+ 116C:00AE       IOctl$
+ 116C:00BC       DosUtil$
+ 116C:00CE       Lib1$
+ 116C:00D8       KEY$
+ 116C:00E2       ScreenHandler$
+ 116C:00F4       UserIO$
+ 116C:0112       TextPlot$
+ 116C:0128       PM$
+ 116C:015A       MiniFont$
+ 116C:0160       PmProgs$
+ 116C:016E       PmDisp$
+ 116C:0190       PCalc$
+ 116C:019E       Window$
+ 116C:01BC       FIO$
+ 116C:01CE       MATHLIB$
+ 116C:01DC       SYSTEM$
+ 116C:01E2       Str$
+ 116C:01F0       Lib$
+ 116C:0202       IO$
+ 116C:0214       Process$
+ 116C:0222       BiosIO$
+ 116C:0230       Graph$
+ 116C:0246       Storage$
+ 1192:0000       __initx
+ 11B8:0000       NodeMgr@MaxNodes
+ 11B8:0002       NodeMgr@nnodes
+ 11B8:0004       NodeMgr@lastnode
+ 11B8:0006       NodeMgr@Nodes
+ 11B8:1F4A       NodeMgr@Dimensions
+ 13AD:0000       PM@Order
+ 13AD:0002       PM@BasePerm
+ 13AD:000B       PM@OpTable
+ 13AD:00AD       PM@LastEditLine
+
+Program entry point at 000F:0000
