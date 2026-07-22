@@ -1,0 +1,18 @@
+[project]
+name = "permuto"
+version = "0.0.1"
+description = "Modern (PySide6) reincarnation of the 1990-95 Modula-2 Polytop/Permutograph viewer"
+requires-python = ">=3.10"
+dependencies = ["PySide6>=6.5"]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
