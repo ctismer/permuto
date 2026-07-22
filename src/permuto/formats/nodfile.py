@@ -31,7 +31,16 @@ def read_pgd(path) -> PgdCommand:
 
 
 def read_int_pairs(path) -> List[Tuple[int, int]]:
-    nums = [int(x) for x in Path(path).read_text().split()]
+    # Mirror NodeMgr.ReadNodes / FIO.RdCard: read leading cardinal pairs and
+    # stop at the first non-numeric token (some hand-made .nod files carry a
+    # trailing German comment, in CP437 -> decode as latin-1, never utf-8).
+    text = Path(path).read_bytes().decode("latin-1")
+    nums: List[int] = []
+    for tok in text.split():
+        try:
+            nums.append(int(tok))
+        except ValueError:
+            break
     return list(zip(nums[0::2], nums[1::2]))
 
 

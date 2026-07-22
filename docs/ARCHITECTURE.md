@@ -169,22 +169,42 @@ src/permuto/
   perms.py               # NextPerm                              [done]
   gen/                   # genperm, operate, num2, pipeline       [done, verified]
   formats/               # .pg/.nod/.pgd readers                  [done]
-  core/                  # NodeMgr, PM, PmProgs, IntVector, PCalc [next]
+  core/                  # IntVector, NodeMgr(graph), PCalc(layout), PmProgs(spa) [done, tested]
   ui/                    # PySide6 2D-projection viewer           [next]
 tests/                   # golden tests vs legacy/modula/nod/*
 docs/ARCHITECTURE.md
 ```
 
-**Phase 1** — strict 1:1 port, verified against the `nod/` golden files
-(`IntVector`, rotation, `Scale`/`Sqrt` reproduced bit-exact; keep coordinates
-`int`). *Done so far:* the whole generation pipeline.
+**Phase 1** — strict 1:1 port, verified against the `nod/` golden files; keep
+coordinates `int`. *Done:*
+* generation pipeline (`gen/`) — regenerates 11 originals byte-for-byte;
+* `core/intvector` — fixed-point ops (`Scale` truncates toward zero,
+  `Sqrt` = floor);
+* `core/graph` — `NodeMgr` data model + `.nod` loader;
+* `core/layout` — `PCalc` (Contract ×5, Squeeze, Punish, Normalize, Spin,
+  CanShrink) + the main-loop cadence;
+* `core/spa` — `PmProgs` SPA (parallel BFS), checked against an independent BFS.
+
+Verified emergent behaviour: relaxing the icosahedron from 8-D lets the
+dimensions "fall" to 3-D (`tools/relax_demo.py`).
+
 **Phase 2** — refactor to idiomatic Python once behaviour is locked.
 **Phase 3** — optional TypeScript/browser port of the (then clean) UI-free core.
 
 The core stays **UI-free** so PySide6 and a later web viewer are just frontends.
 
-### To confirm when porting the core
-* Where `Dimensions` is set and how `pos` is seeded (looks like random init +
-  relaxation; `RandomVector` + `PM`/`polytop` main — `ReadNodes` sets neither).
-* Exact `Contract` algorithm chosen by default and the main-loop cadence.
-* Whether initial positions ever use the permutation itself (permutohedron).
+### Confirmed while porting the core
+* `Dimensions` starts at `MaxDimen` (8); `pos` is seeded by `RandomVector`
+  (random init, **not** the permutation itself) and the shape is purely
+  emergent from relaxation. `ReadNodes` sets neither.
+* Default algorithm is `a_Rubber`; `Punish` runs only for `Rubber`. Main loop:
+  `Backup → Contract → Squeeze → Punish → Spin(if dim≥3) → Normalize →
+  while CanShrink: dim−−` (dimension check every 25 iters in the original).
+* The RNG (`Lib.RANDOM`) is source-less, so absolute positions are not
+  bit-reproducible — we use a seedable Python RNG; the algorithm is faithful.
+
+### Still open (for the viewer)
+* Some hand-made `.nod` files carry a trailing German comment after the
+  numbers (CP437); the loader stops at the first non-number, like `FIO.RdCard`.
+* Small symmetric graphs (e.g. the cube) need not reach their true minimum
+  dimension — faithful heuristic behaviour, not a bug.
