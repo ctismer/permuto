@@ -170,7 +170,7 @@ src/permuto/
   gen/                   # genperm, operate, num2, pipeline       [done, verified]
   formats/               # .pg/.nod/.pgd readers                  [done]
   core/                  # IntVector, NodeMgr(graph), PCalc(layout), PmProgs(spa) [done, tested]
-  ui/                    # PySide6 2D-projection viewer           [next]
+  ui/                    # PySide6 2D-projection viewer + PNG renderer [done]
 tests/                   # golden tests vs legacy/modula/nod/*
 docs/ARCHITECTURE.md
 ```
