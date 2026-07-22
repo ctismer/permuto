@@ -11,10 +11,22 @@ objects this way looks glorious.
 
 ## Status
 
-* **Generation pipeline ported and verified** — `genperm → operate → num2`
-  regenerates 11 of the original graphs byte-for-byte (golden tests).
-* Core (graph model, SPA, fixed-point layout/rotation) and the PySide6 viewer
-  are next.
+* **Generation pipeline** — `genperm → operate → num2` regenerates 11 of the
+  original graphs byte-for-byte (golden tests).
+* **Core** — `IntVector` (fixed point), graph model, `PCalc` layout (rubber /
+  squeeze / punish / spin / dimension-shrink) and the `PmProgs` SPA, all
+  ported and tested. Relaxing the icosahedron from 8-D lets the dimensions
+  "fall" to 3-D, just like the original.
+* **Viewer** — PySide6 2-D projection with rotation (`show`), plus a headless
+  PNG renderer (`render`).
+
+## Gallery
+
+Headless renders (`python -m permuto render <name>`):
+
+| icosahedron (`ikosa2`) | S₄ permutohedron (`pgl4`) |
+|---|---|
+| ![ikosa2](docs/demo/ikosa2.png) | ![pgl4](docs/demo/pgl4.png) |
 
 ## Use
 
