@@ -213,9 +213,29 @@ def write_ply(path, session: PlySession) -> None:
     Path(path).write_bytes(bytes(out))
 
 
+_I16_MIN, _I16_MAX = -0x8000, 0x7FFF
+
+
 def _write_record(nd: Node) -> bytes:
     def padded(seq, size, fill=0):
         return list(seq)[:size] + [fill] * max(0, size - len(seq))
+
+    def coords(seq, what):
+        """The file format is 16-bit even though the port computes in 32.
+
+        Normalize keeps coordinates within +-NORM, so this only bites for
+        un-relaxed seed layouts -- worth a clear message rather than a
+        struct.error from six frames down.
+        """
+        out = padded(seq, 8)
+        for value in out:
+            if not _I16_MIN <= value <= _I16_MAX:
+                raise FileFormatError(
+                    "<save>",
+                    f"{what} {value} of node {nd.num} does not fit the format's "
+                    f"16-bit INTEGER; relax the graph before saving",
+                )
+        return out
 
     st, iri = nd.state, nd.iri
     broken_bits = 0
@@ -224,8 +244,8 @@ def _write_record(nd: Node) -> bytes:
             broken_bits |= 1 << b
 
     rec = bytearray()
-    rec += struct.pack("<8h", *padded(nd.pos, 8))
-    rec += struct.pack("<8h", *padded(nd.old, 8))
+    rec += struct.pack("<8h", *coords(nd.pos, "coordinate"))
+    rec += struct.pack("<8h", *coords(nd.old, "previous coordinate"))
     rec += struct.pack("<HHH", nd.color, nd.num, nd.nlink)
     rec += struct.pack("<12H", *padded(nd.links, MAX_LINKS))
     rec += struct.pack("<12B", *padded(nd.opno, MAX_LINKS))

@@ -22,6 +22,17 @@ from typing import List
 MAXDIMEN = 8
 NORM = 4096  # fixed-point "1.0"  (IntVector.Norm)
 
+# Integer width for the port: 32 bit, everywhere.
+#
+# TopSpeed's INTEGER was 16 bit, but Scale already computed through
+# MacFns.LI_DIV_I, i.e. a LONGINT intermediate, and every coordinate is kept
+# inside +-NORM by Normalize anyway -- so the narrow type never showed except
+# in corners like Iri's seed positions.  Rather than reproduce 16-bit wraparound
+# in some places and not others, the port is uniformly 32 bit.  Python ints do
+# not overflow, so int32() is only needed where the original's overflow is part
+# of the observable behaviour.
+INT32_MIN, INT32_MAX = -0x80000000, 0x7FFFFFFF
+
 _dim = 3  # Dimensions, module-local as in the original
 
 
@@ -36,6 +47,15 @@ def get_dimensions() -> int:
 
 def new_vector() -> List[int]:
     return [0] * MAXDIMEN
+
+
+def int32(x: int) -> int:
+    """Wrap *x* into a 32-bit signed integer.
+
+    Only for the few places where the original's overflow is visible behaviour
+    rather than an accident; see the note on integer width above.
+    """
+    return (x + 0x80000000) % 0x100000000 - 0x80000000
 
 
 def idiv(a: int, b: int) -> int:
