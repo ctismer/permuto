@@ -10,8 +10,10 @@ Read this first, then `docs/ARCHITECTURE.md` and `git log --oneline`.
 > is the current work plan. Refactoring is deferred until parity is reached.
 
 ## Where we are
-- Branch `port/python-scaffold` — **not pushed**; `main` is the pristine
-  recovery import. Working tree clean, 156 tests: `python -m pytest`.
+- Branch `port/python-scaffold`; `main` is the pristine recovery import.
+  Working tree clean, 156 tests: `python -m pytest`.
+- **Local only — there is no remote.** The repository exists on one disk, and
+  so does the only known copy of the recovered 1990s original.
 - The **domain core is complete**; what remains is essentially all UI.
 
 ## Done (ported + tested)
