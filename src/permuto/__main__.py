@@ -47,24 +47,20 @@ def main(argv=None) -> int:
         return run(rest[0], seed=int(rest[1]) if len(rest) > 1 else 1)
 
     if cmd == "render":
-        import os
-        from .core import intvector as iv
         from .core import layout
-        from .core.graph import Graph
         from .ui import render as rndr
+        from .ui.viewer import load_graph
 
-        name = rest[0]
-        out = rest[1] if len(rest) > 1 else "permuto.png"
-        steps = int(rest[2]) if len(rest) > 2 else 500
-        path = name if os.path.exists(name) else name
-        if not os.path.exists(path):
-            root = os.path.join(os.path.dirname(__file__), "..", "..")
-            path = os.path.join(root, "legacy", "modula", "nod",
-                                name if name.endswith(".nod") else name + ".nod")
-        g = Graph.load_nod(path, dimensions=iv.MAXDIMEN, seed=1)
+        pos = [a for a in rest if not a.startswith("--")]
+        flags = {a for a in rest if a.startswith("--")}
+        name = pos[0]
+        out = pos[1] if len(pos) > 1 else "permuto.png"
+        steps = int(pos[2]) if len(pos) > 2 else 500
+        g = load_graph(name, seed=1)
         for _ in range(steps):
             layout.relax_step(g, alg="rubber")
-        rndr.save_png(g, out)
+        rndr.save_png(g, out, labels="--labels" in flags,
+                      op_colors="--no-op" not in flags)
         print(f"rendered {name} ({g.nnodes} nodes, {g.dimensions}-D) -> {out}")
         return 0
 

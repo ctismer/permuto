@@ -40,9 +40,26 @@ def project(g, width: int, height: int) -> Dict[int, Tuple[int, int, int]]:
     return pts
 
 
-def paint(g, painter, width: int, height: int) -> None:
+# distinct, reasonably colour-blind-friendly hues for operators 1..n
+_PALETTE = [
+    (90, 200, 255), (255, 150, 90), (140, 230, 120), (230, 120, 220),
+    (240, 220, 90), (120, 190, 235), (250, 130, 150), (170, 220, 200),
+]
+
+
+def _op_color(opk: int, front: bool):
+    from PySide6.QtGui import QColor
+
+    r, g, b = _PALETTE[(opk - 1) % len(_PALETTE)]
+    if not front:  # dim the back edges for depth
+        r, g, b = r * 45 // 100, g * 45 // 100, b * 45 // 100
+    return QColor(r, g, b)
+
+
+def paint(g, painter, width: int, height: int, *,
+          labels: bool = False, op_colors: bool = False) -> None:
     from PySide6.QtCore import QPointF, Qt
-    from PySide6.QtGui import QBrush, QColor, QPen
+    from PySide6.QtGui import QBrush, QColor, QFont, QPen
 
     pts = project(g, width, height)
     painter.setRenderHint(painter.RenderHint.Antialiasing, True)
@@ -51,14 +68,21 @@ def paint(g, painter, width: int, height: int) -> None:
     front_pen.setWidthF(2.2)
     back_pen = QPen(QColor(70, 80, 120))
     back_pen.setWidthF(1.0)
+    have_ops = op_colors and g.n_operators > 0
 
     for nd in g.ordered():
         xi, yi, zi = pts[nd.num]
-        for j in nd.links:
+        for idx, j in enumerate(nd.links):
             if j <= nd.num:  # draw each undirected edge once
                 continue
             xj, yj, zj = pts[j]
-            painter.setPen(front_pen if (zi + zj) > 0 else back_pen)
+            front = (zi + zj) > 0
+            if have_ops and idx < len(nd.opno):
+                pen = QPen(_op_color(nd.opno[idx], front))
+                pen.setWidthF(2.2 if front else 1.1)
+                painter.setPen(pen)
+            else:
+                painter.setPen(front_pen if front else back_pen)
             painter.drawLine(QPointF(xi, yi), QPointF(xj, yj))
 
     painter.setPen(Qt.NoPen)
@@ -66,19 +90,28 @@ def paint(g, painter, width: int, height: int) -> None:
     for (x, y, z) in pts.values():
         painter.drawEllipse(QPointF(x, y), 3.5, 3.5)
 
+    if labels:
+        painter.setPen(QColor(215, 215, 230))
+        painter.setFont(QFont("Menlo", 9))
+        for nd in g.nodes.values():
+            if nd.perm:
+                x, y, _z = pts[nd.num]
+                painter.drawText(QPointF(x + 6, y - 6), nd.perm)
 
-def render_image(g, width: int = 800, height: int = 800):
+
+def render_image(g, width: int = 800, height: int = 800, *,
+                 labels: bool = False, op_colors: bool = False):
     _ensure_gui_app()
     from PySide6.QtGui import QColor, QImage, QPainter
 
     img = QImage(width, height, QImage.Format.Format_ARGB32)
     img.fill(QColor(18, 18, 28))
     p = QPainter(img)
-    paint(g, p, width, height)
+    paint(g, p, width, height, labels=labels, op_colors=op_colors)
     p.end()
     return img
 
 
-def save_png(g, path, width: int = 800, height: int = 800):
-    render_image(g, width, height).save(str(path), "PNG")
+def save_png(g, path, width: int = 800, height: int = 800, **kw):
+    render_image(g, width, height, **kw).save(str(path), "PNG")
     return path

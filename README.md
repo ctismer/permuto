@@ -17,16 +17,22 @@ objects this way looks glorious.
   squeeze / punish / spin / dimension-shrink) and the `PmProgs` SPA, all
   ported and tested. Relaxing the icosahedron from 8-D lets the dimensions
   "fall" to 3-D, just like the original.
-* **Viewer** — PySide6 2-D projection with rotation (`show`), plus a headless
-  PNG renderer (`render`).
+* **Viewer** — PySide6 2-D projection with rotation (`show`); node labels (the
+  permutations), operator-coloured edges, live algorithm switching; plus a
+  headless PNG renderer (`render`).
 
 ## Gallery
 
 Headless renders (`python -m permuto render <name>`):
 
-| icosahedron (`ikosa2`) | S₄ permutohedron (`pgl4`) |
+| icosahedron (`ikosa2`) | S₃ permutohedron, labelled (`pgl3`) |
 |---|---|
-| ![ikosa2](docs/demo/ikosa2.png) | ![pgl4](docs/demo/pgl4.png) |
+| ![ikosa2](docs/demo/ikosa2.png) | ![pgl3](docs/demo/pgl3.png) |
+| **S₄ permutohedron, operators coloured (`pgl4`)** | **S₅ permutohedron, 120 nodes (`pgl5`)** |
+| ![pgl4](docs/demo/pgl4.png) | ![pgl5](docs/demo/pgl5.png) |
+
+Edges are coloured by which *operator* (adjacent transposition) produced
+them — the parallel edge-classes of the permutohedron become visible.
 
 ## Use
 

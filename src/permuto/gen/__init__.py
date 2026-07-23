@@ -3,6 +3,7 @@
 from .genperm import all_permutations
 from .operate import apply_cycle, operate_line
 from .number import number
+from .permutograph import neighbors, operator_groups
 from .pipeline import Permutograph, build
 
 __all__ = [
@@ -10,6 +11,8 @@ __all__ = [
     "apply_cycle",
     "operate_line",
     "number",
+    "neighbors",
+    "operator_groups",
     "Permutograph",
     "build",
 ]

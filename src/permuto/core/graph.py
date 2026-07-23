@@ -44,11 +44,13 @@ class Graph:
         self.nodes: Dict[int, Node] = {}
         self.nnodes: int = 0
         self.dimensions: int = 3
+        self.n_operators: int = 0  # >0 when built with operator identity
 
     # -- construction --------------------------------------------------
     @classmethod
     def load_nod(cls, path, *, dimensions: int = iv.MAXDIMEN, seed: int = 0,
                  init: bool = True) -> "Graph":
+        """Load topology only (permutation labels / operators are lost)."""
         base = read_nod(path)
         g = cls()
         g.nnodes = base.nnodes
@@ -60,6 +62,43 @@ class Graph:
         if init:
             g.random_init(seed)
         return g
+
+    @classmethod
+    def build(cls, base: str, operators: List[str], *,
+              dimensions: int = iv.MAXDIMEN, seed: int = 0,
+              init: bool = True) -> "Graph":
+        """Build the permutograph from a base + operators, keeping the
+        permutation string per node and the operator number per edge."""
+        from ..gen import all_permutations, neighbors, operator_groups
+
+        perms = all_permutations(base)
+        num = {p: i + 1 for i, p in enumerate(perms)}
+        g = cls()
+        g.nnodes = len(perms)
+        g.n_operators = len(operator_groups(operators))
+        for i, p in enumerate(perms, start=1):
+            nd = Node(num=i, perm=p)
+            seen: Dict[int, int] = {}
+            for opk, nb in neighbors(p, operators):
+                j = num.get(nb)
+                if j is None or j == i or j in seen:
+                    continue
+                seen[j] = opk
+                nd.links.append(j)
+                nd.opno.append(opk)
+            nd.nlink = len(nd.links)
+            g.nodes[i] = nd
+        g.set_dimensions(dimensions)
+        if init:
+            g.random_init(seed)
+        return g
+
+    @classmethod
+    def from_pgd(cls, pgd_path, **kw) -> "Graph":
+        from ..formats import read_pgd
+
+        c = read_pgd(pgd_path)
+        return cls.build(c.base, c.operators, **kw)
 
     # -- helpers -------------------------------------------------------
     def set_dimensions(self, dim: int) -> None:
