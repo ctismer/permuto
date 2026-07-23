@@ -22,7 +22,8 @@ the original's behaviour is not portable (see §0).
 | 5 | `PM` model: naming, build, runtime editing (`core/pm.py`) | **done** |
 | 5 | Operator editor UI | open |
 | 6 | Drawing details, EGA sizes scaled | open |
-| 7 | Iridium / SIMONE | open |
+| 7 | Iridium / SIMONE — simulation (`core/iri.py`) | **done** |
+| 7 | Iridium / SIMONE — `/I` mode UI | open |
 | 8 | `makeikos` geodesic generator (`gen/geodesic.py`) | **done** |
 | 8 | `trunc` factorisation (`gen/factorize.py`), `vierdrei` (`gen/vierdrei.py`) | **done** |
 | 9 | `UserIO` input primitives | open |
@@ -93,6 +94,17 @@ Bottom line: `iter=<n> dim=<d> nodes=<n>  A=<algorithm>`
 | `ESC` | `UserWantsToExit()` — accepts `y/Y`, `j/J`, `o/O`, Enter | **missing** |
 
 ## 3. File submenu `(Q)uit (O)utput (L)oad (S)ave` — all missing
+
+> **Open question on the format itself.** `SavePoly` is a raw memory dump
+> (`FIO.WrBin` of `SIZE(NodeType)`), and its purpose was to preserve the
+> *relaxed* state — `.nod` holds only topology, while settling into the final
+> 3-D shape takes hundreds of iterations. In 1995 a dump was the cheapest way
+> there. Its faults are visible in the files themselves: no magic, no version,
+> no validation, uninitialised memory written along (50 junk bytes in
+> `pg24.ply`), 16-bit coordinates that now collide with the port's 32-bit
+> decision, and no diffability although the files live in git. The plan is to
+> keep *reading* `.ply` and make a line-oriented **text** format the default for
+> saving. See the task list; decide together with the file menu.
 
 - **`.ply` binary load/save — the whole session state.** Verified byte-exact
   against `pg24.ply` (3130 = 178 + 24·123), `cube.ply`, `okt*.ply`,
