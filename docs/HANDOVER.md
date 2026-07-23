@@ -12,8 +12,16 @@ Read this first, then `docs/ARCHITECTURE.md` and `git log --oneline`.
 ## Where we are
 - Branch `port/python-scaffold`; `main` is the pristine recovery import.
   Working tree clean, 156 tests: `python -m pytest`.
-- **Local only — there is no remote.** The repository exists on one disk, and
-  so does the only known copy of the recovered 1990s original.
+- **Local only — there is no remote** (yet; Christian will push once the port
+  is good enough).
+- **This port is becoming the reference implementation.** The 1990s program
+  still runs under DOSBox and is still in use, which makes it an excellent
+  place to look up *what the original did* — menu layout, colours, what a key
+  actually does — so ask for a run or a screenshot rather than inferring from
+  `polytop.mod`. But it is a source, not an authority: where it was simply bad
+  (no error handling, a raw memory dump for a file format, 16-bit arithmetic),
+  the port decides for itself. Parity first so that nothing is lost; then this
+  is the version that counts.
 - The **domain core is complete**; what remains is essentially all UI.
 
 ## Done (ported + tested)
