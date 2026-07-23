@@ -5,6 +5,7 @@
     python -m permuto build <name> <base> <op...>   # write <name>.pg/.nod/.pgd
     python -m permuto show  <name-or-file.nod>      # interactive PySide6 viewer
     python -m permuto render <name.nod> [out.png] [steps]   # offscreen PNG
+    python -m permuto export <name> [out.ps] [steps]        # PostScript (SavePicture)
 
 Example:
     python -m permuto gen 123 12 + 23
@@ -62,6 +63,22 @@ def main(argv=None) -> int:
         rndr.save_png(g, out, labels="--labels" in flags,
                       op_colors="--no-op" not in flags)
         print(f"rendered {name} ({g.nnodes} nodes, {g.dimensions}-D) -> {out}")
+        return 0
+
+    if cmd == "export":
+        from .core import layout
+        from .formats import save_ps
+        from .ui.viewer import load_graph
+
+        pos = [a for a in rest if not a.startswith("--")]
+        name = pos[0]
+        out = pos[1] if len(pos) > 1 else "permuto.ps"
+        steps = int(pos[2]) if len(pos) > 2 else 500
+        g = load_graph(name, seed=1)
+        for _ in range(steps):
+            layout.relax_step(g, alg="rubber")
+        save_ps(g, out)
+        print(f"exported {name} ({g.nnodes} nodes, {g.dimensions}-D) -> {out}")
         return 0
 
     print(f"unknown command: {cmd!r}\n{__doc__}")

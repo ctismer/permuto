@@ -183,10 +183,28 @@ coordinates `int`. *Done:*
 * `core/graph` — `NodeMgr` data model + `.nod` loader;
 * `core/layout` — `PCalc` (Contract ×5, Squeeze, Punish, Normalize, Spin,
   CanShrink) + the main-loop cadence;
-* `core/spa` — `PmProgs` SPA (parallel BFS), checked against an independent BFS.
+* `core/spa` — `PmProgs` in full: SPA (parallel BFS, checked vs an independent
+  BFS), `ParSum`, and the per-edge line states (`L_input/output/locked`);
+* `core/graph` — the permutograph builder (`build` / `from_pgd`) keeping the
+  permutation label per node and operator number per edge;
+* `ui/` — PySide6 viewer (relax + spin, node labels, operator-coloured edges,
+  live algorithm switch, **program mode** running SPA/ParSum with node picking)
+  and an offscreen PNG renderer;
+* `formats/postscript` — `NodeMgr.SavePicture` (PostScript export).
 
 Verified emergent behaviour: relaxing the icosahedron from 8-D lets the
 dimensions "fall" to 3-D (`tools/relax_demo.py`).
+
+**Phase 1 is complete for the permutograph viewer.** Intentionally *not* ported
+(auxiliary standalone programs / interactive TopSpeed UI, out of the viewer's
+scope — portable on request):
+* `Iri` (Iridium routing sim, the `P_SPTA` program), `kugel` (sphere shader,
+  uses MATHLIB), `ham1` (Hamiltonian search), `h`, `pmtest`, `pm5` — separate
+  experiments, not part of the viewer;
+* `PM`'s interactive editing (adding operators / editing the base at runtime)
+  and the DOS menu/keyboard system — a UI concern for phase 2;
+* `TextPlot` / `ScreenHandler` / `MiniFont` — DOS text-on-graphics infra,
+  replaced by Qt; `Utilities` (`SetZero`, `nl`) inlined.
 
 **Phase 2** — refactor to idiomatic Python once behaviour is locked.
 **Phase 3** — optional TypeScript/browser port of the (then clean) UI-free core.

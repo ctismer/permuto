@@ -56,8 +56,25 @@ def _op_color(opk: int, front: bool):
     return QColor(r, g, b)
 
 
+def _state_color(state: int, front: bool):
+    # LineStatus -> colour (PmDisp): input/output green, locked red, free grey
+    from ..core.graph import L_INPUT, L_LOCKED, L_OUTPUT
+    from PySide6.QtGui import QColor
+
+    if state in (L_INPUT, L_OUTPUT):
+        r, g, b = 90, 220, 110
+    elif state == L_LOCKED:
+        r, g, b = 220, 80, 80
+    else:  # L_FREE
+        r, g, b = 80, 85, 100
+    if not front:
+        r, g, b = r * 50 // 100, g * 50 // 100, b * 50 // 100
+    return QColor(r, g, b)
+
+
 def paint(g, painter, width: int, height: int, *,
-          labels: bool = False, op_colors: bool = False) -> None:
+          labels: bool = False, op_colors: bool = False,
+          program: bool = False) -> None:
     from PySide6.QtCore import QPointF, Qt
     from PySide6.QtGui import QBrush, QColor, QFont, QPen
 
@@ -77,7 +94,11 @@ def paint(g, painter, width: int, height: int, *,
                 continue
             xj, yj, zj = pts[j]
             front = (zi + zj) > 0
-            if have_ops and idx < len(nd.opno):
+            if program and idx < len(nd.state.lines):
+                pen = QPen(_state_color(nd.state.lines[idx], front))
+                pen.setWidthF(2.6 if front else 1.3)
+                painter.setPen(pen)
+            elif have_ops and idx < len(nd.opno):
                 pen = QPen(_op_color(nd.opno[idx], front))
                 pen.setWidthF(2.2 if front else 1.1)
                 painter.setPen(pen)
@@ -90,24 +111,24 @@ def paint(g, painter, width: int, height: int, *,
     for (x, y, z) in pts.values():
         painter.drawEllipse(QPointF(x, y), 3.5, 3.5)
 
-    if labels:
+    if labels or program:
         painter.setPen(QColor(215, 215, 230))
         painter.setFont(QFont("Menlo", 9))
         for nd in g.nodes.values():
-            if nd.perm:
+            text = str(nd.state.display) if program else nd.perm
+            if text:
                 x, y, _z = pts[nd.num]
-                painter.drawText(QPointF(x + 6, y - 6), nd.perm)
+                painter.drawText(QPointF(x + 6, y - 6), str(text))
 
 
-def render_image(g, width: int = 800, height: int = 800, *,
-                 labels: bool = False, op_colors: bool = False):
+def render_image(g, width: int = 800, height: int = 800, **kw):
     _ensure_gui_app()
     from PySide6.QtGui import QColor, QImage, QPainter
 
     img = QImage(width, height, QImage.Format.Format_ARGB32)
     img.fill(QColor(18, 18, 28))
     p = QPainter(img)
-    paint(g, p, width, height, labels=labels, op_colors=op_colors)
+    paint(g, p, width, height, **kw)
     p.end()
     return img
 

@@ -16,6 +16,10 @@ from . import intvector as iv
 from ..formats import read_nod
 
 
+# LineStatus (NodeMgr): edge state used by the PmProgs programs / display
+L_FREE, L_INPUT, L_OUTPUT, L_LOCKED = 0, 1, 2, 3
+
+
 @dataclass
 class NodeState:
     step: int = 0
@@ -24,6 +28,7 @@ class NodeState:
     sum: int = 0
     display: int = 0
     broken: Set[int] = field(default_factory=set)  # 1-based link indices
+    lines: List[int] = field(default_factory=list)  # LineStatus per link
 
 
 @dataclass

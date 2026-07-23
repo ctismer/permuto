@@ -48,9 +48,11 @@ def load_graph(name_or_path, *, dimensions: int = iv.MAXDIMEN,
 
 
 def run(name_or_path, seed: int = 1) -> int:
-    from PySide6.QtCore import QTimer
+    from PySide6.QtCore import QPointF, QTimer
     from PySide6.QtGui import QColor, QFont, QPainter
     from PySide6.QtWidgets import QApplication, QWidget
+
+    from ..core import spa
 
     class PermutographView(QWidget):
         def __init__(self, name):
@@ -62,6 +64,10 @@ def run(name_or_path, seed: int = 1) -> int:
             self.calculating = True
             self.labels = False
             self.op_colors = True
+            self.program = False       # SPA/ParSum program mode
+            self.phase = "off"         # off | spa | parsum | done
+            self.start = 1
+            self._pcount = 0
             self.g = load_graph(name, seed=self.seed)
             self.setWindowTitle(f"permuto — {self.name}")
             self.resize(820, 860)
@@ -73,27 +79,68 @@ def run(name_or_path, seed: int = 1) -> int:
         def alg(self):
             return layout.ALGORITHMS[self.alg_i]
 
+        # -- program (SPA / ParSum) ------------------------------------
+        def _start_program(self):
+            self.start = min(self.g.nodes) if self.start not in self.g.nodes else self.start
+            spa.init_spa(self.g, self.start)
+            self.phase = "spa"
+            self._pcount = 0
+
+        def _advance_program(self):
+            self._pcount += 1
+            if self._pcount % 3:      # slow enough to watch
+                return
+            if self.phase == "spa":
+                if not spa.shortest_path(self.g):
+                    self.phase = "parsum"
+                    spa.init_par_sum(self.g)
+            elif self.phase == "parsum":
+                if not spa.par_sum(self.g):
+                    self.phase = "done"
+
         def _step(self):
-            layout.relax_step(self.g, alg=self.alg,
-                              calculating=self.calculating, spinning=self.spinning)
+            if self.program:
+                if self.spinning and self.g.dimensions >= 3:
+                    layout.spin(self.g)      # keep rotating, freeze relaxation
+                self._advance_program()
+            else:
+                layout.relax_step(self.g, alg=self.alg,
+                                  calculating=self.calculating, spinning=self.spinning)
             self.update()
+
+        # -- input -----------------------------------------------------
+        def mousePressEvent(self, ev):
+            pts = render.project(self.g, self.width(), self.height())
+            pos = ev.position()
+            best, bestd = None, 1e18
+            for num, (x, y, _z) in pts.items():
+                d = (x - pos.x()) ** 2 + (y - pos.y()) ** 2
+                if d < bestd:
+                    best, bestd = num, d
+            if best is not None:
+                self.start = best
+                if self.program:
+                    self._start_program()
+                self.update()
 
         def paintEvent(self, _ev):
             p = QPainter(self)
             p.fillRect(self.rect(), QColor(18, 18, 28))
             render.paint(self.g, p, self.width(), self.height(),
-                         labels=self.labels, op_colors=self.op_colors)
+                         labels=self.labels, op_colors=self.op_colors,
+                         program=self.program)
             p.setPen(QColor(150, 155, 175))
             p.setFont(QFont("Menlo", 10))
-            flags = f"alg={self.alg}  dim={self.g.dimensions}  " \
-                    f"spin={'on' if self.spinning else 'off'}  " \
-                    f"calc={'on' if self.calculating else 'off'}  " \
+            mode = f"program={self.phase} start={self.start}" if self.program \
+                else f"alg={self.alg} dim={self.g.dimensions}"
+            flags = f"{mode}  spin={'on' if self.spinning else 'off'}  " \
                     f"labels={'on' if self.labels else 'off'}  " \
                     f"opcol={'on' if self.op_colors else 'off'}"
             p.drawText(12, 22, f"{self.name}: {self.g.nnodes} nodes")
             p.drawText(12, 40, flags)
             p.drawText(12, self.height() - 14,
-                       "keys: s spin  c calc  a alg  l labels  o opcol  r reset  q quit")
+                       "keys: s spin  c calc  a alg  l labels  o opcol  "
+                       "p program(SPA)  click=start  r reset  q quit")
             p.end()
 
         def keyPressEvent(self, ev):
@@ -108,8 +155,16 @@ def run(name_or_path, seed: int = 1) -> int:
                 self.labels = not self.labels
             elif k == "o":
                 self.op_colors = not self.op_colors
+            elif k == "p":
+                self.program = not self.program
+                if self.program:
+                    self._start_program()
+                else:
+                    self.phase = "off"
             elif k == "r":
                 self.seed += 1
+                self.program = False
+                self.phase = "off"
                 self.g = load_graph(self.name, seed=self.seed)
             elif k == "q":
                 self.close()
