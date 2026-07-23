@@ -22,7 +22,9 @@ alongside for reference until the port is complete.
   - `mail-fragments/` — the individually e-mailed SPA fragments (duplicates)
 
 ## Working notes
-- Read `docs/ARCHITECTURE.md` first — it has the verified formats and the
+- **Start here:** `docs/HANDOVER.md` — current state and what's next.
+  Phase 1 (the faithful viewer) is complete; we are heading into phase 2.
+- Read `docs/ARCHITECTURE.md` — it has the verified formats and the
   fixed-point rotation/projection/relaxation maths.
 - Port style: **strict 1:1 first**, verified against the `nod/` golden files;
   keep coordinates `int` (the original is deliberately float-free). Refactor
