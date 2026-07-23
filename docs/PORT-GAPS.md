@@ -244,13 +244,39 @@ reproduce the bugs silently; document each:
 6. The neighbour sum before division can reach 60000 — fits a 16-bit CARDINAL
    only because the triangular grid has ≤ 6 links. Document, don't reproduce.
 
-## 8. Generators
+## 8. Generators and graph tools
 
-`makeikos.awk` — geodesic icosahedra, frequency 1..12 (`10f²+2` nodes) — is
-**not ported**. `nod/ikosa1..12.nod` are frozen outputs of it; `ikosa2` is used
-by `tests/test_layout.py` and the demo. Without the generator, arbitrary
-frequencies are impossible. ~80 lines, no dependencies. (`makeiko.awk`,
-`makeiko1.awk`, `makeiko2.awk` are its predecessors — redundant.)
+None of these are ported. All are AWK, none depend on the Modula code.
+
+* **`makeikos.awk`** — geodesic icosahedra, frequency 1..12 (`10f²+2` nodes).
+  `nod/ikosa1..12.nod` are frozen outputs; `ikosa2` is used by
+  `tests/test_layout.py` and the demo. Without the generator, arbitrary
+  frequencies are impossible. (`makeiko.awk`, `makeiko1.awk`, `makeiko2.awk`
+  are its predecessors — redundant.)
+* **`trunc.awk` / `trunc2.awk`** — *factorisation*: truncate every permutation
+  string to its first n characters, collapsing a permutograph onto a coarser
+  one ("Dadurch wird pgl6 nach pgl6-4 faktorisiert"). This is the "Zerlegung in
+  Subpermutographen" of `denke.txt` made operational; `nod/pgl6-4.nod` is the
+  result, and its truncated labels are still visible in the file.
+* **`vierdrei.awk`** — a different graph family altogether: "Vier Werte, 3
+  Plätze", 4³ = 64 nodes with 9 edges each (every value change at every place
+  is an edge), plus filter modes 0–3 that drop the all-equal and/or
+  all-different nodes "um Struktur sehen zu können". Output: `nod/vierdrei.nod`.
+
+Not needed: `zyk.awk` (the predecessor of `operate.awk`, prints `u(arg) = res`),
+`num.awk` (superseded by `num2.awk`), `trans.awk` (a vocabulary-drill toy,
+unrelated to the project).
+
+### A note on reproducing the AWK output byte-for-byte
+
+Not possible, and not worth chasing. `makeikos.awk` numbers nodes in the order
+they come out of `for (tr in Tri)` / `for (i in Edges)`, i.e. the hash order of
+Thompson AWK's associative arrays. It is visible in the data: in `ikosa1.nod`
+the first triangle's edges `(a,b), (b,c), (a,c)` are emitted as `1 2 / 3 2 /
+1 3`, which is the order `(a,c), (b,c), (a,b)` — neither sorted nor insertion
+order. Without TAWK's hash function the numbering cannot be reconstructed. The
+*graph* is well defined, so the port checks isomorphism against the originals
+instead, which is the stronger statement anyway.
 
 ## 9. Input layer (`UserIO`) — no equivalent yet
 
