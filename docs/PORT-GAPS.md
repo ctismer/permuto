@@ -9,6 +9,30 @@ Rule for this phase: **reach parity first.** Improvements beyond the original
 are welcome afterwards — with the single exception of error handling, where
 the original's behaviour is not portable (see §0).
 
+## Progress
+
+| § | Item | State |
+|---|---|---|
+| 0 | Error handling (`permuto/errors.py`) | **done** |
+| 1 | Operating modes (Polytop / `/PG` / `/I`) | open — §5 |
+| 2 | Menu, keys, status lines, single-step | open |
+| 3 | `.ply` binary session format (`formats/plyfile.py`) | **done** |
+| 3 | PostScript preamble shipped with the export | open |
+| 4 | Program submenu (kill/break/collapse/uncollapse) — model in `core/pm.py` | model **done**, UI open |
+| 5 | `PM` model: naming, build, runtime editing (`core/pm.py`) | **done** |
+| 5 | Operator editor UI | open |
+| 6 | Drawing details, EGA sizes scaled | open |
+| 7 | Iridium / SIMONE | open |
+| 8 | `makeikos` geodesic generator (`gen/geodesic.py`) | **done** |
+| 8 | `trunc` factorisation (`gen/factorize.py`), `vierdrei` (`gen/vierdrei.py`) | **done** |
+| 9 | `UserIO` input primitives | open |
+
+What is done is verified against the original data, not just against
+invariants: `PM` reproduces the permutations, edges *and* operator numbers of
+all eight `.ply` files; the geodesic generator is isomorphic to all twelve
+`ikosa*.nod`; `vierdrei` and the factorisation match their `.nod` edge sets
+exactly; `.ply` round-trips byte-for-byte apart from uninitialised padding.
+
 Earlier versions of `HANDOVER.md` / `ARCHITECTURE.md` declared the interactive
 layer, the operator editor and `Iri` "intentionally not ported / out of
 scope". That was wrong and has been corrected.
