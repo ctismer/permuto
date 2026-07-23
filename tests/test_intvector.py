@@ -1,6 +1,17 @@
 """Unit tests for the fixed-point vector arithmetic (IntVector port)."""
 
+import pytest
+
 from permuto.core import intvector as iv
+
+
+@pytest.fixture(autouse=True)
+def restore_dimensions():
+    """``Dimensions`` is module state in the original and in the port alike, so
+    a test that changes it would otherwise leak into whatever runs next."""
+    saved = iv.get_dimensions()
+    yield
+    iv.set_dimensions(saved)
 
 
 def test_scale_truncates_toward_zero():

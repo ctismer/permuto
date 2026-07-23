@@ -195,19 +195,28 @@ coordinates `int`. *Done:*
 Verified emergent behaviour: relaxing the icosahedron from 8-D lets the
 dimensions "fall" to 3-D (`tools/relax_demo.py`).
 
-**Phase 1 is complete for the permutograph viewer.** Intentionally *not* ported
-(auxiliary standalone programs / interactive TopSpeed UI, out of the viewer's
-scope — portable on request):
-* `Iri` (Iridium routing sim, the `P_SPTA` program), `kugel` (sphere shader,
-  uses MATHLIB), `ham1` (Hamiltonian search), `h`, `pmtest`, `pm5` — separate
-  experiments, not part of the viewer;
-* `PM`'s interactive editing (adding operators / editing the base at runtime)
-  and the DOS menu/keyboard system — a UI concern for phase 2;
-* `TextPlot` / `ScreenHandler` / `MiniFont` — DOS text-on-graphics infra,
-  replaced by Qt; `Utilities` (`SetZero`, `nl`) inlined.
+The permutograph **viewer core** is done. The program as a whole is **not**
+feature-complete — see `docs/PORT-GAPS.md` for the verified gap list.
 
-**Phase 2** — refactor to idiomatic Python once behaviour is locked.
-**Phase 3** — optional TypeScript/browser port of the (then clean) UI-free core.
+Still to port (phase 2, "reach parity"):
+* `PM`'s interactive editing — the **operator editor** (base + 6 operators × 3
+  cycles), Connect/Disconnect/Collapse/Uncollapse, `PermName`/`PermCache`;
+* the menu/keyboard system from `polytop.mod`, including single-step mode, the
+  file submenu and the full program submenu, plus `UserIO`'s input primitives;
+* the `.ply` binary session format and the PostScript preamble `plots/poly.pre`;
+* the missing `PmDisp` details (operator digit on edges, direction discs,
+  dead/active node styling, EGA-pixel sizes scaled to today's picture area);
+* `Iri` — the Iridium/SIMONE satellite routing simulation (`/I` mode);
+* `makeikos.awk` — the geodesic icosahedron generator (frequency 1..12).
+
+Genuinely out of scope (verified standalone experiments): `kugel`, `ham1`,
+`h`, `pmtest`, `pm5`. `TextPlot`/`ScreenHandler`/`MiniFont` are DOS
+text-on-graphics infra replaced by Qt (`MiniFont` was a fixed-width 6×8 cell —
+the replacement must be monospace and scaled to look the same size);
+`Utilities` (`SetZero`, `nl`) inlined.
+
+**Phase 3** — refactor to idiomatic Python once parity is reached.
+**Phase 4** — optional TypeScript/browser port of the (then clean) UI-free core.
 
 The core stays **UI-free** so PySide6 and a later web viewer are just frontends.
 

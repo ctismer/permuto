@@ -18,3 +18,8 @@ def modula_dir() -> Path:
 @pytest.fixture(scope="session")
 def nod_dir() -> Path:
     return modula_dir() / "nod"
+
+
+def ply_files():
+    """The surviving binary session files, saved by the original in 1995."""
+    return sorted(modula_dir().rglob("*.ply"))

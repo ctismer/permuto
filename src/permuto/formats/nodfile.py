@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+from ..errors import FileFormatError
+
 
 @dataclass
 class PgdCommand:
@@ -24,23 +26,60 @@ class PgdCommand:
 
 
 def read_pgd(path) -> PgdCommand:
-    tokens = Path(path).read_text().split()
+    """Read the one-line generating command ``<prog> <name> <base> <ops...>``.
+
+    The original never read these back -- ``permuto.bat`` only wrote them, as a
+    record of how a graph had been made ("Durch umkopieren in eine Batch-Datei
+    laesst sich der Aufruf wiederholen").  So there is no original behaviour to
+    be faithful to here, and a short line must not turn into an IndexError.
+    """
+    tokens = Path(path).read_bytes().decode("latin-1").split()
+    if len(tokens) < 3:
+        raise FileFormatError(
+            path,
+            f"expected at least '<prog> <name> <base>', got {len(tokens)} token(s)",
+        )
     return PgdCommand(
         prog=tokens[0], name=tokens[1], base=tokens[2], operators=tokens[3:]
     )
 
 
 def read_int_pairs(path) -> List[Tuple[int, int]]:
-    # Mirror NodeMgr.ReadNodes / FIO.RdCard: read leading cardinal pairs and
-    # stop at the first non-numeric token (some hand-made .nod files carry a
-    # trailing German comment, in CP437 -> decode as latin-1, never utf-8).
+    """Read the leading ``(from, to)`` node-number pairs of a ``.nod`` file.
+
+    Mirrors ``NodeMgr.ReadNodes`` / ``FIO.RdCard``: numbers are read until the
+    first non-numeric token, which is then ignored along with the rest.  That
+    is deliberate, not sloppiness -- about a third of the hand-made ``.nod``
+    files end in a German prose comment ("Dies ist ein Ikosaeder der Frequenz
+    3"), written in CP437, hence the latin-1 decode.  Checked across all 95
+    legacy files: nothing but prose ever follows, so no edge is lost this way.
+
+    Unlike the original we do complain when the numbers themselves are wrong:
+    an odd count means a dangling node number, i.e. a truncated file, which
+    ``ReadNodes`` would have accepted as a slightly smaller graph.
+    """
     text = Path(path).read_bytes().decode("latin-1")
     nums: List[int] = []
-    for tok in text.split():
-        try:
-            nums.append(int(tok))
-        except ValueError:
+    lineno = 0
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        stop = False
+        for tok in line.split():
+            try:
+                nums.append(int(tok))
+            except ValueError:
+                stop = True
+                break
+        if stop:
             break
+    if not nums:
+        raise FileFormatError(path, "no node numbers found")
+    if len(nums) % 2:
+        raise FileFormatError(
+            path,
+            f"odd number of node numbers ({len(nums)}) -- edges come in "
+            f"(from, to) pairs, so the file looks truncated",
+            where=f"line {lineno}",
+        )
     return list(zip(nums[0::2], nums[1::2]))
 
 

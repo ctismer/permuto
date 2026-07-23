@@ -13,7 +13,9 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Set
 
 from . import intvector as iv
-from ..formats import read_nod
+
+# NOTE: ``formats`` is imported inside load_nod, not here: formats/plyfile.py
+# needs Graph and Node, so a module-level import would close a cycle.
 
 
 # LineStatus (NodeMgr): edge state used by the PmProgs programs / display
@@ -32,6 +34,27 @@ class NodeState:
 
 
 @dataclass
+class IriState:
+    """``NodeMgr.IriStatus`` -- the satellite's state in Iridium/SIMONE mode.
+
+    Carried on every node because the original declared it inside ``NodeType``
+    and ``.ply`` therefore stores it, even for graphs that never run Iridium.
+    ``avail`` is fixed point with 10000 = fully charged; node numbers are
+    1-based with 0 meaning "none".
+    """
+
+    avail: int = 0
+    avbak: int = 0
+    target: int = 0
+    tarbak: int = 0
+    message_num: int = 0
+    message_color: int = 0
+    sender_repeat: int = 0
+    sender_target: int = 0
+    sender_color: int = 0
+
+
+@dataclass
 class Node:
     num: int
     pos: List[int] = field(default_factory=iv.new_vector)
@@ -42,6 +65,7 @@ class Node:
     opno: List[int] = field(default_factory=list)
     perm: str = ""
     state: NodeState = field(default_factory=NodeState)
+    iri: IriState = field(default_factory=IriState)
 
 
 class Graph:
@@ -56,6 +80,8 @@ class Graph:
     def load_nod(cls, path, *, dimensions: int = iv.MAXDIMEN, seed: int = 0,
                  init: bool = True) -> "Graph":
         """Load topology only (permutation labels / operators are lost)."""
+        from ..formats import read_nod
+
         base = read_nod(path)
         g = cls()
         g.nnodes = base.nnodes
@@ -112,6 +138,31 @@ class Graph:
 
     def ordered(self) -> List[Node]:
         return [self.nodes[i] for i in sorted(self.nodes)]
+
+    def pack_nodes(self) -> int:
+        """``NodeMgr.PackNodes`` + ``MoveNode`` -- squeeze out deleted nodes.
+
+        A node marked ``num = 0`` (rejected by ``PolytopFilter``) is removed and
+        the rest renumbered densely, with every neighbour's link list rewritten
+        to match.  Returns how many nodes were dropped.
+        """
+        kept = [nd for nd in self.ordered() if nd.num != 0]
+        if len(kept) == len(self.nodes):
+            return 0
+        renumber = {nd.num: i for i, nd in enumerate(kept, start=1)}
+        self.nodes = {}
+        for new_num, nd in enumerate(kept, start=1):
+            nd.num = new_num
+            # drop links to removed nodes, keeping opno aligned
+            pairs = [(renumber[j], nd.opno[k] if k < len(nd.opno) else 0)
+                     for k, j in enumerate(nd.links) if j in renumber]
+            nd.links = [j for j, _ in pairs]
+            nd.opno = [op for _, op in pairs]
+            nd.nlink = len(nd.links)
+            self.nodes[new_num] = nd
+        dropped = self.nnodes - len(kept)
+        self.nnodes = len(kept)
+        return dropped
 
     def random_init(self, seed: int = 0) -> None:
         iv.set_dimensions(self.dimensions)
