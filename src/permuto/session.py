@@ -254,12 +254,22 @@ class Session:
 
 def new_permutograph_session(base: str = "1234",
                              operators: Optional[List[str]] = None) -> Session:
-    """Start in ``/PG`` mode, with PM's own defaults: base 1234, ops 12/23/34."""
+    """Start in ``/PG`` mode.
+
+    ``operators`` uses the generation-pipeline syntax: cycle tokens with ``+``
+    separating one operator from the next, so an operator may be several cycles
+    (``12 + 23`` is two operators of one cycle; ``18 27 + 36 45`` is two
+    operators of two cycles).  With no operators, PM's own defaults apply --
+    base 1234, operators 12/23/34.
+    """
+    from .gen import operator_groups
+
     pm = PM(base=base)
     if operators is not None:
-        for i in range(len(pm.optable)):
-            for j in range(len(pm.optable[i])):
-                pm.optable[i][j] = ""
-        for i, cyc in enumerate(operators):
-            pm.set_cycle(i + 1, 1, cyc)
+        for row in pm.optable:
+            for j in range(len(row)):
+                row[j] = ""
+        for i, group in enumerate(operator_groups(operators)):
+            for j, cyc in enumerate(group):
+                pm.set_cycle(i + 1, j + 1, cyc)
     return Session(graph=pm.new_permutograph(), mode=Mode.PERMUTO, pm=pm)

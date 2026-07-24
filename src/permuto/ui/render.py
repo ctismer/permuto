@@ -24,17 +24,23 @@ def _ensure_gui_app():
 
 
 def project(g, width: int, height: int) -> Dict[int, Tuple[int, int, int]]:
-    """Map each node to (screen x, screen y, depth z), like PmDisp:
-    ``px = Scale(pos[1], Scale_X, Norm) + centre`` (component 3 = depth)."""
+    """Map each node to (screen x, screen y, depth z), like ``PmDisp.DrawEdges``:
+    ``px = Scale(pos[1], Scale_X, Norm) + centre`` (component 3 = depth).
+
+    The original used different ``Scale_X`` and ``Scale_Y`` because its pixels
+    were not square (the ``AspectX=350 / AspectY=480`` correction made circles
+    look round).  On today's square pixels the honest equivalent is a single,
+    isotropic scale, so a sphere stays a sphere whatever the window shape and
+    however much of the width the operator panel takes.
+    """
     NORM = iv.NORM
-    sx = (width // 2) * 95 // 100
-    sy = (height // 2) * 95 // 100
+    scale = (min(width, height) // 2) * 95 // 100
     cx, cy = width // 2, height // 2
     pts: Dict[int, Tuple[int, int, int]] = {}
     for nd in g.nodes.values():
         pos = nd.pos
-        px = iv.scale(pos[0], sx, NORM) + cx
-        py = iv.scale(-pos[1], sy, NORM) + cy
+        px = iv.scale(pos[0], scale, NORM) + cx
+        py = iv.scale(-pos[1], scale, NORM) + cy
         z = pos[2] if g.dimensions >= 3 else 0
         pts[nd.num] = (px, py, z)
     return pts
@@ -72,53 +78,173 @@ def _state_color(state: int, front: bool):
     return QColor(r, g, b)
 
 
+BACKGROUND = (18, 18, 28)   # picture background; shared with the viewer chrome
+
+
+_PICTURE_PIXELS = 320   # the original picture area was 479 x 320 (pmdisp.def)
+
+
+def _scaled(height: int, picture_pixels: int) -> float:
+    """Scale a size given in the original's picture pixels to today's picture.
+
+    Every drawing size in ``PmDisp`` is an absolute count on the 479x320 picture
+    area; kept as-is it would shrink to nothing in a large window, so a size
+    keeps the same fraction of the picture height instead (PORT-GAPS section 6).
+    """
+    return max(1.0, picture_pixels * height / _PICTURE_PIXELS)
+
+
 def paint(g, painter, width: int, height: int, *,
           labels: bool = False, op_colors: bool = False,
-          program: bool = False) -> None:
-    from PySide6.QtCore import QPointF, Qt
+          program: bool = False, name_mode: int = 0,
+          operator_digits: bool = True) -> None:
+    from PySide6.QtCore import QPointF, QRectF, Qt
     from PySide6.QtGui import QBrush, QColor, QFont, QPen
 
     pts = project(g, width, height)
     painter.setRenderHint(painter.RenderHint.Antialiasing, True)
 
     front_pen = QPen(QColor(90, 200, 255))
-    front_pen.setWidthF(2.2)
+    front_pen.setWidthF(_scaled(height, 2))
     back_pen = QPen(QColor(70, 80, 120))
-    back_pen.setWidthF(1.0)
+    back_pen.setWidthF(_scaled(height, 1))
     have_ops = op_colors and g.n_operators > 0
 
+    # edges, each undirected pair once; remember midpoints for the op digit
+    digit_spots = []   # (x, y, op, front)
     for nd in g.ordered():
         xi, yi, zi = pts[nd.num]
         for idx, j in enumerate(nd.links):
-            if j <= nd.num:  # draw each undirected edge once
+            if j <= nd.num:
                 continue
             xj, yj, zj = pts[j]
             front = (zi + zj) > 0
-            if program and idx < len(nd.state.lines):
+            broken = (idx + 1) in nd.state.broken
+            if broken:
+                pen = QPen(QColor(0, 0, 0))
+                pen.setWidthF(_scaled(height, 2))
+            elif program and idx < len(nd.state.lines):
                 pen = QPen(_state_color(nd.state.lines[idx], front))
-                pen.setWidthF(2.6 if front else 1.3)
-                painter.setPen(pen)
+                pen.setWidthF(_scaled(height, 2 if front else 1))
             elif have_ops and idx < len(nd.opno):
                 pen = QPen(_op_color(nd.opno[idx], front))
-                pen.setWidthF(2.2 if front else 1.1)
-                painter.setPen(pen)
+                pen.setWidthF(_scaled(height, 2 if front else 1))
             else:
                 painter.setPen(front_pen if front else back_pen)
+                pen = None
+            if pen is not None:
+                painter.setPen(pen)
             painter.drawLine(QPointF(xi, yi), QPointF(xj, yj))
+            if operator_digits and have_ops and not program and not broken \
+                    and idx < len(nd.opno) and nd.opno[idx]:
+                digit_spots.append(((xi + xj) / 2, (yi + yj) / 2,
+                                    nd.opno[idx], front))
 
-    painter.setPen(Qt.NoPen)
-    painter.setBrush(QBrush(QColor(235, 235, 245)))
-    for (x, y, z) in pts.values():
-        painter.drawEllipse(QPointF(x, y), 3.5, 3.5)
+    # operator number at each edge midpoint, on a punched-out background patch
+    if digit_spots:
+        digit_font = QFont("Menlo")
+        digit_font.setPixelSize(int(_scaled(height, 8)))
+        painter.setFont(digit_font)
+        pad = _scaled(height, 4)
+        for x, y, op, front in digit_spots:
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(QColor(*BACKGROUND)))
+            painter.drawRect(QRectF(x - pad, y - pad * 1.25, pad * 2, pad * 2.5))
+            painter.setPen(_op_color(op, front))
+            painter.drawText(QRectF(x - pad, y - pad * 1.25, pad * 2, pad * 2.5),
+                             Qt.AlignCenter, str(op))
 
-    if labels or program:
+    # nodes: diameter follows the name mode, dead ones hollow, active ringed
+    diam = {0: 5, 1: 9, 2: 12, 3: 9}.get(name_mode, 5)
+    radius = _scaled(height, diam) / 2
+    for nd in g.ordered():
+        x, y, _z = pts[nd.num]
+        if nd.state.dead:
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(QColor(*BACKGROUND)))
+            painter.drawEllipse(QPointF(x, y), radius, radius)
+            pen = QPen(QColor(0, 0, 0))
+            pen.setWidthF(_scaled(height, 1))
+            painter.setPen(pen)
+            painter.setBrush(Qt.NoBrush)
+            painter.drawEllipse(QPointF(x, y), radius, radius)
+        else:
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(QColor(235, 235, 245)))
+            painter.drawEllipse(QPointF(x, y), radius, radius)
+        if nd.state.active:
+            pen = QPen(QColor(255, 255, 255))
+            pen.setWidthF(_scaled(height, 1))
+            painter.setPen(pen)
+            painter.setBrush(Qt.NoBrush)
+            painter.drawEllipse(QPointF(x, y), radius + 1, radius + 1)
+
+    # labels inside/next to the balls: node number / perm / SPA display value
+    text_mode = name_mode if name_mode else (2 if labels else 0)
+    if program:
+        text_mode = 3
+    if text_mode:
+        label_font = QFont("Menlo")
+        label_font.setPixelSize(int(_scaled(height, 7)))
+        painter.setFont(label_font)
         painter.setPen(QColor(215, 215, 230))
-        painter.setFont(QFont("Menlo", 9))
         for nd in g.nodes.values():
-            text = str(nd.state.display) if program else nd.perm
+            if text_mode == 1:
+                text = str(nd.num)
+            elif text_mode == 2:
+                text = nd.perm
+            else:
+                text = str(nd.state.display)
             if text:
                 x, y, _z = pts[nd.num]
-                painter.drawText(QPointF(x + 6, y - 6), str(text))
+                painter.drawText(QPointF(x + radius + 2, y - radius), str(text))
+
+
+def operator_panel_rows(pm):
+    """The lines of the operator editor, as ``(label, value, field)`` tuples.
+
+    ``field`` is ``('base',)`` or ``('op', i, j)`` (1-based), or ``None`` for
+    the blank spacer line after the base -- matching the original's layout of a
+    base line, a gap, then 6 operators of 3 cycles each, only the first cycle
+    of each operator carrying an ``Op n`` label.
+    """
+    rows = [("Base", pm.base, ("base",)), ("", "", None)]
+    for i in range(len(pm.optable)):
+        for j in range(len(pm.optable[i])):
+            label = f"Op {i + 1}" if j == 0 else ""
+            rows.append((label, pm.optable[i][j], ("op", i + 1, j + 1)))
+    return rows
+
+
+def paint_operator_panel(pm, painter, x, y, height, *,
+                         active_field=None, buffer_text=None):
+    """Draw the operator table beside the picture.
+
+    In the original this is permanently visible in permutograph mode; with
+    ``active_field`` set it shows the edit cursor, and ``buffer_text`` is the
+    digits being typed into that field.
+    """
+    from PySide6.QtCore import QPointF
+    from PySide6.QtGui import QColor, QFont
+
+    font = QFont("Menlo")
+    line_px = _scaled(height, 12)
+    font.setPixelSize(int(line_px * 0.8))
+    painter.setFont(font)
+    for row, (label, value, field) in enumerate(operator_panel_rows(pm)):
+        cy = y + row * line_px
+        if label:
+            painter.setPen(QColor(150, 155, 175))
+            painter.drawText(QPointF(x, cy), label)
+        if field is not None:
+            shown = value
+            editing = active_field is not None and field == active_field
+            if editing and buffer_text is not None:
+                shown = buffer_text
+            painter.setPen(QColor(255, 230, 140) if editing
+                           else QColor(215, 215, 230))
+            painter.drawText(QPointF(x + line_px * 3, cy),
+                             (shown or "·") + ("_" if editing else ""))
 
 
 def render_image(g, width: int = 800, height: int = 800, **kw):
@@ -126,7 +252,7 @@ def render_image(g, width: int = 800, height: int = 800, **kw):
     from PySide6.QtGui import QColor, QImage, QPainter
 
     img = QImage(width, height, QImage.Format.Format_ARGB32)
-    img.fill(QColor(18, 18, 28))
+    img.fill(QColor(*BACKGROUND))
     p = QPainter(img)
     paint(g, p, width, height, **kw)
     p.end()
