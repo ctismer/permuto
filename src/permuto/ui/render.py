@@ -83,15 +83,27 @@ BACKGROUND = (18, 18, 28)   # picture background; shared with the viewer chrome
 
 _PICTURE_PIXELS = 320   # the original picture area was 479 x 320 (pmdisp.def)
 
+# One knob for the whole UI's apparent size.  A faithful mapping (1.0) puts
+# every mark at the same fraction of the picture it had on the 479x320 original,
+# but that reads a touch large on a modern display, so the default trims it.
+# This is the single number to turn if things want to be bigger or smaller.
+UI_SCALE = 0.62
 
-def _scaled(height: int, picture_pixels: int) -> float:
-    """Scale a size given in the original's picture pixels to today's picture.
 
-    Every drawing size in ``PmDisp`` is an absolute count on the 479x320 picture
-    area; kept as-is it would shrink to nothing in a large window, so a size
-    keeps the same fraction of the picture height instead (PORT-GAPS section 6).
+def _scaled(height: int, picture_pixels: float) -> float:
+    """A mark size (font, node), in the original's picture pixels, for today.
+
+    Kept as an absolute count it would vanish in a large window, so it keeps the
+    same fraction of the picture height (PORT-GAPS section 6), times UI_SCALE.
+    Floored at 1 px so fonts never round to nothing.
     """
-    return max(1.0, picture_pixels * height / _PICTURE_PIXELS)
+    return max(1.0, picture_pixels * height / _PICTURE_PIXELS * UI_SCALE)
+
+
+def _line(height: int, picture_pixels: float) -> float:
+    """Like :func:`_scaled` but for pen widths, which may go below 1 px so that
+    a busy sphere of edges does not turn into a solid blob."""
+    return max(0.5, picture_pixels * height / _PICTURE_PIXELS * UI_SCALE)
 
 
 def paint(g, painter, width: int, height: int, *,
@@ -105,9 +117,9 @@ def paint(g, painter, width: int, height: int, *,
     painter.setRenderHint(painter.RenderHint.Antialiasing, True)
 
     front_pen = QPen(QColor(90, 200, 255))
-    front_pen.setWidthF(_scaled(height, 2))
+    front_pen.setWidthF(_line(height, 1.1))
     back_pen = QPen(QColor(70, 80, 120))
-    back_pen.setWidthF(_scaled(height, 1))
+    back_pen.setWidthF(_line(height, 0.6))
     have_ops = op_colors and g.n_operators > 0
 
     # edges, each undirected pair once; remember midpoints for the op digit
@@ -122,13 +134,13 @@ def paint(g, painter, width: int, height: int, *,
             broken = (idx + 1) in nd.state.broken
             if broken:
                 pen = QPen(QColor(0, 0, 0))
-                pen.setWidthF(_scaled(height, 2))
+                pen.setWidthF(_line(height, 1.1))
             elif program and idx < len(nd.state.lines):
                 pen = QPen(_state_color(nd.state.lines[idx], front))
-                pen.setWidthF(_scaled(height, 2 if front else 1))
+                pen.setWidthF(_line(height, 1.1 if front else 0.6))
             elif have_ops and idx < len(nd.opno):
                 pen = QPen(_op_color(nd.opno[idx], front))
-                pen.setWidthF(_scaled(height, 2 if front else 1))
+                pen.setWidthF(_line(height, 1.1 if front else 0.6))
             else:
                 painter.setPen(front_pen if front else back_pen)
                 pen = None
@@ -164,7 +176,7 @@ def paint(g, painter, width: int, height: int, *,
             painter.setBrush(QBrush(QColor(*BACKGROUND)))
             painter.drawEllipse(QPointF(x, y), radius, radius)
             pen = QPen(QColor(0, 0, 0))
-            pen.setWidthF(_scaled(height, 1))
+            pen.setWidthF(_line(height, 0.8))
             painter.setPen(pen)
             painter.setBrush(Qt.NoBrush)
             painter.drawEllipse(QPointF(x, y), radius, radius)
@@ -174,7 +186,7 @@ def paint(g, painter, width: int, height: int, *,
             painter.drawEllipse(QPointF(x, y), radius, radius)
         if nd.state.active:
             pen = QPen(QColor(255, 255, 255))
-            pen.setWidthF(_scaled(height, 1))
+            pen.setWidthF(_line(height, 0.8))
             painter.setPen(pen)
             painter.setBrush(Qt.NoBrush)
             painter.drawEllipse(QPointF(x, y), radius + 1, radius + 1)
@@ -228,8 +240,8 @@ def paint_operator_panel(pm, painter, x, y, height, *,
     from PySide6.QtGui import QColor, QFont
 
     font = QFont("Menlo")
-    line_px = _scaled(height, 12)
-    font.setPixelSize(int(line_px * 0.8))
+    line_px = _scaled(height, 11)
+    font.setPixelSize(int(line_px * 0.7))
     painter.setFont(font)
     for row, (label, value, field) in enumerate(operator_panel_rows(pm)):
         cy = y + row * line_px

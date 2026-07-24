@@ -161,7 +161,7 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
             from PySide6.QtGui import QColor, QFont
 
             font = QFont("Menlo")
-            font.setPixelSize(max(11, int(self.height() * 12 / 320 * 0.7)))
+            font.setPixelSize(int(render._scaled(self.height(), 9)))
             p.setFont(font)
 
             # top: the menu line for the current UI mode
