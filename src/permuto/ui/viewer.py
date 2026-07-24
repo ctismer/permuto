@@ -524,3 +524,145 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
     view = PermutographView()
     view.show()
     return app.exec()
+
+
+def run_iridium(seed: int = 1) -> int:
+    """The ``/I`` mode -- a thin bypass reusing core.iri, core.layout and
+    render.paint_iridium, mirroring how polytop.mod "hacked it in at this point".
+    """
+    from PySide6.QtCore import Qt, QTimer
+    from PySide6.QtGui import QColor, QFont, QPainter
+    from PySide6.QtWidgets import QApplication, QWidget
+
+    from ..core import layout
+    from ..core.graph import Graph
+    from ..core.iri import Iridium
+    from ..errors import PermutoError
+
+    SETTLE_STEPS = 180
+
+    class IridiumView(QWidget):
+        def __init__(self):
+            super().__init__()
+            self.graph = Graph()
+            self.graph.set_dimensions(2)
+            self.iri = Iridium(self.graph)
+            self.phase = "build"        # build -> settle -> run
+            self.settle = 0
+            self.stepbuf = 0            # queued step keys (autorepeat)
+            self.prompt = None          # (label, fields, values) while typing
+            self.message = ("SIMONE   building the network"
+                            "   (any key skips the wait)")
+            self.setWindowTitle("permuto - Iridium / SIMONE")
+            self.resize(900, 820)
+            self.timer = QTimer(self)
+            self.timer.timeout.connect(self._tick)
+            self.timer.start(30)
+
+        def _relax(self):
+            layout.backup(self.graph)
+            layout.contract(self.graph, "new")
+            layout.normalize(self.graph)
+
+        def _tick(self):
+            if self.phase == "build":
+                if not self.iri.built:
+                    self.iri.new_node()
+                    for _ in range(5):
+                        self._relax()
+                else:
+                    self.phase = "settle"
+            elif self.phase == "settle":
+                self._relax()
+                self.settle += 1
+                if self.settle >= SETTLE_STEPS:
+                    self.phase = "run"
+                    self.message = ""
+            elif self.stepbuf > 0:      # drain queued steps, one per frame
+                self.stepbuf -= 1
+                self.iri.step()
+            self.update()
+
+        # -- drawing ---------------------------------------------------
+        def paintEvent(self, _ev):
+            p = QPainter(self)
+            p.fillRect(self.rect(), QColor(*render.BACKGROUND))
+            render.paint_iridium(self.graph, p, self.width(), self.height())
+            font = QFont("Menlo")
+            font.setPixelSize(int(render._scaled(self.height(), 9)))
+            p.setFont(font)
+            p.setPen(QColor(200, 205, 225))
+            p.drawText(12, 22, "Kill  Transmit  Step  Repeat  Clear      Quit")
+            p.setPen(QColor(255, 230, 140))
+            if self.prompt:
+                label, fields, values = self.prompt
+                shown = "  ".join(f"{f}={v}" for f, v in zip(fields, values + [""]))
+                p.drawText(12, self.height() - 14, f" {label}  {shown}_")
+            elif self.message:
+                p.drawText(12, self.height() - 14, self.message)
+            p.end()
+
+        # -- input -----------------------------------------------------
+        def keyPressEvent(self, ev):
+            if self.prompt:
+                self._prompt_key(ev)
+                self.update()
+                return
+            if self.phase != "run":
+                self.phase = "run"      # any key skips the intro wait
+                self.settle = SETTLE_STEPS
+                self.message = ""
+            k = ev.text().lower()
+            if ev.key() == Qt.Key_Escape or k == "q":
+                self.close()
+            elif k in ("s", " ") or ev.key() == Qt.Key_Space:
+                self.stepbuf += 1
+            elif k == "r":
+                self.iri.step()
+                self.update()
+                self.iri.step()
+                self.iri.repeat_all()
+            elif k == "c":
+                self.iri.reset()
+            elif k == "k":
+                self._begin_prompt("kill", ["Node"])
+            elif k == "t":
+                self._begin_prompt("transmit", ["Node1", "Node2", "Repeat"])
+            self.update()
+
+        def _begin_prompt(self, action, fields):
+            self.prompt = (action, fields, [])
+            self.buffer = ""
+
+        def _prompt_key(self, ev):
+            action, fields, values = self.prompt
+            if ev.key() == Qt.Key_Escape:
+                self.prompt = None
+            elif ev.text().isdigit():
+                self.buffer += ev.text()
+            elif ev.key() == Qt.Key_Backspace:
+                self.buffer = self.buffer[:-1]
+            elif ev.key() in (Qt.Key_Return, Qt.Key_Enter):
+                values.append(self.buffer)
+                self.buffer = ""
+                if len(values) == len(fields):
+                    self._run_prompt(action, values)
+                    self.prompt = None
+
+        def _run_prompt(self, action, values):
+            nums = [int(v) if v else 0 for v in values]
+            try:
+                if action == "kill":
+                    self.iri.kill_node(Iridium.num_to_label(nums[0]))
+                elif action == "transmit":
+                    self.iri.step()
+                    self.iri.transmit(Iridium.num_to_label(nums[0]),
+                                      Iridium.num_to_label(nums[1]), nums[2])
+                self.message = ""
+            except PermutoError as exc:
+                self.message = str(exc)
+
+    app = QApplication.instance() or QApplication([])
+    view = IridiumView()
+    view.show()
+    return app.exec()

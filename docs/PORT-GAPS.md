@@ -23,7 +23,7 @@ the original's behaviour is not portable (see §0).
 | 5 | Operator editor UI | open |
 | 6 | Drawing details, EGA sizes scaled | open |
 | 7 | Iridium / SIMONE — simulation (`core/iri.py`) | **done** |
-| 7 | Iridium / SIMONE — `/I` mode UI | open |
+| 7 | Iridium / SIMONE — `/I` mode UI (`run_iridium`) | **done** |
 | 8 | `makeikos` geodesic generator (`gen/geodesic.py`) | **done** |
 | 8 | `trunc` factorisation (`gen/factorize.py`), `vierdrei` (`gen/vierdrei.py`) | **done** |
 | 9 | `UserIO` input primitives | open |

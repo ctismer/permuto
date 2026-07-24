@@ -59,6 +59,38 @@ def test_operator_panel_lists_the_base_and_operators():
     assert {"12", "23", "34"} <= values
 
 
+def test_iridium_view_builds_and_paints_a_transmitting_network():
+    """The /I drawing path: build the 55-satellite grid the way the viewer
+    does, transmit, and paint. Checks the network builds and the packet turns
+    a node non-idle (so the colour path is exercised), then that something is
+    drawn."""
+    from PySide6.QtGui import QImage, QPainter
+    from permuto.core.graph import Graph
+    from permuto.core.iri import Iridium, YELLOW
+
+    g = Graph()
+    g.set_dimensions(2)
+    iri = Iridium(g)
+    while not iri.built:
+        iri.new_node()
+        for _ in range(5):
+            layout.backup(g)
+            layout.contract(g, "new")
+            layout.normalize(g)
+    assert g.nnodes == 55
+    iri.transmit("900", "009")
+    assert any(nd.color != YELLOW for nd in g.nodes.values())  # a packet is live
+
+    img = QImage(600, 600, QImage.Format.Format_ARGB32)
+    img.fill(0)
+    p = QPainter(img)
+    render.paint_iridium(g, p, 600, 600)
+    p.end()
+    bg = img.pixel(0, 0)
+    assert any(img.pixel(x, y) != bg
+               for x in range(0, 600, 12) for y in range(0, 600, 12))
+
+
 def test_viewer_builds_without_a_display():
     """The whole viewer construction path (session + panel + first paint) must
     work headless, so this stays covered without a human at the screen."""

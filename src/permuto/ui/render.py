@@ -212,6 +212,62 @@ def paint(g, painter, width: int, height: int, *,
                 painter.drawText(QPointF(x + radius + 2, y - radius), str(text))
 
 
+# The standard DOS 16-colour palette, by index -- Iridium/SIMONE colours nodes
+# by these (Window.Yellow=14 idle, Blue=1 destination, Red=4 and NextColor for
+# packets).
+_DOS_PALETTE = [
+    (0, 0, 0), (60, 60, 220), (0, 170, 0), (0, 170, 170),
+    (210, 40, 40), (200, 0, 200), (170, 85, 0), (200, 200, 200),
+    (110, 110, 120), (110, 110, 255), (85, 255, 85), (85, 255, 255),
+    (255, 110, 110), (255, 120, 255), (245, 235, 90), (255, 255, 255),
+]
+
+
+def paint_iridium(g, painter, width: int, height: int) -> None:
+    """Draw the Iridium/SIMONE network (``PmDisp`` with ``progsel = P_SPTA``).
+
+    Node size encodes availability, the colour is the satellite's state
+    (yellow idle, blue destination, else the packet's colour), and the label is
+    the node's own name when idle, otherwise the message number it carries.
+    No operator digits -- Iridium never sets ``opno``.
+    """
+    from PySide6.QtCore import QPointF, QRectF, Qt
+    from PySide6.QtGui import QBrush, QColor, QFont, QPen
+
+    pts = project(g, width, height)
+    painter.setRenderHint(painter.RenderHint.Antialiasing, True)
+
+    pen = QPen(QColor(150, 150, 160))
+    pen.setWidthF(_line(height, 0.9))
+    painter.setPen(pen)
+    for nd in g.ordered():
+        xi, yi, _zi = pts[nd.num]
+        for j in nd.links:
+            if j > nd.num:
+                xj, yj, _zj = pts[j]
+                painter.drawLine(QPointF(xi, yi), QPointF(xj, yj))
+
+    YELLOW = 14
+    font = QFont("Menlo")
+    font.setPixelSize(int(_scaled(height, 7)))
+    painter.setFont(font)
+    for nd in g.ordered():
+        x, y, _z = pts[nd.num]
+        # diameter = Scale(11, avail+1500, 10000), scaled to the picture
+        diam = _scaled(height, 11 * (nd.iri.avail + 1500) / 10000)
+        r = diam / 2
+        colour = QColor(*_DOS_PALETTE[nd.color % 16])
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(colour))
+        painter.drawEllipse(QPointF(x, y), r, r)
+        # label: own name when idle (yellow), else the message number it carries
+        text = nd.perm if nd.color == YELLOW else str(nd.iri.message_num)
+        if text and text != "0":
+            painter.setPen(QColor(0, 0, 0))
+            painter.drawText(QRectF(x - r, y - r, 2 * r, 2 * r),
+                             Qt.AlignCenter, text)
+
+
 def operator_panel_rows(pm):
     """The lines of the operator editor, as ``(label, value, field)`` tuples.
 
