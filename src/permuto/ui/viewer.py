@@ -22,11 +22,8 @@ def _nod_dir():
                         "legacy", "modula", "nod")
 
 
-def load_graph(name_or_path, *, dimensions: int = iv.MAXDIMEN,
-               seed: int = 0) -> Graph:
-    """Resolve a name or file to a Graph. Prefer a ``.pgd`` (gives permutation
-    labels + operator colours); fall back to plain ``.nod`` topology."""
-    p = str(name_or_path)
+def _resolve_file(p: str):
+    """Return the .pgd/.nod path for a name or file, or None if none exists."""
     candidates = []
     if os.path.exists(p):
         candidates.append(p)
@@ -39,15 +36,32 @@ def load_graph(name_or_path, *, dimensions: int = iv.MAXDIMEN,
                 candidates.append(base + ext)
         if p.endswith((".pgd", ".nod")) and os.path.exists(os.path.join(_nod_dir(), p)):
             candidates.insert(0, os.path.join(_nod_dir(), p))
-    if not candidates:
-        raise FileNotFoundError(f"no .pgd/.nod found for {name_or_path!r}")
-    chosen = candidates[0]
+    return candidates[0] if candidates else None
+
+
+def load_graph(name_or_path, *, dimensions: int = iv.MAXDIMEN,
+               seed: int = 0, operators=None) -> Graph:
+    """Resolve a spec to a Graph.
+
+    * with ``operators`` given, build the permutograph from base + operators
+      directly (the ``/PG`` idea: no file needed);
+    * otherwise resolve a name or file, preferring a ``.pgd`` (permutation
+      labels + operator colours) over plain ``.nod`` topology.
+    """
+    if operators is not None:
+        return Graph.build(str(name_or_path), list(operators),
+                           dimensions=dimensions, seed=seed)
+    chosen = _resolve_file(str(name_or_path))
+    if chosen is None:
+        raise FileNotFoundError(
+            f"no .pgd/.nod found for {name_or_path!r} "
+            f"(and no operators given to build one)")
     if chosen.endswith(".pgd"):
         return Graph.from_pgd(chosen, dimensions=dimensions, seed=seed)
     return Graph.load_nod(chosen, dimensions=dimensions, seed=seed)
 
 
-def run(name_or_path, seed: int = 1) -> int:
+def run(name_or_path, seed: int = 1, operators=None) -> int:
     from PySide6.QtCore import QPointF, QTimer
     from PySide6.QtGui import QColor, QFont, QPainter
     from PySide6.QtWidgets import QApplication, QWidget
@@ -58,6 +72,7 @@ def run(name_or_path, seed: int = 1) -> int:
         def __init__(self, name):
             super().__init__()
             self.name = str(name)
+            self.operators = list(operators) if operators is not None else None
             self.seed = seed
             self.alg_i = 0
             self.spinning = True
@@ -68,8 +83,10 @@ def run(name_or_path, seed: int = 1) -> int:
             self.phase = "off"         # off | spa | parsum | done
             self.start = 1
             self._pcount = 0
-            self.g = load_graph(name, seed=self.seed)
-            self.setWindowTitle(f"permuto — {self.name}")
+            self.g = load_graph(name, seed=self.seed, operators=self.operators)
+            title = self.name if self.operators is None \
+                else f"{self.name} {' '.join(self.operators)}"
+            self.setWindowTitle(f"permuto — {title}")
             self.resize(820, 860)
             self.timer = QTimer(self)
             self.timer.timeout.connect(self._step)
@@ -165,7 +182,8 @@ def run(name_or_path, seed: int = 1) -> int:
                 self.seed += 1
                 self.program = False
                 self.phase = "off"
-                self.g = load_graph(self.name, seed=self.seed)
+                self.g = load_graph(self.name, seed=self.seed,
+                                    operators=self.operators)
             elif k == "q":
                 self.close()
             self.update()

@@ -4,12 +4,14 @@
     python -m permuto gen   <base> <op...>          # -> .nod on stdout
     python -m permuto build <name> <base> <op...>   # write <name>.pg/.nod/.pgd
     python -m permuto show  <name-or-file.nod>      # interactive PySide6 viewer
+    python -m permuto show  <base> <op...>          # build + view on the fly
     python -m permuto render <name.nod> [out.png] [steps]   # offscreen PNG
     python -m permuto export <name> [out.ps] [steps]        # PostScript (SavePicture)
 
 Example:
     python -m permuto gen 123 12 + 23
     python -m permuto show ikosa2
+    python -m permuto show 1234 12 + 23 + 34
 """
 
 from __future__ import annotations
@@ -18,6 +20,26 @@ import sys
 from pathlib import Path
 
 from .gen import build
+
+
+def _as_spec(rest, resolves):
+    """Split viewer args into (name, operators, seed).
+
+    ``show 1234 12 + 23`` builds a permutograph from base + operators;
+    ``show ikosa2`` / ``show ikosa2 3`` loads a file with an optional seed.
+    They are told apart by whether the first argument resolves to a file:
+    if it does, a lone trailing integer is a seed; if it does not, the tail
+    must be an operator list to build from.
+    """
+    name = rest[0]
+    tail = rest[1:]
+    if not tail:
+        return name, None, 1
+    if resolves(name):
+        if len(tail) == 1 and tail[0].lstrip("-").isdigit():
+            return name, None, int(tail[0])     # name + seed
+        return name, None, 1                     # a file ignores trailing junk
+    return name, tail, 1                          # base + operators
 
 
 def main(argv=None) -> int:
@@ -44,8 +66,11 @@ def main(argv=None) -> int:
         return 0
 
     if cmd == "show":
-        from .ui.viewer import run
-        return run(rest[0], seed=int(rest[1]) if len(rest) > 1 else 1)
+        from .ui.viewer import _resolve_file, run
+
+        name, operators, seed = _as_spec(
+            rest, resolves=lambda n: _resolve_file(n) is not None)
+        return run(name, seed=seed, operators=operators)
 
     if cmd == "render":
         from .core import layout
