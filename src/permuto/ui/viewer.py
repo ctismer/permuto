@@ -224,6 +224,10 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
                 self.ui_mode = "file"
             elif k == "p":
                 self.ui_mode = "program"
+                # show node numbers so the user can read what to pick, exactly
+                # as the original drew them before opening the program menu
+                if self.session.name_mode == NameMode.NONE:
+                    self.session.name_mode = NameMode.NUMBER
             elif k == "e" and s.permuto:
                 self._enter_edit()
             elif ev.key() == Qt.Key_Escape:
@@ -250,26 +254,32 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
             if ev.key() == Qt.Key_Escape:
                 self.ui_mode = "main"
             elif k == "n":
-                self.pending = ("kill",)
-                self.message = "click a node to kill/repair"
+                self._ask_node("Node=", ("kill",), "kill/repair")
             elif k == "l":
-                self.pending = ("break1",)
-                self.message = "click the first node of the edge"
+                self._ask_node("Node 1=", ("break1",), "break/repair a line")
             elif k == "c":
-                self.pending = ("collapse1",)
-                self.message = "click the node to collapse"
+                self._ask_node("Collapse node=", ("collapse1",), "collapse")
             elif k == "u":
-                self.pending = ("uncollapse",)
-                self.message = "click the node to uncollapse"
+                self._ask_node("Uncollapse node=", ("uncollapse",), "uncollapse")
             elif k == "s":
-                self.pending = ("spa",)
-                self.message = "click the start node"
+                self._ask_node("StartNode=", ("spa",), "run SPA from")
             elif k == "t":
                 self._guard(s.start_spta)
                 self.ui_mode = "main"
             elif k == "p":
                 if self._guard(s.start_par_sum):
                     self.ui_mode = "main"
+
+        def _ask_node(self, label, pending, what):
+            """Ask for a node the original way -- type its number and Enter.
+
+            Clicking the node works too, as a modern convenience (the DOS
+            program had no mouse; that path is ours, the typed number is the
+            faithful one).
+            """
+            self.pending = pending
+            self._begin_prompt(f" {label}", "node")
+            self.message = f"type a node number and Enter, or click a node to {what}"
 
         # -- operator editor -------------------------------------------
         def _enter_edit(self):
@@ -364,32 +374,41 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
             self.prompt_kind = kind
 
         def _prompt_key(self, ev):
+            numeric = self.prompt_kind == "node"
             if ev.key() == Qt.Key_Escape:
+                self.pending = None
                 self.ui_mode = "main"
             elif ev.key() in (Qt.Key_Return, Qt.Key_Enter):
                 self._run_prompt()
-                self.ui_mode = "main"
             elif ev.key() == Qt.Key_Backspace:
                 self.prompt_buffer = self.prompt_buffer[:-1]
-            elif ev.text() and ev.text().isprintable():
+            elif ev.text() and ev.text().isprintable() \
+                    and (not numeric or ev.text().isdigit()):
                 self.prompt_buffer += ev.text()
 
         def _run_prompt(self):
-            name = self.prompt_buffer.strip()
-            if not name:
+            text = self.prompt_buffer.strip()
+            if not text:
+                return
+            if self.prompt_kind == "node":
+                if not text.isdigit() or int(text) not in self.g.nodes:
+                    self.message = f"no node {text} (1..{self.g.nnodes})"
+                    return
+                self._apply_pending(int(text))
                 return
             try:
                 if self.prompt_kind == "ps":
-                    save_ps(self.g, name)
-                    self.message = f"wrote {name}"
+                    save_ps(self.g, text)
+                    self.message = f"wrote {text}"
                 elif self.prompt_kind == "save":
-                    self._save_ply(name)
-                    self.message = f"saved {name}"
+                    self._save_ply(text)
+                    self.message = f"saved {text}"
                 elif self.prompt_kind == "load":
-                    self._load_ply(name)
-                    self.message = f"loaded {name}"
+                    self._load_ply(text)
+                    self.message = f"loaded {text}"
             except (PermutoError, OSError) as exc:
                 self.message = str(exc)
+            self.ui_mode = "main"
 
         def _save_ply(self, path):
             pm = self.session.pm
@@ -428,30 +447,27 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
             pm = s.pm
             if action == "kill":
                 self.g.nodes[node].state.dead = not self.g.nodes[node].state.dead
-                self.pending = None
-                self.ui_mode = "main"
+                self._done_pending()
             elif action == "break1":
-                self.pending = ("break2", node)
-                self.message = "click the second node of the edge"
+                self._ask_node("Node 2=", ("break2", node), "as the other end")
             elif action == "break2":
                 self._toggle_broken(self.pending[1], node)
-                self.pending = None
-                self.ui_mode = "main"
+                self._done_pending()
             elif action == "collapse1":
-                self.pending = ("collapse2", node)
-                self.message = "click the node to collapse it onto"
+                self._ask_node("onto node=", ("collapse2", node), "collapse onto")
             elif action == "collapse2":
                 self._guard(lambda: pm.collapse(self.g, self.pending[1], node))
-                self.pending = None
-                self.ui_mode = "main"
+                self._done_pending()
             elif action == "uncollapse":
                 self._guard(lambda: pm.uncollapse(self.g, node))
-                self.pending = None
-                self.ui_mode = "main"
+                self._done_pending()
             elif action == "spa":
                 self._guard(lambda: s.start_spa(node))
-                self.pending = None
-                self.ui_mode = "main"
+                self._done_pending()
+
+        def _done_pending(self):
+            self.pending = None
+            self.ui_mode = "main"
 
         def _toggle_broken(self, n1, n2):
             from ..core.pm import find_link
