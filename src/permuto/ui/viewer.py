@@ -125,6 +125,7 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
             title = self.spec_name if self.operators is None \
                 else f"{self.spec_name} {' '.join(self.operators)}"
             self.setWindowTitle(f"permuto - {title}")
+            self.setFocusPolicy(Qt.StrongFocus)
             self.resize(1000, 860)
             self.timer = QTimer(self)
             self.timer.timeout.connect(self._on_timer)
@@ -551,9 +552,11 @@ def run_iridium(seed: int = 1) -> int:
             self.settle = 0
             self.stepbuf = 0            # queued step keys (autorepeat)
             self.prompt = None          # (label, fields, values) while typing
+            self.buffer = ""            # the digits being typed into a field
             self.message = ("SIMONE   building the network"
                             "   (any key skips the wait)")
             self.setWindowTitle("permuto - Iridium / SIMONE")
+            self.setFocusPolicy(Qt.StrongFocus)   # make sure keys arrive here
             self.resize(900, 820)
             self.timer = QTimer(self)
             self.timer.timeout.connect(self._tick)
@@ -596,8 +599,16 @@ def run_iridium(seed: int = 1) -> int:
             p.setPen(QColor(255, 230, 140))
             if self.prompt:
                 label, fields, values = self.prompt
-                shown = "  ".join(f"{f}={v}" for f, v in zip(fields, values + [""]))
-                p.drawText(12, self.height() - 14, f" {label}  {shown}_")
+                parts = []
+                for i, f in enumerate(fields):
+                    if i < len(values):
+                        parts.append(f"{f}={values[i]}")
+                    elif i == len(values):
+                        parts.append(f"{f}={self.buffer}_")   # the live field
+                    else:
+                        parts.append(f"{f}=")
+                p.drawText(12, self.height() - 14,
+                           f" {label}:  " + "   ".join(parts))
             elif self.message:
                 p.drawText(12, self.height() - 14, self.message)
             p.end()
