@@ -28,6 +28,7 @@ from ..core.pm import PM
 from ..errors import PermutoError
 from ..session import Mode, NameMode, Session, new_permutograph_session
 from . import render
+from .prompt import FieldPrompt
 
 
 def _nod_dir():
@@ -86,6 +87,25 @@ def make_session(name_or_path, *, seed: int = 1, operators=None) -> Session:
     return Session(graph=g, mode=Mode.POLYTOP)
 
 
+def feed_prompt(prompt, ev) -> str:
+    """Map a Qt key event onto a :class:`FieldPrompt`.
+
+    The one place key events touch a prompt, used by every view -- returns
+    ``"cancel"``, ``"submit"`` or ``"typing"``.
+    """
+    from PySide6.QtCore import Qt
+
+    if ev.key() == Qt.Key_Escape:
+        return "cancel"
+    if ev.key() in (Qt.Key_Return, Qt.Key_Enter):
+        return prompt.enter()
+    if ev.key() == Qt.Key_Backspace:
+        prompt.backspace()
+        return "typing"
+    prompt.type_char(ev.text())
+    return "typing"
+
+
 def run(name_or_path, seed: int = 1, operators=None) -> int:
     from PySide6.QtCore import Qt, QTimer
     from PySide6.QtGui import QColor, QFont, QPainter
@@ -116,9 +136,8 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
             self.edit_buffer = ""
             self.edit_base_before = ""
 
-            # text prompt state (file names, numbers)
-            self.prompt_label = ""
-            self.prompt_buffer = ""
+            # a FieldPrompt while typing a file name or node number
+            self.prompt = None
             self.prompt_kind = None
             self.select = None          # SelectCard state, when picking a neighbour
 
@@ -182,9 +201,9 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
             p.setPen(QColor(150, 155, 175))
             p.drawText(12, self.height() - 32, self.session.status_line())
             p.setPen(QColor(255, 230, 140))
-            if self.ui_mode == "prompt":
+            if self.ui_mode == "prompt" and self.prompt:
                 p.drawText(12, self.height() - 14,
-                           f"{self.prompt_label}{self.prompt_buffer}_"
+                           self.prompt.display()
                            + (f"    {self.message}" if self.message else ""))
             elif self.ui_mode == "select" and self.select:
                 sel = self.select
@@ -381,33 +400,30 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
             self.ui_mode = "main"
             self.edit_field = None
 
-        # -- text prompt (filenames) -----------------------------------
+        # -- text prompt (filenames, node numbers) ---------------------
         def _begin_prompt(self, label, kind):
             self.ui_mode = "prompt"
-            self.prompt_label = label
-            self.prompt_buffer = ""
             self.prompt_kind = kind
+            self.prompt = FieldPrompt(label.strip(), [(label.strip(),
+                                                       kind == "node")])
 
         def _prompt_key(self, ev):
-            numeric = self.prompt_kind == "node"
-            if ev.key() == Qt.Key_Escape:
+            result = feed_prompt(self.prompt, ev)
+            if result == "cancel":
                 self.pending = None
                 self.ui_mode = "main"
-            elif ev.key() in (Qt.Key_Return, Qt.Key_Enter):
+            elif result == "submit":
                 self._run_prompt()
-            elif ev.key() == Qt.Key_Backspace:
-                self.prompt_buffer = self.prompt_buffer[:-1]
-            elif ev.text() and ev.text().isprintable() \
-                    and (not numeric or ev.text().isdigit()):
-                self.prompt_buffer += ev.text()
 
         def _run_prompt(self):
-            text = self.prompt_buffer.strip()
+            text = self.prompt.text()
             if not text:
                 return
             if self.prompt_kind == "node":
                 if not text.isdigit() or int(text) not in self.g.nodes:
                     self.message = f"no node {text} (1..{self.g.nnodes})"
+                    self.ui_mode = "main"
+                    self.pending = None
                     return
                 self._apply_pending(int(text))
                 return
@@ -551,8 +567,8 @@ def run_iridium(seed: int = 1) -> int:
             self.phase = "build"        # build -> settle -> run
             self.settle = 0
             self.stepbuf = 0            # queued step keys (autorepeat)
-            self.prompt = None          # (label, fields, values) while typing
-            self.buffer = ""            # the digits being typed into a field
+            self.prompt = None          # a FieldPrompt while typing
+            self.prompt_action = None
             self.message = ("SIMONE   building the network"
                             "   (any key skips the wait)")
             self.setWindowTitle("permuto - Iridium / SIMONE")
@@ -598,17 +614,7 @@ def run_iridium(seed: int = 1) -> int:
             p.drawText(12, 22, "Kill  Transmit  Step  Repeat  Clear      Quit")
             p.setPen(QColor(255, 230, 140))
             if self.prompt:
-                label, fields, values = self.prompt
-                parts = []
-                for i, f in enumerate(fields):
-                    if i < len(values):
-                        parts.append(f"{f}={values[i]}")
-                    elif i == len(values):
-                        parts.append(f"{f}={self.buffer}_")   # the live field
-                    else:
-                        parts.append(f"{f}=")
-                p.drawText(12, self.height() - 14,
-                           f" {label}:  " + "   ".join(parts))
+                p.drawText(12, self.height() - 14, self.prompt.display())
             elif self.message:
                 p.drawText(12, self.height() - 14, self.message)
             p.end()
@@ -616,7 +622,12 @@ def run_iridium(seed: int = 1) -> int:
         # -- input -----------------------------------------------------
         def keyPressEvent(self, ev):
             if self.prompt:
-                self._prompt_key(ev)
+                result = feed_prompt(self.prompt, ev)
+                if result == "cancel":
+                    self.prompt = None
+                elif result == "submit":
+                    self._run_prompt()
+                    self.prompt = None
                 self.update()
                 return
             if self.phase != "run":
@@ -642,26 +653,14 @@ def run_iridium(seed: int = 1) -> int:
             self.update()
 
         def _begin_prompt(self, action, fields):
-            self.prompt = (action, fields, [])
-            self.buffer = ""
+            self.prompt_action = action
+            if len(fields) == 1:
+                self.prompt = FieldPrompt(action, [(f"{fields[0]}=", True)])
+            else:
+                self.prompt = FieldPrompt(action, [(f, True) for f in fields])
 
-        def _prompt_key(self, ev):
-            action, fields, values = self.prompt
-            if ev.key() == Qt.Key_Escape:
-                self.prompt = None
-            elif ev.text().isdigit():
-                self.buffer += ev.text()
-            elif ev.key() == Qt.Key_Backspace:
-                self.buffer = self.buffer[:-1]
-            elif ev.key() in (Qt.Key_Return, Qt.Key_Enter):
-                values.append(self.buffer)
-                self.buffer = ""
-                if len(values) == len(fields):
-                    self._run_prompt(action, values)
-                    self.prompt = None
-
-        def _run_prompt(self, action, values):
-            nums = [int(v) if v else 0 for v in values]
+        def _run_prompt(self):
+            action, nums = self.prompt_action, self.prompt.ints()
             try:
                 if action == "kill":
                     self.iri.kill_node(Iridium.num_to_label(nums[0]))
