@@ -151,7 +151,7 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
             render.paint(self.g, p, pic_w, self.height(),
                          labels=self.labels, op_colors=self.op_colors,
                          program=self.session.program_mode,
-                         name_mode=self.session.name_mode)
+                         name_mode=self._draw_name_mode())
             if self.session.permuto and self.session.pm is not None:
                 render.paint_operator_panel(
                     self.session.pm, p, pic_w + 16, 60, self.height(),
@@ -160,7 +160,13 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
             self._paint_chrome(p)
             p.end()
 
-        def _paint_chrome(self, p):
+        def _draw_name_mode(self):
+            """Node numbers are forced on whenever a node is being chosen, so
+            there is always something to read -- the original drew them before
+            the program menu regardless of the current name mode."""
+            picking = self.ui_mode in ("program", "select") or \
+                (self.ui_mode == "prompt" and self.prompt_kind == "node")
+            return NameMode.NUMBER if picking else self.session.name_mode
             from PySide6.QtGui import QColor, QFont
 
             font = QFont("Menlo")
@@ -239,11 +245,7 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
             elif k == "f":
                 self.ui_mode = "file"
             elif k == "p":
-                self.ui_mode = "program"
-                # show node numbers so the user can read what to pick, exactly
-                # as the original drew them before opening the program menu
-                if self.session.name_mode == NameMode.NONE:
-                    self.session.name_mode = NameMode.NUMBER
+                self.ui_mode = "program"    # numbers are forced on while here
             elif k == "e" and s.permuto:
                 self._enter_edit()
             elif ev.key() == Qt.Key_Escape:
