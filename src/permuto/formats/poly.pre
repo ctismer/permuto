@@ -1,0 +1,176 @@
+% 19.09.95:
+% Ausgabe von Namen / Nummern
+% Korrekte Skalierung
+% Operatoren-Anzeige
+%
+% 22.01.92: DefAttributes
+% Version fÅr hohle Kreise als Knoten
+% ist leider etwas aufwendiger.
+% Um sauber die Kreise zu fÅllen, mÅssen sie
+% am Schlu· ausgegeben werden.
+% Das Åbernimmt die Funktion Finish.
+%
+% PrÑambel zur Postscript-Ausgabe von Polytopen.
+% (C) YCHI 08.02.91
+%
+%
+% Definiert werden
+% SetDimension, DefNode, DefEdge, DefEdgeOp, Finish
+%
+% In dieser Version werden die Knoten und Kanten sofort geplottet.
+% Die Koordinaten ergeben sich aus den Knoten. Kanten werden aus
+% Knotennamen gebildet.
+
+% Default: nimm PermStr als Beschriftung
+
+/LabelPos 2 def     % kann hier
+                    % oder in Zusatz-PrÑambel auf 1 gesetzt werden
+%/LabelPos 1 def    % wÑre NameStr
+
+/SetDimension {/Dimension exch def} def
+
+/PlotNode {      % Name
+  cvx exec     % jetzt Array da
+  dup
+  0 get /xpos exch def
+  1 get /ypos exch def
+  newpath
+  xpos disksize add ypos moveto
+  xpos ypos disksize 0 360 arc
+  currentgray    % auf stack
+  1 setgray      % weiss
+  fill
+  setgray
+  newpath
+  xpos disksize add ypos moveto
+  xpos ypos disksize 0 360 arc
+  stroke
+  xpos ypos moveto
+  Label CenteredText
+} def
+
+/CenteredText {  %  txt --
+  gsave
+  dup stringwidth pop   2 div neg
+  (N) stringwidth pop   2 div neg
+  rmoveto
+  show
+  grestore
+} def
+
+% dummerweise wei· ich hier die Anzahl der Knoten nicht.
+% mache ich spÑter anders. Vorerst gilt
+% hier als Default 1000 Knoten maximal
+
+
+/NodeDict 1000 dict def
+
+/xmax -9999 def
+/ymax -9999 def
+/xmin  9999 def
+/ymin  9999 def
+
+/CalcMinMax {   % Array
+                % berechne Min und Max aus ersten beiden Angaben.
+  dup 0 get
+  dup xmax gt { dup /xmax exch def } if
+  dup xmin lt { dup /xmin exch def } if
+  pop
+  1 get
+  dup ymax gt { dup /ymax exch def } if
+  dup ymin lt { dup /ymin exch def } if
+  pop
+} def
+
+/DefNode {      % Name
+                % braucht nichts zu tun au·er die Skalierung zu berechnen
+                % und den Knoten ins Nodes-Dict zu bringen
+  dup cvx exec CalcMinMax
+  NodeDict exch () put   % dict key val
+} def
+
+/DefAttributes {    % array with label, name-str, perm-str, colornum
+  dup 0 get /ThisNode exch def
+  LabelPos get /Label exch def
+  NodeDict ThisNode Label put
+} def
+
+/MustScale true def
+
+
+% Skalierung berechnen, nachdem alle Knoten bekannt sind.
+
+/CalcScale {  % --
+  20  2 div  2.54 div  72 mul
+  29 10 sub  2.54 div  72 mul
+  translate
+  xmax xmin sub
+  ymax ymin sub
+  1 index 1 index
+  lt { exch } if pop   % Maximum auf Stack
+  14           % cm
+  2.54 div     % inch
+  72   mul     % pt
+  exch div
+  dup 1 exch div /Scale exch def
+  dup scale
+  /Helvetica findfont 8 Scale mul scalefont setfont
+  (123456) stringwidth pop 2 div /disksize exch def
+  (123)    stringwidth pop 2 div /opdisksize exch def
+  3  72 mul 300 div Scale mul setlinewidth  % 3 Pixel, Ref. 300 dpi
+} def
+
+/DefEdge {     % Name1 Name2
+               % nur plotten
+  MustScale { CalcScale /MustScale false def } if
+  cvx exec     % habe Array
+  dup
+  0 get /xpos exch def
+  1 get /ypos exch def
+  newpath
+  xpos ypos moveto
+  cvx exec     % habe Array
+  dup
+  0 get /xpos exch def
+  1 get /ypos exch def
+  xpos ypos lineto stroke
+} def
+
+/DefEdgeOp {     % Name1 Name2 Op-Nr
+                 % nur plotten
+  MustScale { CalcScale /MustScale false def } if
+  3 string cvs /OpNr exch def
+  cvx exec     % habe Array
+  dup
+  0 get /xpos1 exch def
+  1 get /ypos1 exch def
+  newpath
+  xpos1 ypos1 moveto
+  cvx exec     % habe Array
+  dup
+  0 get /xpos2 exch def
+  1 get /ypos2 exch def
+  xpos2 ypos2 lineto stroke
+  newpath
+  xpos1 xpos2 add 2 div /xpos exch def
+  ypos1 ypos2 add 2 div /ypos exch def
+  xpos opdisksize add ypos moveto
+  xpos ypos opdisksize 0 360 arc
+  currentgray    % auf stack
+  1 setgray      % weiss
+  fill
+  setgray
+  xpos ypos moveto
+  OpNr CenteredText
+} def
+
+/Finish   { % in dieser Version druckt Finish das NodeDict
+  NodeDict
+  {
+    /Label exch def  % pop nicht mehr, Beschriftung
+    PlotNode  % der verarbeitet genau einen Key, das war's.
+  }
+  forall      % tue voriges fÅr jedes Element aus NodeDict
+  showpage
+} def
+
