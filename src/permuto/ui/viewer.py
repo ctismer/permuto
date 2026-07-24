@@ -13,7 +13,9 @@ Keys (as in the original):
 File menu (F):     Q quit   O PostScript out   L load .ply   S save .ply
 Program menu (P):  N kill/repair node   L break/repair line   C collapse
                    U uncollapse   S run SPA   T SPTA   P ParSum
-                   (for node/line actions, click the node(s) afterwards)
+                   Node actions ask for a node number (ReadInt); line/collapse
+                   then pick the neighbour with space/Enter (SelectCard), as in
+                   the original -- it had no mouse.
 """
 
 from __future__ import annotations
@@ -118,6 +120,7 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
             self.prompt_label = ""
             self.prompt_buffer = ""
             self.prompt_kind = None
+            self.select = None          # SelectCard state, when picking a neighbour
 
             title = self.spec_name if self.operators is None \
                 else f"{self.spec_name} {' '.join(self.operators)}"
@@ -168,21 +171,32 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
             p.setPen(QColor(200, 205, 225))
             p.drawText(12, 22, self._top_line())
 
-            # bottom: the status line, plus any transient message
+            # bottom: the status line, plus the live prompt / message
             p.setPen(QColor(150, 155, 175))
             p.drawText(12, self.height() - 32, self.session.status_line())
-            if self.message:
+            p.setPen(QColor(255, 230, 140))
+            if self.ui_mode == "prompt":
+                p.drawText(12, self.height() - 14,
+                           f"{self.prompt_label}{self.prompt_buffer}_"
+                           + (f"    {self.message}" if self.message else ""))
+            elif self.ui_mode == "select" and self.select:
+                sel = self.select
+                cand = sel["items"][sel["pos"]]
+                p.drawText(12, self.height() - 14,
+                           f" neighbour: node {cand}   "
+                           f"(space = next, Enter = pick, Esc = cancel)")
+            elif self.message:
                 p.setPen(QColor(255, 210, 140))
                 p.drawText(12, self.height() - 14, self.message)
-            elif self.ui_mode == "prompt":
-                p.setPen(QColor(255, 230, 140))
-                p.drawText(12, self.height() - 14,
-                           f"{self.prompt_label}{self.prompt_buffer}_")
 
         def _top_line(self):
             if self.ui_mode == "file":
                 return self.session.file_menu_line()
-            if self.ui_mode == "program":
+            if self.ui_mode == "prompt":
+                return (self.session.file_menu_line()
+                        if self.prompt_kind in ("ps", "save", "load")
+                        else self.session.program_menu_line())
+            if self.ui_mode in ("program", "select"):
                 return self.session.program_menu_line()
             if self.ui_mode == "edit":
                 return ("editing operators: digits, arrows move, "
@@ -196,6 +210,8 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
                 self._edit_key(ev)
             elif self.ui_mode == "prompt":
                 self._prompt_key(ev)
+            elif self.ui_mode == "select":
+                self._select_key(ev)
             elif self.ui_mode == "file":
                 self._file_key(ev)
             elif self.ui_mode == "program":
@@ -271,15 +287,11 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
                     self.ui_mode = "main"
 
         def _ask_node(self, label, pending, what):
-            """Ask for a node the original way -- type its number and Enter.
-
-            Clicking the node works too, as a modern convenience (the DOS
-            program had no mouse; that path is ours, the typed number is the
-            faithful one).
-            """
+            """Ask for a node the original way -- type its number and Enter
+            (``UserIO.ReadInt``).  The DOS program had no mouse."""
             self.pending = pending
             self._begin_prompt(f" {label}", "node")
-            self.message = f"type a node number and Enter, or click a node to {what}"
+            self.message = f"type a node number and Enter to {what}"
 
         # -- operator editor -------------------------------------------
         def _enter_edit(self):
@@ -427,43 +439,61 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
             else:
                 self.session = Session(graph=loaded.graph, mode=Mode.POLYTOP)
 
-        # -- mouse (node picking for program actions) ------------------
-        def mousePressEvent(self, ev):
-            pic_w = self.width() - (260 if self.session.permuto else 0)
-            pts = render.project(self.g, pic_w, self.height())
-            pos = ev.position()
-            best, bestd = None, 1e18
-            for num, (x, y, _z) in pts.items():
-                d = (x - pos.x()) ** 2 + (y - pos.y()) ** 2
-                if d < bestd:
-                    best, bestd = num, d
-            if best is not None and self.pending is not None:
-                self._apply_pending(best)
-            self.update()
+        # (no mouse: the DOS original was keyboard-only; node picking by click
+        #  is deferred to the refactor/extend phase.)
 
         def _apply_pending(self, node):
+            """Act on a node number just entered (``ReadInt`` returned)."""
             s = self.session
             action = self.pending[0]
-            pm = s.pm
             if action == "kill":
                 self.g.nodes[node].state.dead = not self.g.nodes[node].state.dead
                 self._done_pending()
             elif action == "break1":
-                self._ask_node("Node 2=", ("break2", node), "as the other end")
-            elif action == "break2":
-                self._toggle_broken(self.pending[1], node)
-                self._done_pending()
+                self._begin_select(node, "break2", "select the other end")
             elif action == "collapse1":
-                self._ask_node("onto node=", ("collapse2", node), "collapse onto")
-            elif action == "collapse2":
-                self._guard(lambda: pm.collapse(self.g, self.pending[1], node))
-                self._done_pending()
+                self._begin_select(node, "collapse2", "select the node to collapse onto")
             elif action == "uncollapse":
-                self._guard(lambda: pm.uncollapse(self.g, node))
+                self._guard(lambda: s.pm.uncollapse(self.g, node))
                 self._done_pending()
             elif action == "spa":
                 self._guard(lambda: s.start_spa(node))
                 self._done_pending()
+
+        def _begin_select(self, node, action, what):
+            """Enter SelectCard: cycle *node*'s neighbours with space, Enter picks.
+
+            This is the original's second step for line-break and collapse --
+            ``UserIO.SelectCard`` over the node's link list.
+            """
+            neighbours = list(self.g.nodes[node].links)
+            if not neighbours:
+                self.message = f"node {node} has no neighbours"
+                self._done_pending()
+                return
+            self.select = {"node": node, "action": action,
+                           "items": neighbours, "pos": 0}
+            self.ui_mode = "select"
+            self.message = f"{what}: space = next, Enter = pick, Esc = cancel"
+
+        def _select_key(self, ev):
+            sel = self.select
+            if ev.key() == Qt.Key_Escape:
+                self._end_select()
+            elif ev.key() == Qt.Key_Space:
+                sel["pos"] = (sel["pos"] + 1) % len(sel["items"])
+            elif ev.key() in (Qt.Key_Return, Qt.Key_Enter):
+                chosen = sel["items"][sel["pos"]]
+                if sel["action"] == "break2":
+                    self._toggle_broken(sel["node"], chosen)
+                elif sel["action"] == "collapse2":
+                    self._guard(
+                        lambda: self.session.pm.collapse(self.g, sel["node"], chosen))
+                self._end_select()
+
+        def _end_select(self):
+            self.select = None
+            self._done_pending()
 
         def _done_pending(self):
             self.pending = None
