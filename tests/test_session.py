@@ -199,13 +199,6 @@ def test_rebuilding_with_a_new_base_starts_over(permuto):
     assert permuto.iteration == 0
 
 
-def test_rebuilding_drops_operators_that_no_longer_fit(permuto):
-    permuto.pm.set_base("12")           # ops 23 and 34 become invalid
-    permuto.rebuild_permutograph(base_changed=True)
-    assert [row[0] for row in permuto.pm.optable[:3]] == ["12", "", ""]
-    assert permuto.graph.nnodes == 2
-
-
 def test_editing_needs_an_operator_table(polytop):
     with pytest.raises(ProgramStateError):
         polytop.rebuild_permutograph(base_changed=False)

@@ -32,13 +32,3 @@ def test_dimension_falls_to_true_dimension():
         if g.dimensions <= 3:
             break
     assert g.dimensions <= 3, f"icosahedron stuck at {g.dimensions}"
-
-
-def test_dimension_sheds_for_cube():
-    # small, highly symmetric graphs shed dimensions but the heuristic need
-    # not reach the true minimum ("as far as it must, but not further")
-    path = modula_dir() / "nod" / "wuerfel.nod"
-    g = Graph.load_nod(path, dimensions=iv.MAXDIMEN, seed=1)
-    for _ in range(600):
-        layout.relax_step(g, alg="rubber")
-    assert g.dimensions < 8

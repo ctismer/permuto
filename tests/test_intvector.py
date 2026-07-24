@@ -31,11 +31,18 @@ def test_vector_length():
     assert iv.vector_length([3, 4, 0, 0, 0, 0, 0, 0]) == 5
 
 
-def test_spin_cos_sin_identity():
-    # rotc^2 + rots^2 == Norm^2 (drift-free rotation), as in PCalc.Spin
+def test_spin_rotation_is_drift_free():
+    # PCalc.Spin builds a rotation from rots = Norm/120 (small-angle sine) and
+    # rotc = sqrt(Norm^2 - rots^2).  The point is that sin^2 + cos^2 stays at
+    # Norm^2 so repeated spins do not shrink or grow the figure.  Assert that
+    # identity to within integer-sqrt truncation -- not the intermediate values.
     rots = iv.NORM // 120
     rotc = iv.sqrt(iv.sqr(iv.NORM) - iv.sqr(rots))
-    assert rots == 34 and rotc == 4095
+    hypot_sq = iv.sqr(rotc) + iv.sqr(rots)
+    # rotc is the floor of the true cosine, so the sum is <= Norm^2 but within
+    # the rounding of one unit in rotc: (rotc+1)^2 must exceed Norm^2.
+    assert hypot_sq <= iv.sqr(iv.NORM)
+    assert iv.sqr(rotc + 1) + iv.sqr(rots) > iv.sqr(iv.NORM)
 
 
 def test_spin_preserves_length_approximately():
