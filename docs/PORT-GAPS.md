@@ -121,11 +121,15 @@ Bottom line: `iter=<n> dim=<d> nodes=<n>  A=<algorithm>`
   **Load order matters**: read header → `NewPermutograph(TRUE)` to regenerate
   the graph (this is what sets `Order` and the `PermCache`) → then overwrite
   every node record. Loading also flips the Permuto flag.
-- **PostScript preamble.** Our `.p` output is not runnable on its own; it
-  needs `legacy/modula/plots/poly.pre` (auto-scaling to 14 cm, Helvetica 8pt,
-  hollow circles, `DefEdgeOp` draws the operator digit on the edge midpoint).
-  Ship or embed it. `plots/namestr.pre` selects `LabelPos 1` (node number)
-  instead of the default `2` (permutation string).
+- **PostScript preamble** (done — bundled as `src/permuto/formats/poly.pre`,
+  prepended by `save_ps` by default). The raw `.p` body is not runnable on its
+  own; `poly.pre` is the hand-written driver (auto-scaling to 14 cm, Helvetica
+  8pt, hollow circles, `DefEdgeOp` draws the operator digit on the edge
+  midpoint). `plots/namestr.pre` selects `LabelPos 1` (node number) instead of
+  the default `2` (permutation string).
+  The `(C) YCHI` byline is the author's own pseudonym: mis-heard from The Small
+  Faces' *Itchycoo Park* (1967), adopted without understanding it, then
+  forgotten — recovered here in 2026.
 
 ## 4. Program submenu — partly missing
 
