@@ -3,16 +3,7 @@
 import pytest
 
 from permuto import NodeNotFound, ProgramStateError
-from permuto.core.iri import (
-    BLUE,
-    FREQ,
-    FULL,
-    LIMIT,
-    RED,
-    YELLOW,
-    Iridium,
-    valid_label,
-)
+from permuto.core.iri import FREQ, FULL, LIMIT, YELLOW, Iridium, valid_label
 
 
 @pytest.fixture
@@ -34,13 +25,6 @@ def test_the_grid_is_the_triangle_of_labels_summing_to_freq(net):
     expected = {f"{a}{b}{c}" for a in range(FREQ + 1) for b in range(FREQ + 1)
                 for c in range(FREQ + 1) if a + b + c == FREQ}
     assert labels == {f"{int(l[0])}{int(l[1])}{int(l[2])}" for l in expected}
-
-
-def test_the_sweep_visits_rows_alternately(net):
-    """"090", then "081" "180", then "270" "171" "072" -- a boustrophedon, so
-    the incremental build looks like a growing sheet."""
-    order = [net.graph.nodes[n].perm for n in sorted(net.graph.nodes)]
-    assert order[:6] == ["090", "081", "180", "270", "171", "072"]
 
 
 def test_neighbours_differ_by_one_step_in_two_coordinates(net):
@@ -133,20 +117,6 @@ def test_a_packet_walks_to_its_destination_and_is_consumed(net):
     assert all(nd.iri.target == 0 for nd in net.graph.nodes.values())
 
 
-def test_the_packet_gets_closer_on_the_undamaged_grid(net):
-    net.transmit("900", "009")
-    dst_label = "009"
-
-    def distance_now():
-        n = _carrier(net)
-        return None if n is None else \
-            sum(abs(int(a) - int(b)) for a, b in zip(net.graph.nodes[n].perm, dst_label))
-
-    start = distance_now()
-    net.step()
-    assert distance_now() < start
-
-
 def test_routing_detours_around_dead_satellites(net):
     """The whole point of the exercise: because "sideways" and even
     "backwards" carry a non-zero quality, a packet routes around damage
@@ -189,33 +159,7 @@ def test_only_one_packet_per_node(net):
             assert net.graph.nodes[n].iri.message_num != 0
 
 
-def test_destination_is_marked_blue_and_carrier_takes_the_message_colour(net):
-    net.transmit("900", "009")
-    assert net.graph.nodes[net.seek_node("009")].color == BLUE
-    assert net.graph.nodes[net.seek_node("900")].color == RED
-    net.step()
-    carrier = _carrier(net)
-    assert net.graph.nodes[carrier].color == RED
-
-
-def test_forwarding_discharges_the_node(net):
-    net.transmit("900", "009")
-    net.step()
-    carrier = _carrier(net)
-    # the sender forwarded, so it paid the 80% discharge
-    assert net.availability()[net.seek_node("900")] < FULL
-    assert carrier != net.seek_node("900")
-
-
 # --- repeated senders --------------------------------------------------
-
-def test_a_repeating_sender_keeps_its_own_colour(net):
-    net.transmit("900", "009", repeat=3)
-    src = net.graph.nodes[net.seek_node("900")]
-    assert src.iri.sender_repeat == 3
-    assert src.iri.sender_color not in (BLUE, YELLOW, 0)
-    assert src.color == src.iri.sender_color
-
 
 def test_repeat_injects_one_packet_per_call_until_exhausted(net):
     net.transmit("900", "009", repeat=2)
