@@ -472,6 +472,8 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
             self.ui_mode = "main"
 
         def _save_session(self, path):
+            import pathlib
+
             pm = self.session.pm
             mode = "permuto" if self.session.permuto else "polytop"
             sess = PlySession(
@@ -479,8 +481,10 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
                 base=pm.base if pm else "",
                 optable=[list(r) for r in pm.optable] if pm else [],
                 last_edit_line=pm.last_edit_line if pm else 0)
-            # .pms text unless the name ends in .ply; a bare name gets .pms
-            return save_session(path, sess)
+            # the viewer always saves text .pms (binary .ply is read-only legacy);
+            # whatever extension was typed, the file is a .pms
+            out = pathlib.Path(path).with_suffix(".pms")
+            return save_session(out, sess, binary=False)
 
         def _load_session(self, path):
             loaded = load_session(path)  # .pms or .ply, detected by content

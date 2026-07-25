@@ -105,6 +105,25 @@ def test_saving_and_loading_a_pms_in_the_running_viewer(qapp, tmp_path):
     assert captured["reloaded"] == 24
 
 
+def test_viewer_always_saves_text_pms_never_binary(qapp, tmp_path):
+    """The save prompt says .pms, and .ply is read-only legacy, so the viewer
+    must write text whatever extension is typed -- no hidden switch to binary."""
+    captured = {}
+
+    def drive(view):
+        captured["bare"] = view._save_session(str(tmp_path / "xanti")).name
+        captured["ply"] = view._save_session(str(tmp_path / "foo.ply")).name
+        # the file written for a .ply name must still be text
+        captured["is_text"] = (tmp_path / "foo.pms").read_bytes()[:15] == \
+            b"permuto session"
+        view.close()
+
+    viewer.run("1234", operators=["12", "+", "23", "+", "34"], _drive=drive)
+    assert captured["bare"] == "xanti.pms"
+    assert captured["ply"] == "foo.pms"
+    assert captured["is_text"]
+
+
 def test_polytop_view_paints_a_plain_nod_graph(qapp):
     captured = {}
 
