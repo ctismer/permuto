@@ -72,6 +72,39 @@ def test_permutograph_view_paints_in_every_mode(qapp):
     assert captured["error"] is None, f"paint raised: {captured['error']!r}"
 
 
+def test_saving_and_loading_a_pms_in_the_running_viewer(qapp, tmp_path):
+    """Start bare, save the session, load a different one, load the first back
+    -- all through the viewer's own F->S / F->L, painting after each."""
+    captured = {}
+
+    def drive(view):
+        for _ in range(30):
+            view.session.tick()
+        view._save_session(str(tmp_path / "pgl4.pms"))
+        first_nodes = view.g.nnodes
+
+        # a different graph, written as .pms, then loaded via the viewer
+        from permuto.core.graph import Graph
+        from permuto.formats import PlySession, write_pms
+        other = Graph.build("123", ["12", "+", "23"], seed=1)
+        write_pms(tmp_path / "other.pms",
+                  PlySession(graph=other, mode="permuto", base="123"))
+
+        view._load_session(str(tmp_path / "other.pms"))
+        _repaint(view)
+        loaded_nodes = view.g.nnodes
+
+        view._load_session(str(tmp_path / "pgl4.pms"))     # first one back
+        _repaint(view)
+        captured.update(first=first_nodes, loaded=loaded_nodes,
+                        reloaded=view.g.nnodes)
+        view.close()
+
+    viewer.run("1234", operators=["12", "+", "23", "+", "34"], _drive=drive)
+    assert captured["first"] == 24 and captured["loaded"] == 6
+    assert captured["reloaded"] == 24
+
+
 def test_polytop_view_paints_a_plain_nod_graph(qapp):
     captured = {}
 
