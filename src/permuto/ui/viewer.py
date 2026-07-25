@@ -63,22 +63,54 @@ def load_graph(name_or_path, *, dimensions: int = iv.MAXDIMEN,
     chosen = _resolve_file(str(name_or_path))
     if chosen is None:
         raise FileNotFoundError(
-            f"no .pgd/.nod found for {name_or_path!r} "
-            f"(and no operators given to build one)")
+            f"nothing found for {name_or_path!r}: no session (.pms/.ply), "
+            f"no graph (.pgd/.nod), and no operators to build one")
     if chosen.endswith(".pgd"):
         return Graph.from_pgd(chosen, dimensions=dimensions, seed=seed)
     return Graph.load_nod(chosen, dimensions=dimensions, seed=seed)
+
+
+def _session_path(p: str):
+    """Return the session file for *p*, trying ``.pms``/``.ply`` too, or None.
+
+    So ``show xanti`` finds ``xanti.pms`` -- symmetric with save, which appends
+    ``.pms`` to a bare name.
+    """
+    for cand in (p, p + ".pms", p + ".ply"):
+        if not os.path.isfile(cand):
+            continue
+        if cand.endswith((".pms", ".ply")):
+            return cand
+        with open(cand, "rb") as f:
+            if f.read(15) == b"permuto session":
+                return cand
+    return None
 
 
 def make_session(name_or_path, *, seed: int = 1, operators=None) -> Session:
     """Build the initial :class:`Session` for the viewer.
 
     A base + operators (or a ``.pgd``) yields permutograph mode, with a live
-    :class:`PM`; a plain ``.nod`` yields polytop mode.
+    :class:`PM`; a plain ``.nod`` yields polytop mode; a saved session file
+    (``.pms`` / ``.ply``) is loaded and resumed where it left off.
     """
     if operators is not None:
         return new_permutograph_session(str(name_or_path), list(operators))
-    chosen = _resolve_file(str(name_or_path))
+    p = str(name_or_path)
+    session_file = _session_path(p)
+    if session_file is not None:
+        from ..core import layout
+        from ..formats import load_session
+
+        loaded = load_session(session_file)
+        layout.normalize(loaded.graph)         # frame it at the current scale
+        mode = Mode.PERMUTO if loaded.pm is not None else Mode.POLYTOP
+        session = Session(graph=loaded.graph, mode=mode, pm=loaded.pm)
+        session.iteration = loaded.iteration
+        for w in loaded.warnings:              # truncation salvaged on load
+            print(f"warning: {w}", file=sys.stderr)
+        return session
+    chosen = _resolve_file(p)
     if chosen and chosen.endswith(".pgd"):
         from ..formats import read_pgd
 

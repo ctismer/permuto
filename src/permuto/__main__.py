@@ -5,6 +5,7 @@
     python -m permuto gen   <base> <op...>          # -> .nod on stdout
     python -m permuto build <name> <base> <op...>   # write <name>.pg/.nod/.pgd
     python -m permuto show  <name-or-file.nod>      # interactive PySide6 viewer
+    python -m permuto show  <session.pms|.ply>      # resume a saved session
     python -m permuto show  <base> <op...>          # build + view on the fly
     python -m permuto iridium                       # the /I satellite simulation
     python -m permuto convert <in.ply> [out.pms]    # migrate a binary session

@@ -282,18 +282,19 @@ def read_pms(path) -> PlySession:
     if not body or not body[0][1].startswith(MAGIC):
         raise FileFormatError(path, f"not a {MAGIC!r} file", where="line 1")
 
-    # A well-terminated file ends with the 'end' marker.  If it does not, it was
-    # cut off, and *only* its final line may be an incomplete tail -- everything
-    # before it must still be perfectly valid, and everything else is an error.
-    truncated = body[-1][1].split(" ", 1)[0] != "end"
-    if truncated:
-        warnings.append("no 'end' marker: the file was cut off; "
-                        "loaded what was readable")
+    # A well-terminated file ends with the 'end' marker.  Its absence does NOT
+    # by itself mean truncation (a file written before the marker existed is
+    # complete without it) -- truncation is only concluded from actual damage: a
+    # final line cut mid-way, or fewer nodes than the header declared.  When the
+    # 'end' marker IS present the file claims to be complete, so any
+    # inconsistency is corruption and fatal.
+    has_end = body[-1][1].split(" ", 1)[0] == "end"
+    tail_cut = False
 
     for idx, (lineno, line) in enumerate(body[1:], start=1):
         head, _, rest = line.partition(" ")
         rest = rest.strip()
-        salvage = truncated and idx == len(body) - 1   # only the final line
+        is_last = idx == len(body) - 1
         try:
             if head == "mode":
                 mode = rest
@@ -314,7 +315,7 @@ def read_pms(path) -> PlySession:
                 declared_nodes = int(rest)
             elif head == "node":
                 nd = _parse_node(path, lineno, rest.split(), dim,
-                                 warnings.append, salvage)
+                                 warnings.append, salvage=False)
                 g.nodes[nd.num] = nd
             elif head == "end":
                 pass
@@ -322,12 +323,19 @@ def read_pms(path) -> PlySession:
                 raise FileFormatError(path, f"unknown key {head!r}",
                                       where=f"line {lineno}")
         except (ValueError, FileFormatError) as exc:
-            if not salvage:
+            # A strict parse failure is only tolerable on the very last line of a
+            # file with no 'end' marker -- that is a truncated tail.
+            if not (is_last and not has_end):
                 if isinstance(exc, FileFormatError):
                     raise
                 raise FileFormatError(path, f"could not parse: {exc}",
                                       where=f"line {lineno}") from exc
-            warnings.append(f"line {lineno}: cut short, stopped here")
+            tail_cut = True
+            warnings.append(f"line {lineno}: last line cut short")
+            if head == "node" and rest:
+                nd = _parse_node(path, lineno, rest.split(), dim,
+                                 warnings.append, salvage=True)
+                g.nodes[nd.num] = nd
 
     if not 1 <= dim <= iv.MAXDIMEN:
         raise FileFormatError(path, f"dim {dim} is outside 1..{iv.MAXDIMEN}")
@@ -335,16 +343,11 @@ def read_pms(path) -> PlySession:
     g.dimensions = dim
     g.n_operators = sum(1 for row in optable if any(row))
 
-    # count and link consistency: a warning when truncated (nodes were lost off
-    # the end), a hard error in a file that claims to be complete.
-    if declared_nodes is not None and declared_nodes != g.nnodes:
-        msg = f"expected {declared_nodes} nodes, recovered {g.nnodes}"
-        if truncated:
-            warnings.append(msg)
-        else:
-            raise FileFormatError(path, f"header says {declared_nodes} nodes "
-                                  f"but {g.nnodes} were read")
-    _resolve_links(path, g, warnings, truncated)
+    count_bad = declared_nodes is not None and declared_nodes != g.nnodes
+    if count_bad and has_end:
+        raise FileFormatError(path, f"header says {declared_nodes} nodes "
+                              f"but {g.nnodes} were read")
+    dropped = _resolve_links(path, g, warnings, strict=has_end)
 
     pm = None
     if base:
@@ -352,28 +355,44 @@ def read_pms(path) -> PlySession:
         try:
             pm = PM(base=base, optable=[list(r) for r in optable])
         except (InvalidBase, InvalidCycle) as exc:
-            if not truncated:
+            if has_end:
                 raise FileFormatError(path, f"unusable operators: {exc}")
             warnings.append(f"operators unusable, editor disabled: {exc}")
+
+    # A cleanly written file ends with the 'end' marker (checked above when it is
+    # present).  If it is missing, the file is either an older save from before
+    # the marker existed, or it was truncated.  We cannot always tell a
+    # boundary-aligned cut from a complete file, so we always note the missing
+    # marker -- reassuringly when nothing looks lost, plainly when it does.
+    if not has_end:
+        if tail_cut or count_bad or dropped:
+            warnings.insert(0, f"file was truncated; recovered {g.nnodes}"
+                            + (f" of {declared_nodes}" if count_bad else "")
+                            + " nodes")
+        else:
+            warnings.insert(0, "no 'end' marker (older save?); loaded fully")
 
     return PlySession(graph=g, permuto=(mode == "permuto"), base=base,
                       optable=optable, last_edit_line=last_edit_line,
                       iteration=iteration, pm=pm, mode=mode, warnings=warnings)
 
 
-def _resolve_links(path, g: Graph, warnings: List[str], truncated: bool) -> None:
-    """Links to a missing node are a truncation artefact (its line was cut away)
-    -- dropped with a warning; in a complete file they are corruption -- fatal."""
+def _resolve_links(path, g: Graph, warnings: List[str], strict: bool) -> int:
+    """Links to a missing node: corruption in a complete file (fatal), or a
+    truncation artefact otherwise (dropped, counted).  Returns how many dropped."""
+    dropped = 0
     for nd in g.nodes.values():
         opno = list(nd.opno) + [0] * (len(nd.links) - len(nd.opno))
         kept = [(j, op) for j, op in zip(nd.links, opno) if j in g.nodes]
         if len(kept) != len(nd.links):
-            if not truncated:
+            if strict:
                 bad = next(j for j in nd.links if j not in g.nodes)
                 raise FileFormatError(
                     path, f"node {nd.num} links to {bad}, which does not exist")
+            dropped += len(nd.links) - len(kept)
             warnings.append(f"node {nd.num}: dropped {len(nd.links) - len(kept)} "
                             f"link(s) to missing node(s)")
             nd.links = [j for j, _ in kept]
             nd.opno = [op for _, op in kept] if nd.opno else []
         nd.nlink = len(nd.links)
+    return dropped

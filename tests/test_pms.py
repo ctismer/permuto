@@ -195,10 +195,10 @@ def test_malformed_files_are_reported(tmp_path, text, detail):
 
 
 def test_truncation_is_salvaged_with_a_warning_not_rejected(tmp_path):
-    """A cut file is loaded, not refused: the 'end' marker is missing, so the
-    reader keeps what parsed, zero-fills the rest (coordinates re-derive from
-    the relaxation) and reports it in .warnings.  Cutting inside the last node
-    line is caught too, which the node count alone would miss."""
+    """A cut file is loaded, not refused: the reader keeps what parsed,
+    zero-fills the rest (coordinates re-derive from the relaxation) and reports
+    it in .warnings.  A cut inside the last node line is caught too, which the
+    node count alone would miss."""
     g = Graph.build("1234", ["12", "+", "23", "+", "34"], seed=1)
     for _ in range(30):
         layout.relax_step(g, alg="rubber")
@@ -207,20 +207,39 @@ def test_truncation_is_salvaged_with_a_warning_not_rejected(tmp_path):
     data = full.read_text()
     lines = data.splitlines(keepends=True)
 
-    cuts = {
+    damaged = {                                  # whole node lines lost off the end
         "half the lines": "".join(lines[:len(lines) // 2]),
-        "just the end marker gone": data.rstrip()[:-len("end")],
-        "mid last node line": data[:len(data) - 15],
         "half the bytes": data[:len(data) // 2],
     }
-    for label, text in cuts.items():
+    for label, text in damaged.items():
         p = tmp_path / "cut.pms"
         p.write_text(text)
-        s = read_pms(p)                       # loads, does not raise
-        assert s.warnings, f"{label}: truncation not reported"
-        assert any("cut off" in w for w in s.warnings)
-        assert s.graph.nnodes >= 1
+        s = read_pms(p)                          # loads, does not raise
+        assert any("truncated" in w for w in s.warnings), f"{label}: not flagged"
+        assert 1 <= s.graph.nnodes < g.nnodes
 
-    assert not read_pms(full).warnings        # the intact file: no warnings
+    assert not read_pms(full).warnings           # the intact file: no warnings
+
+
+def test_a_file_without_the_end_marker_is_flagged_but_loaded(tmp_path):
+    """The 'end' trailer is new.  A file missing it -- an older save, or one
+    truncated exactly on a boundary -- cannot be proven complete, so it is
+    always noted, but reassuringly ('loaded fully') when nothing looks lost and
+    plainly ('truncated') when nodes are missing."""
+    g = Graph.build("1234", ["12", "+", "23", "+", "34"], seed=1)
+    for _ in range(30):
+        layout.relax_step(g, alg="rubber")
+    full = tmp_path / "full.pms"
+    write_pms(full, PlySession(graph=g, mode="permuto", base="1234"))
+
+    no_end = full.read_text().rstrip()
+    assert no_end.endswith("end")
+    no_end = no_end[:-len("end")].rstrip() + "\n"     # drop just the 'end' line
+    p = tmp_path / "old.pms"
+    p.write_text(no_end)
+
+    s = read_pms(p)
+    assert s.graph.nnodes == g.nnodes                  # nothing actually lost
+    assert len(s.warnings) == 1 and "loaded fully" in s.warnings[0]
 
 

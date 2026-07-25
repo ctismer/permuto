@@ -157,6 +157,31 @@ def test_loading_a_session_saved_at_a_different_scale_fills_the_view(qapp, tmp_p
     assert captured["spread"] > 100, "loaded graph is a dot, not renormalized"
 
 
+def test_starting_directly_on_a_session_file(qapp, tmp_path):
+    """`permuto show <name>` resumes a saved session, finding <name>.pms when a
+    bare name is given (symmetric with save appending .pms)."""
+    from permuto.core.graph import Graph
+    from permuto.formats import PlySession, write_pms
+
+    g = Graph.build("1234", ["12", "+", "23", "+", "34"], seed=1)
+    write_pms(tmp_path / "sess.pms",
+              PlySession(graph=g, mode="permuto", base="1234", iteration=42))
+    captured = {}
+
+    def drive(view):
+        captured["nodes"] = view.g.nnodes
+        captured["iter"] = view.session.iteration
+        captured["pm"] = view.session.pm is not None
+        _repaint(view)
+        view.close()
+
+    # bare name (no extension) must resolve to sess.pms
+    viewer.run(str(tmp_path / "sess"), _drive=drive)
+    assert captured["nodes"] == 24
+    assert captured["iter"] == 42
+    assert captured["pm"] is True
+
+
 def test_polytop_view_paints_a_plain_nod_graph(qapp):
     captured = {}
 
