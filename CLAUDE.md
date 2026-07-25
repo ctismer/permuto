@@ -4,7 +4,9 @@ Christian Tismer's polytope / permutograph viewer. The original working copy
 was deleted years ago; it survived only as `Poly.cry` — a ZIP encrypted with
 the author's own 1987 `Crypt.pas` XOR tool — attached to a 1997 mail to a
 colleague ("Vijay"). Recovered in 2026 from the Thunderbird archive and
-decrypted (password `christian`).
+decrypted (password `christian`). The XOR scheme and that password were never
+meant as real security — it was more a light test of whether the recipient could
+cope with decrypting it at all.
 
 We are now **porting it to Python (PySide6)**, keeping the Modula-2 original
 alongside for reference until the port is complete.
