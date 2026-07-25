@@ -182,6 +182,26 @@ def test_starting_directly_on_a_session_file(qapp, tmp_path):
     assert captured["pm"] is True
 
 
+def test_freshly_built_graph_fills_the_view_not_a_dot(qapp):
+    """A just-built permutograph seeds its coordinates from the topology (tiny),
+    which at the large NORM would project to a single dot; the viewer must
+    normalize the initial picture so it fills the view straight away."""
+    from permuto.ui import render
+
+    captured = {}
+
+    def drive(view):
+        view.resize(900, 800)
+        pts = render.project(view.g, 640, 800)
+        xs = [p[0] for p in pts.values()]
+        ys = [p[1] for p in pts.values()]
+        captured["spread"] = max(max(xs) - min(xs), max(ys) - min(ys))
+        view.close()
+
+    viewer.run("1234", operators=["12", "+", "23", "+", "34"], _drive=drive)
+    assert captured["spread"] > 100, "startup graph collapsed to a dot"
+
+
 def test_polytop_view_paints_a_plain_nod_graph(qapp):
     captured = {}
 

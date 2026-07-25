@@ -180,6 +180,13 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
             self.seed = seed
             self.session = make_session(name_or_path, seed=seed,
                                         operators=self.operators)
+            # Frame the initial picture: a freshly built permutograph seeds its
+            # coordinates from the topology (tiny, ~tens of units), which at the
+            # large NORM projects to a single dot until relaxed.  One normalize
+            # scales it to fill the view straight away (the original ran one
+            # iteration, and hence a Normalize, before waiting for a key).
+            from ..core import layout
+            layout.normalize(self.session.graph)
 
             # UI chrome state
             self.ui_mode = "main"       # main | file | program | edit | prompt
