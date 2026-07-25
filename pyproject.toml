@@ -1,9 +1,22 @@
 [project]
 name = "permuto"
-version = "0.0.1"
-description = "Modern (PySide6) reincarnation of the 1990-95 Modula-2 Polytop/Permutograph viewer"
+version = "0.1.0"
+description = "Polytop / Permutograph viewer — a Modula-2 (1990-95) program recovered and ported to Python/PySide6"
+readme = "README.md"
 requires-python = ">=3.10"
+authors = [{ name = "Christian Tismer-Sperling", email = "tismer@stackless.com" }]
+keywords = ["permutograph", "permutohedron", "visualization", "PySide6", "Gotthard Günther"]
 dependencies = ["PySide6>=6.5"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.urls]
+Homepage = "https://github.com/ctismer/permuto"
+Source = "https://github.com/ctismer/permuto"
+
+[project.scripts]
+permuto = "permuto.__main__:main"
 
 [build-system]
 requires = ["setuptools>=61"]
