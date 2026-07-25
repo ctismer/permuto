@@ -46,12 +46,15 @@ the shortest-path edges:
 
 ## Install & run
 
-Requires Python 3.10+ and PySide6.
+Requires Python 3.10+ (PySide6 is pulled in automatically). One command:
 
 ```bash
-pip install -e .          # or prefix commands with PYTHONPATH=src
-python -m permuto         # just start (permutograph mode, default 1234)
+pip install git+https://github.com/ctismer/permuto
+permuto                   # just start (permutograph mode, default 1234)
+permuto show pgl4         # the sample graphs are bundled -- no extra download
 ```
+
+For development, clone and `pip install -e .` instead.
 
 ```bash
 python -m permuto show pgl4                 # a named graph (legacy/modula/nod/)

@@ -28,6 +28,8 @@ where = ["src"]
 [tool.setuptools.package-data]
 # the hand-written PostScript preamble that makes an export runnable
 "permuto.formats" = ["poly.pre"]
+# the named sample graphs, so "permuto show pgl4" works from a plain install
+"permuto.data" = ["nod/*.nod", "nod/*.pgd"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

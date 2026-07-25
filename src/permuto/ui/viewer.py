@@ -33,8 +33,17 @@ from .prompt import FieldPrompt
 
 
 def _nod_dir():
-    return os.path.join(os.path.dirname(__file__), "..", "..", "..",
-                        "legacy", "modula", "nod")
+    """Where the named sample graphs live.
+
+    Prefer the copy bundled with the package (so ``pip install`` + ``permuto
+    show pgl4`` just works), and fall back to the recovered originals under
+    ``legacy/`` when running from a source checkout.
+    """
+    here = os.path.dirname(__file__)
+    bundled = os.path.join(here, "..", "data", "nod")
+    if os.path.isdir(bundled):
+        return bundled
+    return os.path.join(here, "..", "..", "..", "legacy", "modula", "nod")
 
 
 def _resolve_file(p: str):
