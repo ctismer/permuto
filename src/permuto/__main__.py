@@ -1,5 +1,6 @@
 """CLI mirroring the original DOS pipeline.
 
+    python -m permuto                               # just start (permutograph mode)
     python -m permuto pg    <base> <op...>          # -> .pg  on stdout
     python -m permuto gen   <base> <op...>          # -> .nod on stdout
     python -m permuto build <name> <base> <op...>   # write <name>.pg/.nod/.pgd
@@ -46,9 +47,14 @@ def _as_spec(rest, resolves):
 
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv:
+    if argv and argv[0] in ("-h", "--help", "help"):
         print(__doc__)
-        return 1
+        return 0
+    if not argv:
+        # no arguments: just start, in permutograph mode with the default
+        # graph (base 1234, operators 12/23/34), as /PG did
+        from .ui.viewer import run
+        return run("1234", operators=["12", "+", "23", "+", "34"])
     cmd, rest = argv[0], argv[1:]
 
     if cmd in ("gen", "pg"):
