@@ -124,6 +124,39 @@ def test_viewer_always_saves_text_pms_never_binary(qapp, tmp_path):
     assert captured["is_text"]
 
 
+def test_loading_a_session_saved_at_a_different_scale_fills_the_view(qapp, tmp_path):
+    """A .pms saved at another fixed-point scale (e.g. the old NORM=4096) must
+    show at full size at once, not microscopic until relaxation catches up."""
+    from permuto.core import intvector as iv
+    from permuto.core import layout
+    from permuto.core.graph import Graph
+    from permuto.formats import PlySession, write_pms
+    from permuto.ui import render
+
+    saved = iv.NORM
+    try:
+        iv.NORM = 4096                       # save at the old scale
+        g = Graph.build("1234", ["12", "+", "23", "+", "34"], seed=1)
+        for _ in range(80):
+            layout.relax_step(g, alg="rubber")
+        write_pms(tmp_path / "old.pms", PlySession(graph=g, mode="permuto", base="1234"))
+    finally:
+        iv.NORM = saved                      # load at the current (large) scale
+
+    captured = {}
+
+    def drive(view):
+        view._load_session(str(tmp_path / "old.pms"))
+        pts = render.project(view.g, 740, 800)
+        xs = [p[0] for p in pts.values()]
+        ys = [p[1] for p in pts.values()]
+        captured["spread"] = max(max(xs) - min(xs), max(ys) - min(ys))
+        view.close()
+
+    viewer.run("1234", operators=["12", "+", "23", "+", "34"], _drive=drive)
+    assert captured["spread"] > 100, "loaded graph is a dot, not renormalized"
+
+
 def test_polytop_view_paints_a_plain_nod_graph(qapp):
     captured = {}
 

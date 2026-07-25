@@ -487,7 +487,14 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
             return save_session(out, sess, binary=False)
 
         def _load_session(self, path):
+            from ..core import layout
+
             loaded = load_session(path)  # .pms or .ply, detected by content
+            # Rescale the loaded coordinates to the current NORM so the picture
+            # fills the view at once -- otherwise a session saved at a different
+            # fixed-point scale (e.g. the old 4096) shows up microscopic until
+            # the relaxation renormalizes it.
+            layout.normalize(loaded.graph)
             if loaded.pm is not None:
                 self.session = Session(graph=loaded.graph, mode=Mode.PERMUTO,
                                        pm=loaded.pm)
