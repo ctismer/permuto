@@ -23,11 +23,13 @@ def test_normalize_centres_and_scales():
 
 
 def test_dimension_falls_to_true_dimension():
-    # the icosahedron (42 nodes) is genuinely 3-D; relaxed from 8-D it falls to 3-D
+    # the icosahedron (42 nodes) is genuinely 3-D; relaxed from 8-D it falls to 3-D.
+    # Budget 1200: with the fine NORM (2**24) the last dimension is shed by Punish
+    # alone (no quantization-to-zero), so it falls around step ~895, not ~545.
     path = modula_dir() / "nod" / "ikosa2.nod"
     g = Graph.load_nod(path, dimensions=iv.MAXDIMEN, seed=1)
     assert g.dimensions == 8
-    for _ in range(800):
+    for _ in range(1200):
         layout.relax_step(g, alg="rubber")
         if g.dimensions <= 3:
             break

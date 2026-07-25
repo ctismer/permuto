@@ -20,7 +20,30 @@ import math
 from typing import List
 
 MAXDIMEN = 8
-NORM = 4096  # fixed-point "1.0"  (IntVector.Norm)
+
+# The fixed-point unit ("1.0").  The original used 4096 = 2**12: coordinates
+# were 16-bit signed INTEGER, and Normalize kept the figure within +-Norm, so
+# 12 bits held the value and the upper ~4 bits (3 magnitude + sign) were
+# head-room for summing neighbour vectors in Contract before re-normalizing.
+# That head-room is moot now that arithmetic is unbounded (see the note below),
+# and 4096 also *caps the resolution* at ~12 bits, which is why the layout still
+# looked "16-bit".  Raised to 2**24 for genuinely fine relaxation and
+# projection; it is a clean global scale factor (Spin, Punish, Squeeze, Contract
+# all use it as a ratio), so the shapes are unchanged, only smoother.
+#
+# Why 2**24 and not higher: it stays inside 32-bit for a future port to C/JS.
+# Coordinates are +-NORM, and Contract accumulates up to ~8 neighbour vectors
+# before Normalize, so ~8*NORM = 2**27 must fit a signed 32-bit int (it does).
+# Squares in VectorLength reach 8*NORM**2 = 2**51, which needs a 64-bit
+# intermediate -- exactly what the original did (I_MUL_I -> LONGINT).
+#
+# The fine resolution does slow the dimension "fall" a little: the coarse 12-bit
+# rounding used to snap tiny high-dimension components to zero, which happened to
+# help the collapse -- an *unintended* side effect of the old fixed point, not a
+# design.  Now Punish alone shrinks them, so ikosa2 reaches 3-D around step ~895
+# instead of ~545.  It still falls, just smoother.  Sessions saved at this NORM
+# are incompatible with the old 4096 scale, which is fine.
+NORM = 1 << 24  # fixed-point "1.0"  (was IntVector.Norm = 4096)
 
 # Integer width for the port: 32 bit, everywhere.
 #
