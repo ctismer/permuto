@@ -147,6 +147,7 @@ def test_comments_and_blank_lines_are_ignored(tmp_path):
         "% node lines follow\n"
         "node 1 color=1 pos=100,200 links=2:0\n"
         "node 2 color=1 pos=-100,-200 links=1:0\n"
+        "end\n"
     )
     s = read_pms(p)
     assert s.mode == "polytop" and s.graph.nnodes == 2
@@ -174,11 +175,16 @@ def test_load_session_detects_format_by_content(tmp_path):
     assert graphs_agree(g, loaded.graph)
 
 
+# A file that ends properly ('end' present) but is inconsistent is corruption,
+# not truncation, and must be rejected -- leniency is for truncation alone.
 @pytest.mark.parametrize("text,detail", [
     ("nothing here\n", "not a"),
-    ("permuto session 1\ndim 2\nnodes 5\nnode 1 pos=0,0\n", "says 5 nodes"),
-    ("permuto session 1\ndim 2\nnodes 1\nnode 1 pos=0,0 links=9:0\n", "does not exist"),
-    ("permuto session 1\ndim 99\nnodes 0\n", "outside 1..8"),
+    ("permuto session 1\ndim 2\nnodes 5\nnode 1 pos=0,0\nend\n", "says 5 nodes"),
+    ("permuto session 1\ndim 2\nnodes 1\nnode 1 pos=0,0 links=9:0\nend\n", "does not exist"),
+    ("permuto session 1\ndim 99\nnodes 0\nend\n", "outside 1..8"),
+    ("permuto session 1\ndim 2\nnodes 1\nnode 1 pos=0\nend\n", "expected dim=2"),
+    ("permuto session 1\ndim 2\nnodes 1\nnode 1 color=1\nend\n", "no pos"),
+    ("permuto session 1\ndim 2\nnodes 0\nbogus 1\nend\n", "unknown key"),
 ])
 def test_malformed_files_are_reported(tmp_path, text, detail):
     p = tmp_path / "bad.pms"
@@ -186,3 +192,35 @@ def test_malformed_files_are_reported(tmp_path, text, detail):
     with pytest.raises(FileFormatError) as exc:
         read_pms(p)
     assert detail in str(exc.value)
+
+
+def test_truncation_is_salvaged_with_a_warning_not_rejected(tmp_path):
+    """A cut file is loaded, not refused: the 'end' marker is missing, so the
+    reader keeps what parsed, zero-fills the rest (coordinates re-derive from
+    the relaxation) and reports it in .warnings.  Cutting inside the last node
+    line is caught too, which the node count alone would miss."""
+    g = Graph.build("1234", ["12", "+", "23", "+", "34"], seed=1)
+    for _ in range(30):
+        layout.relax_step(g, alg="rubber")
+    full = tmp_path / "full.pms"
+    write_pms(full, PlySession(graph=g, mode="permuto", base="1234"))
+    data = full.read_text()
+    lines = data.splitlines(keepends=True)
+
+    cuts = {
+        "half the lines": "".join(lines[:len(lines) // 2]),
+        "just the end marker gone": data.rstrip()[:-len("end")],
+        "mid last node line": data[:len(data) - 15],
+        "half the bytes": data[:len(data) // 2],
+    }
+    for label, text in cuts.items():
+        p = tmp_path / "cut.pms"
+        p.write_text(text)
+        s = read_pms(p)                       # loads, does not raise
+        assert s.warnings, f"{label}: truncation not reported"
+        assert any("cut off" in w for w in s.warnings)
+        assert s.graph.nnodes >= 1
+
+    assert not read_pms(full).warnings        # the intact file: no warnings
+
+

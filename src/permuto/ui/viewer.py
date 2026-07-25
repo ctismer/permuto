@@ -465,8 +465,7 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
                     written = self._save_session(text)
                     self.message = f"saved {written}"
                 elif self.prompt_kind == "load":
-                    self._load_session(text)
-                    self.message = f"loaded {text}"
+                    self._load_session(text)        # sets its own message
             except (PermutoError, OSError) as exc:
                 self.message = str(exc)
             self.ui_mode = "main"
@@ -502,6 +501,13 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
             else:
                 self.session = Session(graph=loaded.graph, mode=Mode.POLYTOP)
             self.session.iteration = loaded.iteration    # restore where it was
+            if loaded.warnings:                          # a salvaged truncation
+                self.message = "loaded (truncated): " + "; ".join(
+                    loaded.warnings[:2]) + (
+                    f" (+{len(loaded.warnings) - 2} more)"
+                    if len(loaded.warnings) > 2 else "")
+            else:
+                self.message = f"loaded {path}"
 
         # (no mouse: the DOS original was keyboard-only; node picking by click
         #  is deferred to the refactor/extend phase.)

@@ -132,6 +132,7 @@ def write_pms(path, session: PlySession) -> None:
     out.append(f"nodes {g.nnodes}")
     for nd in g.ordered():
         out.append(_node_line(nd, dim))
+    out.append("end")   # a trailer, so any truncation is detectable on read
     Path(path).write_text("\n".join(out) + "\n", encoding="utf-8")
 
 
@@ -145,31 +146,47 @@ def _parse_int_list(path, lineno, text) -> List[int]:
                               where=f"line {lineno}")
 
 
-def _parse_node(path, lineno, tokens, dim) -> Node:
-    num = int(tokens[0])
-    nd = Node(num=num)
+def _parse_node(path, lineno, tokens, dim, warn, salvage) -> Node:
+    """Parse one node line.
+
+    Strict by default: any malformed field is a :class:`FileFormatError`.  Only
+    when *salvage* is set -- the final line of a file that was cut off before its
+    ``end`` marker -- is the line treated as a truncated tail: fields lost off
+    the end default to zero and are noted via *warn* instead of rejected, since
+    the coordinates re-derive from the relaxation.
+    """
+    nd = Node(num=int(tokens[0]))
+    have_pos = False
     for tok in tokens[1:]:
         if "=" not in tok:
-            raise FileFormatError(path, f"expected key=value, got {tok!r}",
-                                  where=f"line {lineno}")
+            if not salvage:
+                raise FileFormatError(path, f"expected key=value, got {tok!r}",
+                                      where=f"line {lineno}")
+            warn(f"line {lineno}: node {nd.num} cut at {tok!r}")
+            break
         key, val = tok.split("=", 1)
         if key == "perm":
             nd.perm = val
         elif key == "color":
             nd.color = int(val)
         elif key == "pos":
-            coords = _parse_int_list(path, lineno, val)
-            nd.pos = (coords + [0] * iv.MAXDIMEN)[:iv.MAXDIMEN]
+            nd.pos = _coords(path, lineno, "pos", val, dim, nd.num, warn, salvage)
+            have_pos = True
         elif key == "old":
-            coords = _parse_int_list(path, lineno, val)
-            nd.old = (coords + [0] * iv.MAXDIMEN)[:iv.MAXDIMEN]
+            nd.old = _coords(path, lineno, "old", val, dim, nd.num, warn, salvage)
         elif key == "links":
             for pair in val.split(","):
                 if not pair:
                     continue
                 j, sep, op = pair.partition(":")
+                if not j.lstrip("-").isdigit() or (sep and not op.isdigit()):
+                    if not salvage:
+                        raise FileFormatError(path, f"bad link {pair!r}",
+                                              where=f"line {lineno}")
+                    warn(f"line {lineno}: node {nd.num} link cut at {pair!r}")
+                    break
                 nd.links.append(int(j))
-                if sep:      # only carry opno when the edge actually names one
+                if sep:
                     nd.opno.append(int(op))
         elif key == "state":
             _parse_state(nd.state, val)
@@ -178,8 +195,27 @@ def _parse_node(path, lineno, tokens, dim) -> Node:
         else:
             raise FileFormatError(path, f"unknown node field {key!r}",
                                   where=f"line {lineno}")
+    if not have_pos:
+        if not salvage:
+            raise FileFormatError(path, f"node {nd.num} has no pos",
+                                  where=f"line {lineno}")
+        warn(f"line {lineno}: node {nd.num} has no pos, set to 0")
     nd.nlink = len(nd.links)
     return nd
+
+
+def _coords(path, lineno, field, text, dim, num, warn, salvage) -> List[int]:
+    """Exactly *dim* coordinates; a short count is a truncation only in the
+    salvage tail, otherwise a hard error."""
+    coords = [int(v) for v in text.split(",") if v.lstrip("-").isdigit()]
+    if len(coords) != dim:
+        if not salvage:
+            raise FileFormatError(
+                path, f"{field} has {len(coords)} coordinates, expected dim={dim}",
+                where=f"line {lineno}")
+        warn(f"line {lineno}: node {num} {field} has {len(coords)} of {dim} "
+             f"coordinates, zero-filled")
+    return (coords + [0] * iv.MAXDIMEN)[:iv.MAXDIMEN]
 
 
 def _parse_state(st: NodeState, val) -> None:
@@ -221,7 +257,16 @@ def _parse_iri(iri: IriState, val) -> None:
 
 
 def read_pms(path) -> PlySession:
+    """Read a ``.pms`` session, salvaging a truncated file rather than rejecting.
+
+    A cut file loses lines and fields off the end.  We load everything readable,
+    zero-fill what is missing (coordinates re-derive from the relaxation anyway)
+    and return the problems as ``PlySession.warnings`` for the UI to show.  Only
+    two things are fatal: it is not a ``.pms`` at all, or its dimension is
+    unusable.
+    """
     text = Path(path).read_text(encoding="utf-8")
+    warnings: List[str] = []
     mode = "permuto"
     base = ""
     optable = [["" for _ in range(MAX_CYC)] for _ in range(MAX_OPS)]
@@ -230,73 +275,105 @@ def read_pms(path) -> PlySession:
     dim = 3
     declared_nodes = None
     g = Graph()
-    seen_magic = False
 
-    for lineno, raw in enumerate(text.splitlines(), start=1):
-        line = raw.strip()
-        if not line or line.startswith("%"):
-            continue
+    # meaningful (non-blank, non-comment) lines with their 1-based numbers
+    body = [(i, ln.strip()) for i, ln in enumerate(text.splitlines(), start=1)
+            if ln.strip() and not ln.strip().startswith("%")]
+    if not body or not body[0][1].startswith(MAGIC):
+        raise FileFormatError(path, f"not a {MAGIC!r} file", where="line 1")
+
+    # A well-terminated file ends with the 'end' marker.  If it does not, it was
+    # cut off, and *only* its final line may be an incomplete tail -- everything
+    # before it must still be perfectly valid, and everything else is an error.
+    truncated = body[-1][1].split(" ", 1)[0] != "end"
+    if truncated:
+        warnings.append("no 'end' marker: the file was cut off; "
+                        "loaded what was readable")
+
+    for idx, (lineno, line) in enumerate(body[1:], start=1):
         head, _, rest = line.partition(" ")
         rest = rest.strip()
-        if not seen_magic:
-            if line.startswith(MAGIC):
-                seen_magic = True
-                continue
-            raise FileFormatError(path, f"not a {MAGIC!r} file (line 1 is {line!r})",
-                                  where="line 1")
-        if head == "mode":
-            mode = rest
-        elif head == "base":
-            base = rest
-        elif head == "op":
-            idx, _, cycles = rest.partition(" ")
-            i = int(idx)
-            for j, cyc in enumerate(cycles.split()):
-                if 1 <= i <= MAX_OPS and j < MAX_CYC:
-                    optable[i - 1][j] = cyc
-        elif head == "lastedit":
-            last_edit_line = int(rest)
-        elif head == "iter":
-            iteration = int(rest)
-        elif head == "dim":
-            dim = int(rest)
-        elif head == "nodes":
-            declared_nodes = int(rest)
-        elif head == "node":
-            nd = _parse_node(path, lineno, rest.split(), dim)
-            g.nodes[nd.num] = nd
-        else:
-            raise FileFormatError(path, f"unknown key {head!r}",
-                                  where=f"line {lineno}")
+        salvage = truncated and idx == len(body) - 1   # only the final line
+        try:
+            if head == "mode":
+                mode = rest
+            elif head == "base":
+                base = rest
+            elif head == "op":
+                i = int(rest.split(" ", 1)[0])
+                for j, cyc in enumerate(rest.split()[1:]):
+                    if 1 <= i <= MAX_OPS and j < MAX_CYC:
+                        optable[i - 1][j] = cyc
+            elif head == "lastedit":
+                last_edit_line = int(rest)
+            elif head == "iter":
+                iteration = int(rest)
+            elif head == "dim":
+                dim = int(rest)
+            elif head == "nodes":
+                declared_nodes = int(rest)
+            elif head == "node":
+                nd = _parse_node(path, lineno, rest.split(), dim,
+                                 warnings.append, salvage)
+                g.nodes[nd.num] = nd
+            elif head == "end":
+                pass
+            else:
+                raise FileFormatError(path, f"unknown key {head!r}",
+                                      where=f"line {lineno}")
+        except (ValueError, FileFormatError) as exc:
+            if not salvage:
+                if isinstance(exc, FileFormatError):
+                    raise
+                raise FileFormatError(path, f"could not parse: {exc}",
+                                      where=f"line {lineno}") from exc
+            warnings.append(f"line {lineno}: cut short, stopped here")
 
-    if not seen_magic:
-        raise FileFormatError(path, "empty file", where="line 1")
-    g.nnodes = len(g.nodes)
-    if declared_nodes is not None and declared_nodes != g.nnodes:
-        raise FileFormatError(
-            path, f"header says {declared_nodes} nodes but {g.nnodes} were read")
     if not 1 <= dim <= iv.MAXDIMEN:
         raise FileFormatError(path, f"dim {dim} is outside 1..{iv.MAXDIMEN}")
+    g.nnodes = len(g.nodes)
     g.dimensions = dim
     g.n_operators = sum(1 for row in optable if any(row))
-    _check_links(path, g)
+
+    # count and link consistency: a warning when truncated (nodes were lost off
+    # the end), a hard error in a file that claims to be complete.
+    if declared_nodes is not None and declared_nodes != g.nnodes:
+        msg = f"expected {declared_nodes} nodes, recovered {g.nnodes}"
+        if truncated:
+            warnings.append(msg)
+        else:
+            raise FileFormatError(path, f"header says {declared_nodes} nodes "
+                                  f"but {g.nnodes} were read")
+    _resolve_links(path, g, warnings, truncated)
 
     pm = None
     if base:
         from ..errors import InvalidBase, InvalidCycle
         try:
             pm = PM(base=base, optable=[list(r) for r in optable])
-        except (InvalidBase, InvalidCycle):
-            pm = None
+        except (InvalidBase, InvalidCycle) as exc:
+            if not truncated:
+                raise FileFormatError(path, f"unusable operators: {exc}")
+            warnings.append(f"operators unusable, editor disabled: {exc}")
 
     return PlySession(graph=g, permuto=(mode == "permuto"), base=base,
                       optable=optable, last_edit_line=last_edit_line,
-                      iteration=iteration, pm=pm, mode=mode)
+                      iteration=iteration, pm=pm, mode=mode, warnings=warnings)
 
 
-def _check_links(path, g: Graph) -> None:
+def _resolve_links(path, g: Graph, warnings: List[str], truncated: bool) -> None:
+    """Links to a missing node are a truncation artefact (its line was cut away)
+    -- dropped with a warning; in a complete file they are corruption -- fatal."""
     for nd in g.nodes.values():
-        for j in nd.links:
-            if j not in g.nodes:
+        opno = list(nd.opno) + [0] * (len(nd.links) - len(nd.opno))
+        kept = [(j, op) for j, op in zip(nd.links, opno) if j in g.nodes]
+        if len(kept) != len(nd.links):
+            if not truncated:
+                bad = next(j for j in nd.links if j not in g.nodes)
                 raise FileFormatError(
-                    path, f"node {nd.num} links to {j}, which does not exist")
+                    path, f"node {nd.num} links to {bad}, which does not exist")
+            warnings.append(f"node {nd.num}: dropped {len(nd.links) - len(kept)} "
+                            f"link(s) to missing node(s)")
+            nd.links = [j for j, _ in kept]
+            nd.opno = [op for _, op in kept] if nd.opno else []
+        nd.nlink = len(nd.links)

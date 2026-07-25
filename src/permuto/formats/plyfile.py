@@ -93,6 +93,9 @@ class PlySession:
     mode: str = "permuto"
     """``permuto`` / ``polytop`` / ``iridium`` -- the session's mode.  The binary
     ``.ply`` only knew a Permuto flag; the text ``.pms`` carries the full mode."""
+    warnings: List[str] = field(default_factory=list)
+    """Non-fatal problems found while reading (e.g. a truncated file was
+    salvaged).  The graph is usable; the UI should surface these."""
 
 
 # --- reading -----------------------------------------------------------
