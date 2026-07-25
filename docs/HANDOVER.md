@@ -10,7 +10,8 @@ Read this first, then `docs/ARCHITECTURE.md` and `git log --oneline`.
 > is the current work plan. Refactoring is deferred until parity is reached.
 
 ## Where we are
-- Branch `port/python-scaffold`; `main` is the pristine recovery import.
+- `main` is the working branch (the port); `recovered-original` holds the
+  pristine 1995 import.
   Working tree clean, 156 tests: `python -m pytest`.
 - **Local only — there is no remote** (yet; Christian will push once the port
   is good enough).
