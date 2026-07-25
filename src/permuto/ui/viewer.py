@@ -462,8 +462,8 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
                     save_ps(self.g, text)
                     self.message = f"wrote {text}"
                 elif self.prompt_kind == "save":
-                    self._save_session(text)
-                    self.message = f"saved {text}"
+                    written = self._save_session(text)
+                    self.message = f"saved {written}"
                 elif self.prompt_kind == "load":
                     self._load_session(text)
                     self.message = f"loaded {text}"
@@ -479,7 +479,8 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
                 base=pm.base if pm else "",
                 optable=[list(r) for r in pm.optable] if pm else [],
                 last_edit_line=pm.last_edit_line if pm else 0)
-            save_session(path, sess)     # .pms text unless the name ends in .ply
+            # .pms text unless the name ends in .ply; a bare name gets .pms
+            return save_session(path, sess)
 
         def _load_session(self, path):
             loaded = load_session(path)  # .pms or .ply, detected by content

@@ -144,6 +144,15 @@ def test_comments_and_blank_lines_are_ignored(tmp_path):
     assert s.graph.nodes[1].pos[:2] == [100, 200]
 
 
+def test_save_adds_the_pms_extension_when_none_is_given(tmp_path):
+    """A bare name like "xanti" must land as xanti.pms, not extensionless."""
+    g = Graph.build("123", ["12", "+", "23"], seed=1)
+    sess = PlySession(graph=g, mode="permuto", base="123")
+    assert save_session(tmp_path / "xanti", sess).name == "xanti.pms"
+    assert save_session(tmp_path / "keep.pms", sess).name == "keep.pms"
+    assert save_session(tmp_path / "old.ply", sess).name == "old.ply"
+
+
 def test_load_session_detects_format_by_content(tmp_path):
     """load_session dispatches on what the file is, not its name."""
     g = Graph.build("123", ["12", "+", "23"], seed=1)

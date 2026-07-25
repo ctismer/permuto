@@ -23,15 +23,23 @@ def load_session(path) -> PlySession:
     return read_ply(p)
 
 
-def save_session(path, session: PlySession, *, binary=None) -> None:
-    """Write a session.  Text ``.pms`` by default; a ``.ply`` name (or
-    ``binary=True``) writes the legacy binary format instead."""
+def save_session(path, session: PlySession, *, binary=None) -> Path:
+    """Write a session and return the path actually written.
+
+    Text ``.pms`` by default; a ``.ply`` name (or ``binary=True``) writes the
+    legacy binary format instead.  A name without an extension gets ``.pms``,
+    so "xanti" lands as "xanti.pms".
+    """
+    p = Path(path)
+    if p.suffix == "":
+        p = p.with_suffix(".pms")
     if binary is None:
-        binary = str(path).lower().endswith(".ply")
+        binary = p.suffix.lower() == ".ply"
     if binary:
-        write_ply(path, session)
+        write_ply(p, session)
     else:
-        write_pms(path, session)
+        write_pms(p, session)
+    return p
 
 
 def convert_ply_to_pms(ply_path, pms_path) -> None:
