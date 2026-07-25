@@ -22,7 +22,7 @@ Two details that are easy to miss and change the feel:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional
 
@@ -90,6 +90,10 @@ class Session:
     iteration: int = 0
     changed: bool = True
     _spa_has_run: bool = False
+
+    load_warnings: List[str] = field(default_factory=list)
+    """Non-fatal notes from loading this session (e.g. a truncated file), for
+    the viewer to show in its status line instead of printing to the console."""
 
     # -- derived ---------------------------------------------------------
     @property

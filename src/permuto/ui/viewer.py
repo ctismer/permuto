@@ -107,8 +107,7 @@ def make_session(name_or_path, *, seed: int = 1, operators=None) -> Session:
         mode = Mode.PERMUTO if loaded.pm is not None else Mode.POLYTOP
         session = Session(graph=loaded.graph, mode=mode, pm=loaded.pm)
         session.iteration = loaded.iteration
-        for w in loaded.warnings:              # truncation salvaged on load
-            print(f"warning: {w}", file=sys.stderr)
+        session.load_warnings = list(loaded.warnings)   # shown in the status line
         return session
     chosen = _resolve_file(p)
     if chosen and chosen.endswith(".pgd"):
@@ -177,7 +176,8 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
             self.ui_mode = "main"       # main | file | program | edit | prompt
             self.labels = False
             self.op_colors = True
-            self.message = ""           # transient status/error line
+            # a load note (e.g. a truncated session) shows in the status line
+            self.message = "; ".join(self.session.load_warnings)
             self._paint_error = None    # last exception in paintEvent, for tests
             self.pending = None         # (action, ...) awaiting a node click
 
