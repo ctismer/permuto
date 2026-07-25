@@ -21,6 +21,7 @@ Program menu (P):  N kill/repair node   L break/repair line   C collapse
 from __future__ import annotations
 
 import os
+import sys
 
 from ..core import intvector as iv
 from ..core.graph import Graph
@@ -87,6 +88,22 @@ def make_session(name_or_path, *, seed: int = 1, operators=None) -> Session:
     return Session(graph=g, mode=Mode.POLYTOP)
 
 
+def _report_paint_error(exc: Exception) -> None:
+    """Print a paint-time exception without letting it escape the Qt slot.
+
+    An exception leaving paintEvent is stored in a traceback that keeps the
+    local QPainter alive until interpreter shutdown, where destroying it on an
+    already-torn-down window segfaults.  We print it here and swallow it so the
+    window keeps running and the process exits cleanly.
+    """
+    import traceback
+
+    traceback.print_exc()
+    # drop any saved traceback so it cannot hold a QPainter past shutdown
+    if hasattr(sys, "last_traceback"):
+        sys.last_traceback = None
+
+
 def feed_prompt(prompt, ev) -> str:
     """Map a Qt key event onto a :class:`FieldPrompt`.
 
@@ -106,7 +123,7 @@ def feed_prompt(prompt, ev) -> str:
     return "typing"
 
 
-def run(name_or_path, seed: int = 1, operators=None) -> int:
+def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
     from PySide6.QtCore import Qt, QTimer
     from PySide6.QtGui import QColor, QFont, QPainter
     from PySide6.QtWidgets import QApplication, QWidget
@@ -129,6 +146,7 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
             self.labels = False
             self.op_colors = True
             self.message = ""           # transient status/error line
+            self._paint_error = None    # last exception in paintEvent, for tests
             self.pending = None         # (action, ...) awaiting a node click
 
             # operator editor state
@@ -165,20 +183,30 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
 
         # ================= painting ==================================
         def paintEvent(self, _ev):
+            # The painter MUST be ended even if drawing raises: an exception
+            # escaping paintEvent leaves the QPainter alive in a traceback and
+            # crashes at interpreter shutdown (QPainter::~QPainter on a dead
+            # window).  try/finally ends it; the error is shown, not fatal.
             p = QPainter(self)
-            p.fillRect(self.rect(), QColor(*render.BACKGROUND))
-            pic_w = self.width() - (260 if self.session.permuto else 0)
-            render.paint(self.g, p, pic_w, self.height(),
-                         labels=self.labels, op_colors=self.op_colors,
-                         program=self.session.program_mode,
-                         name_mode=self._draw_name_mode())
-            if self.session.permuto and self.session.pm is not None:
-                render.paint_operator_panel(
-                    self.session.pm, p, pic_w + 16, 60, self.height(),
-                    active_field=self.edit_field if self.ui_mode == "edit" else None,
-                    buffer_text=self.edit_buffer if self.ui_mode == "edit" else None)
-            self._paint_chrome(p)
-            p.end()
+            try:
+                p.fillRect(self.rect(), QColor(*render.BACKGROUND))
+                pic_w = self.width() - (260 if self.session.permuto else 0)
+                render.paint(self.g, p, pic_w, self.height(),
+                             labels=self.labels, op_colors=self.op_colors,
+                             program=self.session.program_mode,
+                             name_mode=self._draw_name_mode())
+                if self.session.permuto and self.session.pm is not None:
+                    render.paint_operator_panel(
+                        self.session.pm, p, pic_w + 16, 60, self.height(),
+                        active_field=self.edit_field if self.ui_mode == "edit" else None,
+                        buffer_text=self.edit_buffer if self.ui_mode == "edit" else None)
+                self._paint_chrome(p)
+            except Exception as exc:      # noqa: BLE001 -- never let paint crash Qt
+                self._paint_error = exc
+                _report_paint_error(exc)
+                self.message = f"draw error: {exc}"
+            finally:
+                p.end()
 
         def _draw_name_mode(self):
             """Node numbers are forced on whenever a node is being chosen, so
@@ -187,6 +215,8 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
             picking = self.ui_mode in ("program", "select") or \
                 (self.ui_mode == "prompt" and self.prompt_kind == "node")
             return NameMode.NUMBER if picking else self.session.name_mode
+
+        def _paint_chrome(self, p):
             from PySide6.QtGui import QColor, QFont
 
             font = QFont("Menlo")
@@ -541,10 +571,13 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
     app = QApplication.instance() or QApplication([])
     view = PermutographView()
     view.show()
+    if _drive is not None:          # tests drive the real widget, no event loop
+        _drive(view)
+        return 0
     return app.exec()
 
 
-def run_iridium(seed: int = 1) -> int:
+def run_iridium(seed: int = 1, _drive=None) -> int:
     """The ``/I`` mode -- a thin bypass reusing core.iri, core.layout and
     render.paint_iridium, mirroring how polytop.mod "hacked it in at this point".
     """
@@ -568,6 +601,7 @@ def run_iridium(seed: int = 1) -> int:
             self.phase = "build"        # build -> settle -> run
             self.settle = 0
             self.stepbuf = 0            # queued step keys (autorepeat)
+            self._paint_error = None    # last exception in paintEvent, for tests
             self.prompt = None          # a FieldPrompt while typing
             self.prompt_action = None
             self.message = ("SIMONE   building the network"
@@ -606,19 +640,25 @@ def run_iridium(seed: int = 1) -> int:
         # -- drawing ---------------------------------------------------
         def paintEvent(self, _ev):
             p = QPainter(self)
-            p.fillRect(self.rect(), QColor(*render.BACKGROUND))
-            render.paint_iridium(self.graph, p, self.width(), self.height())
-            font = QFont("Menlo")
-            font.setPixelSize(int(render._scaled(self.height(), 9)))
-            p.setFont(font)
-            p.setPen(QColor(200, 205, 225))
-            p.drawText(12, 22, "Kill  Transmit  Step  Repeat  Clear      Quit")
-            p.setPen(QColor(255, 230, 140))
-            if self.prompt:
-                p.drawText(12, self.height() - 14, self.prompt.display())
-            elif self.message:
-                p.drawText(12, self.height() - 14, self.message)
-            p.end()
+            try:
+                p.fillRect(self.rect(), QColor(*render.BACKGROUND))
+                render.paint_iridium(self.graph, p, self.width(), self.height())
+                font = QFont("Menlo")
+                font.setPixelSize(int(render._scaled(self.height(), 9)))
+                p.setFont(font)
+                p.setPen(QColor(200, 205, 225))
+                p.drawText(12, 22, "Kill  Transmit  Step  Repeat  Clear      Quit")
+                p.setPen(QColor(255, 230, 140))
+                if self.prompt:
+                    p.drawText(12, self.height() - 14, self.prompt.display())
+                elif self.message:
+                    p.drawText(12, self.height() - 14, self.message)
+            except Exception as exc:      # noqa: BLE001 -- never let paint crash Qt
+                self._paint_error = exc
+                _report_paint_error(exc)
+                self.message = f"draw error: {exc}"
+            finally:
+                p.end()
 
         # -- input -----------------------------------------------------
         def keyPressEvent(self, ev):
@@ -676,4 +716,7 @@ def run_iridium(seed: int = 1) -> int:
     app = QApplication.instance() or QApplication([])
     view = IridiumView()
     view.show()
+    if _drive is not None:          # tests drive the real widget, no event loop
+        _drive(view)
+        return 0
     return app.exec()
