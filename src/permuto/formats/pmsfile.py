@@ -127,6 +127,7 @@ def write_pms(path, session: PlySession) -> None:
             if cycles:
                 out.append(f"op {i + 1} " + " ".join(cycles))
         out.append(f"lastedit {session.last_edit_line}")
+    out.append(f"iter {session.iteration}")
     out.append(f"dim {dim}")
     out.append(f"nodes {g.nnodes}")
     for nd in g.ordered():
@@ -225,6 +226,7 @@ def read_pms(path) -> PlySession:
     base = ""
     optable = [["" for _ in range(MAX_CYC)] for _ in range(MAX_OPS)]
     last_edit_line = 0
+    iteration = 0
     dim = 3
     declared_nodes = None
     g = Graph()
@@ -254,6 +256,8 @@ def read_pms(path) -> PlySession:
                     optable[i - 1][j] = cyc
         elif head == "lastedit":
             last_edit_line = int(rest)
+        elif head == "iter":
+            iteration = int(rest)
         elif head == "dim":
             dim = int(rest)
         elif head == "nodes":
@@ -286,8 +290,8 @@ def read_pms(path) -> PlySession:
             pm = None
 
     return PlySession(graph=g, permuto=(mode == "permuto"), base=base,
-                      optable=optable, last_edit_line=last_edit_line, pm=pm,
-                      mode=mode)
+                      optable=optable, last_edit_line=last_edit_line,
+                      iteration=iteration, pm=pm, mode=mode)
 
 
 def _check_links(path, g: Graph) -> None:

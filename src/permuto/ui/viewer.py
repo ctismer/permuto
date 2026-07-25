@@ -480,7 +480,8 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
                 graph=self.g, permuto=self.session.permuto, mode=mode,
                 base=pm.base if pm else "",
                 optable=[list(r) for r in pm.optable] if pm else [],
-                last_edit_line=pm.last_edit_line if pm else 0)
+                last_edit_line=pm.last_edit_line if pm else 0,
+                iteration=self.session.iteration)
             # the viewer always saves text .pms (binary .ply is read-only legacy);
             # whatever extension was typed, the file is a .pms
             out = pathlib.Path(path).with_suffix(".pms")
@@ -500,6 +501,7 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
                                        pm=loaded.pm)
             else:
                 self.session = Session(graph=loaded.graph, mode=Mode.POLYTOP)
+            self.session.iteration = loaded.iteration    # restore where it was
 
         # (no mouse: the DOS original was keyboard-only; node picking by click
         #  is deferred to the refactor/extend phase.)

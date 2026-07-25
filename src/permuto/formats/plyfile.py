@@ -84,6 +84,9 @@ class PlySession:
     base: str = ""
     optable: List[List[str]] = field(default_factory=list)
     last_edit_line: int = 0
+    iteration: int = 0
+    """The relaxation step counter, so a reloaded session shows where it was.
+    The binary ``.ply`` never stored this; ``.pms`` does."""
     pm: Optional[PM] = None
     """The reconstructed PM, or None when the base/operators are unusable
     (a Polytop-mode session carries a leftover table that need not be valid)."""

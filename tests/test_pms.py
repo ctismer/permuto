@@ -126,6 +126,15 @@ def test_program_state_survives(tmp_path):
     assert back.state.broken == {1, 3}
 
 
+def test_iteration_counter_round_trips(tmp_path):
+    """.pms stores the relaxation step counter so a reloaded session shows where
+    it was -- the binary .ply never did (the original reset it to 0 on load)."""
+    g = Graph.build("123", ["12", "+", "23"], seed=1)
+    out = tmp_path / "s.pms"
+    write_pms(out, PlySession(graph=g, mode="permuto", base="123", iteration=123))
+    assert read_pms(out).iteration == 123
+
+
 def test_comments_and_blank_lines_are_ignored(tmp_path):
     p = tmp_path / "c.pms"
     p.write_text(
