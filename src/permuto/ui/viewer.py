@@ -112,7 +112,7 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
     from PySide6.QtWidgets import QApplication, QWidget
 
     from ..errors import ProgramStateError
-    from ..formats import read_ply, save_ps, write_ply
+    from ..formats import load_session, save_ps, save_session
     from ..formats.plyfile import PlySession
 
     class PermutographView(QWidget):
@@ -281,9 +281,9 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
             elif k == "o":
                 self._begin_prompt("PostScript out = ", "ps")
             elif k == "l":
-                self._begin_prompt("Load .ply = ", "load")
+                self._begin_prompt("Load (.pms/.ply) = ", "load")
             elif k == "s":
-                self._begin_prompt("Save .ply = ", "save")
+                self._begin_prompt("Save .pms = ", "save")
 
         # -- program menu ----------------------------------------------
         def _program_key(self, ev):
@@ -432,26 +432,27 @@ def run(name_or_path, seed: int = 1, operators=None) -> int:
                     save_ps(self.g, text)
                     self.message = f"wrote {text}"
                 elif self.prompt_kind == "save":
-                    self._save_ply(text)
+                    self._save_session(text)
                     self.message = f"saved {text}"
                 elif self.prompt_kind == "load":
-                    self._load_ply(text)
+                    self._load_session(text)
                     self.message = f"loaded {text}"
             except (PermutoError, OSError) as exc:
                 self.message = str(exc)
             self.ui_mode = "main"
 
-        def _save_ply(self, path):
+        def _save_session(self, path):
             pm = self.session.pm
+            mode = "permuto" if self.session.permuto else "polytop"
             sess = PlySession(
-                graph=self.g, permuto=self.session.permuto,
+                graph=self.g, permuto=self.session.permuto, mode=mode,
                 base=pm.base if pm else "",
                 optable=[list(r) for r in pm.optable] if pm else [],
                 last_edit_line=pm.last_edit_line if pm else 0)
-            write_ply(path, sess)
+            save_session(path, sess)     # .pms text unless the name ends in .ply
 
-        def _load_ply(self, path):
-            loaded = read_ply(path)
+        def _load_session(self, path):
+            loaded = load_session(path)  # .pms or .ply, detected by content
             if loaded.pm is not None:
                 self.session = Session(graph=loaded.graph, mode=Mode.PERMUTO,
                                        pm=loaded.pm)

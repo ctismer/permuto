@@ -26,7 +26,8 @@ the original's behaviour is not portable (see §0).
 | 7 | Iridium / SIMONE — `/I` mode UI (`run_iridium`) | **done** |
 | 8 | `makeikos` geodesic generator (`gen/geodesic.py`) | **done** |
 | 8 | `trunc` factorisation (`gen/factorize.py`), `vierdrei` (`gen/vierdrei.py`) | **done** |
-| 9 | `UserIO` input primitives | open |
+| 9 | `UserIO` input primitives | **done** (one `FieldPrompt`) |
+| + | Text session format `.pms` (better than `.ply`) | **done** |
 
 What is done is verified against the original data, not just against
 invariants: `PM` reproduces the permutations, edges *and* operator numbers of

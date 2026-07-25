@@ -87,6 +87,9 @@ class PlySession:
     pm: Optional[PM] = None
     """The reconstructed PM, or None when the base/operators are unusable
     (a Polytop-mode session carries a leftover table that need not be valid)."""
+    mode: str = "permuto"
+    """``permuto`` / ``polytop`` / ``iridium`` -- the session's mode.  The binary
+    ``.ply`` only knew a Permuto flag; the text ``.pms`` carries the full mode."""
 
 
 # --- reading -----------------------------------------------------------
@@ -148,7 +151,8 @@ def read_ply(path) -> PlySession:
         pm = None
 
     return PlySession(graph=g, permuto=permuto, base=base, optable=optable,
-                      last_edit_line=last_edit_line, pm=pm)
+                      last_edit_line=last_edit_line, pm=pm,
+                      mode="permuto" if permuto else "polytop")
 
 
 def _read_record(path, data: bytes, off: int, nnodes: int) -> Node:

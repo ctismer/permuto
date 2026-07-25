@@ -6,6 +6,7 @@
     python -m permuto show  <name-or-file.nod>      # interactive PySide6 viewer
     python -m permuto show  <base> <op...>          # build + view on the fly
     python -m permuto iridium                       # the /I satellite simulation
+    python -m permuto convert <in.ply> [out.pms]    # migrate a binary session
     python -m permuto render <name.nod> [out.png] [steps]   # offscreen PNG
     python -m permuto export <name> [out.ps] [steps]        # PostScript (SavePicture)
 
@@ -76,6 +77,15 @@ def main(argv=None) -> int:
     if cmd in ("iridium", "iri", "/i", "/I"):
         from .ui.viewer import run_iridium
         return run_iridium()
+
+    if cmd == "convert":
+        from .formats.sessionio import convert_ply_to_pms
+
+        src = rest[0]
+        dst = rest[1] if len(rest) > 1 else Path(src).with_suffix(".pms")
+        convert_ply_to_pms(src, dst)
+        print(f"converted {src} -> {dst}")
+        return 0
 
     if cmd == "render":
         from .core import layout
