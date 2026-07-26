@@ -1,8 +1,8 @@
 # Handover — permuto (Modula-2 → Python port)
 
 Read this first, then `CLAUDE.md`, `docs/ARCHITECTURE.md` and
-`git log --oneline`. Last updated 2026-07-26, at the end of the first session
-of phase 3 — the refactor lives on the branch `phase3-refactor`, see below.
+`git log --oneline`. Last updated 2026-07-27, in the second session of phase 3
+— the refactor lives on the branch `phase3-refactor`, see below.
 
 ## Where we are
 
@@ -101,7 +101,7 @@ python -m permuto export pgl4 out.ps 600
 ## Phase 3 — the refactor, on `phase3-refactor`
 
 **On `origin`, and read by nobody but its author.** Tests green at every
-commit; `python -m pytest --cov=permuto` reports 92%. `git log --oneline
+commit; `python -m pytest --cov=permuto` reports 93%. `git log --oneline
 main..phase3-refactor` is the whole story in twenty-odd lines.
 
 Three rules still bind, unchanged from when phase 3 started:
@@ -120,11 +120,29 @@ Three rules still bind, unchanged from when phase 3 started:
   nested inside `run()` / `run_iridium()`, where no language server could see
   them — which is why this was step one.
 * **Nothing in the UI is stringly typed any more.** `UiMode`, `PromptKind`,
-  `NodeAction`, `Selection`, `OpField`, `IriPhase`, `IriAction` and
-  `layout.Algorithm` replace strings, a one-element tuple everybody indexed
-  with `[0]`, and a four-key dict. Keys go through one dispatch table per view:
-  a mode nobody handles is a `KeyError`, not a key that quietly lands in the
-  main menu.
+  `Selection`, `OpField`, `IriPhase`, `PromptResult`, `editor.Move`,
+  `menus.Key` and `layout.Algorithm` replace strings, a one-element tuple
+  everybody indexed with `[0]`, and a four-key dict. Keys go through one
+  dispatch table per view: a mode nobody handles is a `KeyError`, not a key
+  that quietly lands in the main menu.
+* **The menus are one table** (`menus.py`, UI-free). The line used to be an
+  f-string in `session.py` while the keys were an `elif` chain in the widget,
+  with nothing checking that they agreed — and they had drifted. A `Binding` is
+  a key, an action, how the line names it, and where the line does *not* name
+  it, why (the program menu has answered `C` and `U` unadvertised since
+  `polytop.mod:467`). The main line is generated from the table; the other
+  three are the 1995 strings, which do not decompose into one phrase per key.
+  Keys are named UI-free (`menus.Key`), so `ui/keys.py` is the only module that
+  knows a Qt key code — a second frontend replaces that one file.
+* **Two enums that said the same thing twice are gone.** `NodeAction` was the
+  node-asking subset of the program menu, `IriAction` the prompt-collecting
+  subset of Iridium's. What survives carries its own prompt wording, so
+  `"Node 1="` and `"select the other end"` sit on `ProgramAction.BREAK`
+  instead of being spelled out at the call site.
+* **The viewer module became five.** `base_view` (window, timer, crash-proof
+  paint), `permutograph_view`, `iridium_view`, `keys` (Qt, translated once) and
+  `viewer` itself, now 53 lines of entry points and re-exports. Every `elif`
+  chain over keys is a table lookup; `_edit_key` and `_select_key` use `match`.
 * **Logic left the widget** into UI-free modules — `editor.py` (the operator
   editor's cursor and its rules) and `loader.py` (file resolution, session save
   and load, which the widget had a second, disagreeing copy of). `Session` took
@@ -141,7 +159,7 @@ Three rules still bind, unchanged from when phase 3 started:
 * **The CLI is argparse** with a subparser per command; `--pg` and `--iridium`
   for the two modes. The DOS spellings `/PG` and `/I` are gone.
 
-### Four defects found — each has its own test, each was red first
+### Seven defects found — each has its own test, each was red first
 
 | What went wrong | Test that pins it |
 |---|---|
@@ -149,51 +167,65 @@ Three rules still bind, unchanged from when phase 3 started:
 | `(C)ollapse` / `(U)ncollapse` on a `.nod` graph reached through a `pm` that is `None` and threw `AttributeError` out of the key handler. The program menu offers them for any graph, as it did in 1995 | `test_the_table_only_actions_refuse_politely_on_a_plain_graph` |
 | A three-field prompt (Iridium `T`) closed after the first Enter — `"more"` was treated as an ending. **Introduced by this refactor**, caught by the key tests written in the same commit | `test_a_three_field_prompt_stays_open_until_the_last_field` |
 | `PM.Disconnect` shifts `links`/`opno` but leaves `state.lines`/`broken` at their old indices, although they address the same link numbers — the 1995 bug, already fixed in the port, now recorded with its source lines in PORT-GAPS §0 | `test_broken_marks_follow_their_edge_through_a_disconnect` |
+| A typed extension was honoured or not depending on where the file was: `./alle6.nod` was displaced by its `.pgd` sibling, the same name among the samples was not. Same keystrokes, two different graphs and two different modes | `test_a_typed_extension_is_honoured_wherever_the_file_lives` |
+| `permuto build knot …` writes `knot.pg/.nod/.pgd` here, and `permuto show knot` said "nothing found": bare names were only ever looked for in the sample directory. The two commands did not compose | `test_a_graph_just_built_is_found_by_its_bare_name` |
+| `show mine 3` built a nonsense permutograph out of the file name instead of resuming `mine.pms` with a seed. The CLI asked "is this a file?" of the graph loader alone, which knows nothing about sessions | `test_a_seed_behind_a_session_file_still_resumes_the_session` |
 
-Two of those four turned up by accident — one from a user question, one while
-moving code. Nobody went looking for them.
+Four of those seven turned up by accident — one from a user question, three
+while moving code or writing the tests that were meant to *cover* it. Nobody
+went looking for any of them. The three loader ones came out of what the list
+below called a coverage hole: writing the tests as asked would have frozen all
+three as expected behaviour.
 
 ### Measured
 
 ```
-src     main 5071 -> 5464   of which executable code +108 (+3.6%)
-tests   main 2519 -> 3133   (+614)
-Qt-bound (ui/viewer.py + ui/render.py)  1229 -> 1087   = 24% -> 20% of src
-ui/viewer.py  829 -> 643     PermutographView  369 -> 316 lines, 29 -> 25 methods
+src     main 5071 -> 5928
+tests   main 2519 -> 3532   (+1013)
+coverage  92% -> 93%,  menus.py 100%, loader.py 84% -> 100%
+Qt-bound (every file that imports PySide6)  1229 -> 1239  = 24% -> 21% of src
+ui/viewer.py  829 -> 53   (+ base_view 85, permutograph_view 394,
+                             iridium_view 189, keys 70, menus 283 UI-free)
 ```
 
 The refactor did **not** make the code shorter. What moved is where the logic
-lives and whether a mistake is caught.
+lives and whether a mistake is caught: the Qt-bound surface barely changed in
+size but is now five named files instead of two, and the part a second frontend
+would have to rewrite is `ui/keys.py` plus the painting.
 
 ### What to do next, in this order
 
-1. **`loader.py` (84%) — the file-resolution rules have no test**, and they are
-   code that moved house today. Uncovered: `.pgd` wins over `.nod` (the build
-   recipe beats its result), a session file recognised by its content rather
-   than its extension (`f.read(15) == b"permuto session"`), and `_nod_dir`'s
-   fallback to `legacy/` when the bundled samples are missing. Each is a
-   decision with a reason and none of them runs.
-2. **`ui/render.py` (82%) — the direction discs are never drawn** in any test.
+1. **`ui/render.py` (82%) — the direction discs are never drawn** in any test.
    They are a deliberate addition of the port (PORT-GAPS §6: colour says *that*
    an edge carries the wave, the disc says *which way*). Dead nodes (hollow
    ball, black rim) and the white ring on active ones are unpainted too — that
    is the visible result of `P`→`N`, itself an untested key path.
-3. **`formats/pmsfile.py` (88%) — the refusals.** The open lines are the
+2. **`formats/pmsfile.py` (88%) — the refusals.** The open lines are the
    `FileFormatError` branches. "Reject with a reason instead of swallowing it"
    is the port's stated advantage over the original; nobody checks the reasons
    arrive.
-4. **Have someone else read the branch diff** before it lands on `main`.
+3. **Have someone else read the branch diff** before it lands on `main`.
 
-### What not to do
+### How to read a "coverage hole" on this list
 
-Do not split `PermutographView` further. At 316 lines and 25 methods it is not
-pretty, but what is left in it is keys and pixels. A class per `UiMode` was
-considered and rejected: the modes are not independent (program menu → node
-number → neighbour → act is *one* flow with shared state), most handlers are
-four to eight lines, and Qt key codes would end up in every one of them, so a
-second frontend would gain nothing.
+Twice now the honest answer to "these lines never run" has been "and two of
+them are wrong". Before writing a test for an uncovered branch, work out what
+the branch is *supposed* to do and check that it does — a test written to the
+current behaviour turns a defect into a golden expectation, which is worse than
+no test. The loader entry above is the worked example: three of its rules were
+wrong, and all three would have been frozen.
 
-Afterwards: optionally TypeScript/browser on the cleaned core.
+### Nothing is off limits
+
+An earlier version of this file said not to split `PermutographView` further.
+That was withdrawn by the author (2026-07-27): the reference implementation on
+`main` and the golden tests are the safety net, so anything may be taken apart
+as long as the suite stays green. If a change makes you uneasy, pin the
+result with a test rather than leaving it undone.
+
+Afterwards: optionally TypeScript/browser on the cleaned core — `menus.py`,
+`session.py`, `editor.py` and `loader.py` are already frontend-neutral, and
+`test_menus.py::test_the_menus_stay_ui_free` keeps them that way.
 
 ### Loose thread worth picking up
 Christian wrote a Conway **Game of Life** around the same time as the rest, and
