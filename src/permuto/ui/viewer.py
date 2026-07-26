@@ -21,7 +21,6 @@ Program menu (P):  N kill/repair node   L break/repair line   C collapse
 
 from __future__ import annotations
 
-import pathlib
 import sys
 import traceback
 from dataclasses import dataclass, field
@@ -37,11 +36,10 @@ from ..core.graph import Graph
 from ..core.iri import Iridium
 from ..editor import OperatorEditor
 from ..errors import PermutoError
-from ..formats import load_session, save_ps, save_session
-from ..formats.plyfile import PlySession
-from ..loader import make_session
-from ..session import (DIMENSION_CHECK_INTERVAL, EXIT_QUESTION, Mode, NameMode,
-                       Session, confirms_exit)
+from ..formats import save_ps
+from ..loader import make_session, session_from_file, write_session
+from ..session import (DIMENSION_CHECK_INTERVAL, EXIT_QUESTION, NameMode,
+                       confirms_exit)
 from . import render
 from .prompt import FieldPrompt
 
@@ -75,6 +73,20 @@ def feed_prompt(prompt, ev) -> str:
         return "typing"
     prompt.type_char(ev.text())
     return "typing"
+
+
+def load_note(warnings) -> str:
+    """The status line for a load that had to be salvaged.
+
+    A truncated session can produce one warning per node, so the line shows the
+    first two and counts the rest.
+    """
+    if not warnings:
+        return ""
+    note = "; ".join(warnings[:2])
+    if len(warnings) > 2:
+        note += f" (+{len(warnings) - 2} more)"
+    return f"loaded (truncated): {note}"
 
 
 def exit_confirmed(ev) -> bool:
@@ -223,7 +235,7 @@ class PermutographView(ViewBase):
         self.labels = False
         self.op_colors = True
         # a load note (e.g. a truncated session) shows in the status line
-        self.message = "; ".join(session.load_warnings)
+        self.message = load_note(session.load_warnings)
         self.pending = None         # a NodeAction awaiting its node number
 
         # an OperatorEditor while UiMode.EDIT, otherwise None
@@ -497,35 +509,12 @@ class PermutographView(ViewBase):
         self.ui_mode = UiMode.MAIN
 
     def _save_session(self, path):
-        pm = self.session.pm
-        mode = "permuto" if self.session.permuto else "polytop"
-        sess = PlySession(
-            graph=self.g, permuto=self.session.permuto, mode=mode,
-            base=pm.base if pm else "",
-            optable=[list(r) for r in pm.optable] if pm else [],
-            last_edit_line=pm.last_edit_line if pm else 0,
-            iteration=self.session.iteration)
-        # the viewer always saves text .pms (binary .ply is read-only legacy);
-        # whatever extension was typed, the file is a .pms
-        out = pathlib.Path(path).with_suffix(".pms")
-        return save_session(out, sess, binary=False)
+        return write_session(self.session, path)
 
     def _load_session(self, path):
-        loaded = load_session(path)  # .pms or .ply, detected by content
-        # No rescaling here: Session frames whatever coordinates it is given.
-        if loaded.pm is not None:
-            self.session = Session(graph=loaded.graph, mode=Mode.PERMUTO,
-                                   pm=loaded.pm)
-        else:
-            self.session = Session(graph=loaded.graph, mode=Mode.POLYTOP)
-        self.session.iteration = loaded.iteration    # restore where it was
-        if loaded.warnings:                          # a salvaged truncation
-            self.message = "loaded (truncated): " + "; ".join(
-                loaded.warnings[:2]) + (
-                f" (+{len(loaded.warnings) - 2} more)"
-                if len(loaded.warnings) > 2 else "")
-        else:
-            self.message = f"loaded {path}"
+        self.session = session_from_file(path)
+        self.message = load_note(self.session.load_warnings) \
+            or f"loaded {path}"
 
     # (no mouse: the DOS original was keyboard-only; node picking by click
     #  is deferred to the refactor/extend phase.)

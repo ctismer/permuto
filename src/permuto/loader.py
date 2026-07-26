@@ -10,10 +10,12 @@ widget to resolve a filename.
 from __future__ import annotations
 
 import os
+import pathlib
 
 from .core import intvector as iv
 from .core.graph import Graph
-from .formats import load_session, read_pgd
+from .formats import load_session, read_pgd, save_session
+from .formats.plyfile import PlySession
 from .session import Mode, Session, new_permutograph_session
 
 
@@ -93,15 +95,43 @@ def make_session(name_or_path, *, seed: int = 1, operators=None) -> Session:
     p = str(name_or_path)
     session_file = _session_path(p)
     if session_file is not None:
-        loaded = load_session(session_file)
-        mode = Mode.PERMUTO if loaded.pm is not None else Mode.POLYTOP
-        session = Session(graph=loaded.graph, mode=mode, pm=loaded.pm)
-        session.iteration = loaded.iteration
-        session.load_warnings = list(loaded.warnings)   # shown in the status line
-        return session
+        return session_from_file(session_file)
     chosen = resolve_file(p)
     if chosen and chosen.endswith(".pgd"):
         cmd = read_pgd(chosen)
         return new_permutograph_session(cmd.base, cmd.operators)
     g = load_graph(name_or_path, seed=seed)
     return Session(graph=g, mode=Mode.POLYTOP)
+
+
+def session_from_file(path) -> Session:
+    """Resume a saved session -- ``.pms`` or ``.ply``, told apart by content.
+
+    Anything salvaged from a truncated file is left in ``load_warnings`` for
+    the frontend to show; no rescaling happens here, because ``Session`` frames
+    whatever coordinates it is given.
+    """
+    loaded = load_session(path)
+    mode = Mode.PERMUTO if loaded.pm is not None else Mode.POLYTOP
+    session = Session(graph=loaded.graph, mode=mode, pm=loaded.pm)
+    session.iteration = loaded.iteration          # restore where it left off
+    session.load_warnings = list(loaded.warnings)
+    return session
+
+
+def write_session(session: Session, path) -> pathlib.Path:
+    """Save *session*, and return the file actually written.
+
+    Binary ``.ply`` is read-only legacy here, so whatever extension was typed,
+    what gets written is a text ``.pms``.
+    """
+    pm = session.pm
+    sess = PlySession(
+        graph=session.graph, permuto=session.permuto,
+        mode="permuto" if session.permuto else "polytop",
+        base=pm.base if pm else "",
+        optable=[list(r) for r in pm.optable] if pm else [],
+        last_edit_line=pm.last_edit_line if pm else 0,
+        iteration=session.iteration)
+    return save_session(pathlib.Path(path).with_suffix(".pms"), sess,
+                        binary=False)

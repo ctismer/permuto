@@ -497,3 +497,35 @@ def test_iridium_view_paints_through_build_and_run(qapp):
 
     viewer.run_iridium(_drive=drive)
     assert captured["error"] is None, f"paint raised: {captured['error']!r}"
+
+
+def test_a_salvaged_session_says_so_in_the_status_line(qapp, tmp_path):
+    """A truncated .pms loads rather than failing, and both ways in -- starting
+    on the file, and F->L while running -- must say that something was lost,
+    not just quietly show a smaller graph."""
+    from permuto.core import layout
+    from permuto.core.graph import Graph
+    from permuto.formats import PlySession, write_pms
+
+    g = Graph.build("1234", ["12", "+", "23", "+", "34"], seed=1)
+    for _ in range(30):
+        layout.relax_step(g, alg="rubber")
+    full = tmp_path / "full.pms"
+    write_pms(full, PlySession(graph=g, mode="permuto", base="1234"))
+    cut = tmp_path / "cut.pms"
+    cut.write_text(full.read_text()[:len(full.read_text()) // 2])
+
+    captured = {}
+
+    def drive(view):
+        captured["on_start"] = view.message         # started on the cut file
+        view._load_session(str(full))               # a good one, over the top
+        captured["good"] = view.message
+        view._load_session(str(cut))                # and the cut one again
+        captured["reloaded"] = view.message
+        view.close()
+
+    viewer.run(str(cut), _drive=drive)
+    assert captured["on_start"].startswith("loaded (truncated):")
+    assert captured["reloaded"].startswith("loaded (truncated):")
+    assert "truncated" not in captured["good"], captured["good"]
