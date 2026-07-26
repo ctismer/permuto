@@ -483,7 +483,7 @@ def test_iridium_view_paints_through_build_and_run(qapp):
         _repaint(view)
         # force the network fully built and run a step
         while not view.iri.built:
-            view._tick()
+            view._on_timer()
         view.phase = "run"
         view.iri.transmit("900", "009")
         view.iri.step()
