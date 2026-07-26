@@ -334,24 +334,21 @@ def test_escape_asks_before_leaving(qapp):
 
 
 def test_iridium_escape_asks_before_leaving(qapp):
-    from PySide6.QtCore import Qt
-    from PySide6.QtGui import QKeyEvent
+    from permuto.session import EXIT_QUESTION
 
     captured = {}
 
     def drive(view):
-        view.keyPressEvent(QKeyEvent(QKeyEvent.KeyPress, ord("Q"),
-                                     Qt.NoModifier, "q"))
-        captured["asked"] = view.confirming
-        view.keyPressEvent(QKeyEvent(QKeyEvent.KeyPress, ord("X"),
-                                     Qt.NoModifier, "x"))
-        captured["after_no"] = view.confirming
+        _press(view, "q")
+        captured["asked"] = (view.ui_mode, view.message)
+        _press(view, "x")                     # not a yes
+        captured["after_no"] = view.ui_mode
         captured["still_open"] = view.isVisible()
         view.close()
 
     viewer.run_iridium(_drive=drive)
-    assert captured["asked"] is True
-    assert captured["after_no"] is False
+    assert captured["asked"] == (viewer.UiMode.CONFIRM, EXIT_QUESTION)
+    assert captured["after_no"] is viewer.UiMode.MAIN
     assert captured["still_open"]
 
 
@@ -491,7 +488,8 @@ def test_iridium_view_paints_through_build_and_run(qapp):
         view.iri.step()
         _repaint(view)
         # a transmit prompt open
-        view._begin_prompt("transmit", ["Node1", "Node2", "Repeat"])
+        view._begin_prompt(viewer.IriAction.TRANSMIT,
+                           ["Node1", "Node2", "Repeat"])
         view.prompt.type_char("9")
         _repaint(view)
         captured["error"] = view._paint_error
@@ -741,3 +739,125 @@ def test_the_toggle_keys_move_their_own_flag_in_the_menu_line(qapp):
     for flag in ("(C)alc F", "(R)un T", "(H)urry T", "(S)pin F"):
         assert flag in captured["toggled"], captured["toggled"]
     assert captured["alg_before"] != captured["alg_after"], "A steps the algorithm"
+
+
+def _iri_node(view, label):
+    """The satellite carrying *label* -- the name the user reads on screen."""
+    return next(nd for nd in view.graph.nodes.values() if nd.perm == label)
+
+
+def _carrying(view):
+    """How many satellites hold a packet right now."""
+    return sum(1 for nd in view.graph.nodes.values() if nd.iri.message_num)
+
+
+def test_the_iridium_keys_kill_transmit_step_and_clear(qapp):
+    """K, T, space and C, typed as a user types them: the commands take the
+    three-digit label off the screen, not a node index."""
+    captured = {}
+
+    def drive(view):
+        while not view.iri.built:            # grow the network out
+            view._on_timer()
+        _press(view, "s")                    # any key ends the settling wait
+        captured["phase"] = view.phase
+        captured["skip_still_stepped"] = view.stepbuf   # ...and does its own job
+
+        _press(view, "k")                    # kill the satellite labelled 900
+        _type(view, "900")
+        _press(view, "enter")
+        captured["dead"] = _iri_node(view, "900").iri.avail
+        _press(view, "k")                    # and switch it back on
+        _type(view, "900")
+        _press(view, "enter")
+        captured["alive"] = _iri_node(view, "900").iri.avail > 0
+
+        _press(view, "t")                    # send 009 -> 018, no repeat
+        for value in ("9", "18", "0"):
+            _type(view, value)
+            _press(view, "enter")
+        captured["sent"] = _carrying(view)
+        captured["mode"] = view.ui_mode
+
+        before = view.stepbuf                # a step, queued for the timer
+        _press(view, "space")
+        queued = view.stepbuf
+        view._on_timer()
+        captured["queue"] = (queued - before, queued - view.stepbuf)
+
+        _press(view, "c")                    # clear the network
+        captured["cleared"] = _carrying(view)
+        _repaint(view)
+        captured["error"] = view._paint_error
+        view.close()
+
+    viewer.run_iridium(_drive=drive)
+    assert captured["phase"] is viewer.IriPhase.RUN, "a key skips the wait"
+    assert captured["skip_still_stepped"] == 1, \
+        "skipping the wait must not swallow the key that did it"
+    assert captured["dead"] == 0, "K kills the satellite it names"
+    assert captured["alive"], "K again repairs it"
+    assert captured["sent"] >= 2, "sender and target both hold the packet"
+    assert captured["mode"] is viewer.UiMode.MAIN, "the prompt closed"
+    assert captured["queue"] == (1, 1), "space queues a step, the timer drains it"
+    assert captured["cleared"] == 0, "C clears the traffic"
+    assert captured["error"] is None
+
+
+def test_a_dead_satellite_cannot_send_and_says_so(qapp):
+    """The 1992 note "don't allow for target to be a broken node" is an error
+    here, not silence -- and it has to reach the status line."""
+    captured = {}
+
+    def drive(view):
+        while not view.iri.built:
+            view._on_timer()
+        _press(view, "s")
+        _press(view, "k")                    # kill 009 first
+        _type(view, "9")
+        _press(view, "enter")
+        _press(view, "t")                    # then try to send from it
+        for value in ("9", "18", "0"):
+            _type(view, value)
+            _press(view, "enter")
+        captured["message"] = view.message
+        captured["mode"] = view.ui_mode
+        view.close()
+
+    viewer.run_iridium(_drive=drive)
+    assert "dead" in captured["message"], captured["message"]
+    assert captured["mode"] is viewer.UiMode.MAIN
+
+
+def test_a_three_field_prompt_stays_open_until_the_last_field(qapp):
+    """Transmit asks for Node1, Node2 and Repeat in turn.  Enter on the first
+    two commits that one field and keeps the prompt up (FieldPrompt.enter
+    answers "more"); only the third submits.  Treating "more" as an ending
+    swallowed the command after the first Enter."""
+    captured = {}
+
+    def drive(view):
+        while not view.iri.built:
+            view._on_timer()
+        _press(view, "x")                    # end the wait without a side job
+        _press(view, "t")
+        captured["opened"] = view.ui_mode
+        _type(view, "9")
+        _press(view, "enter")
+        captured["after_1st"] = (view.ui_mode, view.prompt is not None)
+        _type(view, "18")
+        _press(view, "enter")
+        captured["after_2nd"] = (view.ui_mode, view.prompt is not None)
+        _type(view, "0")
+        _press(view, "enter")
+        captured["after_3rd"] = (view.ui_mode, view.prompt is None)
+        captured["arrived"] = _carrying(view)
+        view.close()
+
+    viewer.run_iridium(_drive=drive)
+    assert captured["opened"] is viewer.UiMode.PROMPT
+    assert captured["after_1st"] == (viewer.UiMode.PROMPT, True), \
+        "one field committed, two to go -- the prompt must stay"
+    assert captured["after_2nd"] == (viewer.UiMode.PROMPT, True)
+    assert captured["after_3rd"] == (viewer.UiMode.MAIN, True)
+    assert captured["arrived"] >= 2, "and only then does the packet exist"

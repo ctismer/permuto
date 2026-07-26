@@ -593,6 +593,25 @@ class PermutographView(ViewBase):
 SETTLE_STEPS = 180
 
 
+class IriPhase(Enum):
+    """The network is grown one satellite at a time, then left to settle.
+
+    Only in ``RUN`` do the keys mean anything but "stop waiting", which is why
+    this is not the same thing as :class:`UiMode`.
+    """
+
+    BUILD = "build"
+    SETTLE = "settle"
+    RUN = "run"
+
+
+class IriAction(Enum):
+    """What the Iridium prompt is collecting -- ``PromptKind`` for the /I mode."""
+
+    KILL = "kill"
+    TRANSMIT = "transmit"
+
+
 class IridiumView(ViewBase):
     """The ``/I`` mode -- a thin bypass reusing core.iri, core.layout and
     render.paint_iridium, mirroring how polytop.mod "hacked it in at this
@@ -604,10 +623,10 @@ class IridiumView(ViewBase):
         self.graph = Graph()
         self.graph.set_dimensions(2)
         self.iri = Iridium(self.graph)
-        self.phase = "build"        # build -> settle -> run
+        self.ui_mode = UiMode.MAIN   # MAIN | PROMPT | CONFIRM, as in the viewer
+        self.phase = IriPhase.BUILD
         self.settle = 0
-        self.stepbuf = 0            # queued step keys (autorepeat)
-        self.confirming = False     # showing the exit question
+        self.stepbuf = 0             # queued step keys (autorepeat)
         self.prompt_action = None
         self.message = ("SIMONE   building the network"
                         "   (any key skips the wait)")
@@ -619,18 +638,18 @@ class IridiumView(ViewBase):
         layout.normalize(self.graph)
 
     def _on_timer(self):
-        if self.phase == "build":
+        if self.phase is IriPhase.BUILD:
             if not self.iri.built:
                 self.iri.new_node()
                 for _ in range(5):
                     self._relax()
             else:
-                self.phase = "settle"
-        elif self.phase == "settle":
+                self.phase = IriPhase.SETTLE
+        elif self.phase is IriPhase.SETTLE:
             self._relax()
             self.settle += 1
             if self.settle >= SETTLE_STEPS:
-                self.phase = "run"
+                self.phase = IriPhase.RUN
                 self.message = ""
         elif self.stepbuf > 0:      # drain queued steps, one per frame
             self.stepbuf -= 1
@@ -651,30 +670,37 @@ class IridiumView(ViewBase):
 
     # -- input -----------------------------------------------------
     def keyPressEvent(self, ev):
-        if self.confirming:      # "Do You want to exit? (Y/N)"
-            if exit_confirmed(ev):
-                self.close()
-            else:
-                self.confirming = False
-                self.message = ""
-            self.update()
-            return
-        if self.prompt:
-            result = feed_prompt(self.prompt, ev)
-            if result == "cancel":
-                self.prompt = None
-            elif result == "submit":
-                self._run_prompt()
-                self.prompt = None
-            self.update()
-            return
-        if self.phase != "run":
-            self.phase = "run"      # any key skips the intro wait
+        {UiMode.MAIN: self._main_key,
+         UiMode.PROMPT: self._prompt_key,
+         UiMode.CONFIRM: self._confirm_key}[self.ui_mode](ev)
+        self.update()
+
+    def _confirm_key(self, ev):
+        """"Do You want to exit? (Y/N)" -- anything else goes back."""
+        if exit_confirmed(ev):
+            self.close()
+        else:
+            self.ui_mode = UiMode.MAIN
+            self.message = ""
+
+    def _prompt_key(self, ev):
+        result = feed_prompt(self.prompt, ev)
+        if result in ("typing", "more"):
+            return            # still filling in -- "transmit" asks for three
+        if result == "submit":
+            self._run_prompt()
+        self.prompt = None
+        self.ui_mode = UiMode.MAIN
+
+    def _main_key(self, ev):
+        if self.phase is not IriPhase.RUN:
+            # any key cuts the intro short, and still does its own job
+            self.phase = IriPhase.RUN
             self.settle = SETTLE_STEPS
             self.message = ""
         k = ev.text().lower()
         if ev.key() == Qt.Key_Escape or k == "q":
-            self.confirming = True
+            self.ui_mode = UiMode.CONFIRM
             self.message = EXIT_QUESTION
         elif k in ("s", " ") or ev.key() == Qt.Key_Space:
             self.stepbuf += 1
@@ -686,24 +712,24 @@ class IridiumView(ViewBase):
         elif k == "c":
             self.iri.reset()
         elif k == "k":
-            self._begin_prompt("kill", ["Node"])
+            self._begin_prompt(IriAction.KILL, ["Node"])
         elif k == "t":
-            self._begin_prompt("transmit", ["Node1", "Node2", "Repeat"])
-        self.update()
+            self._begin_prompt(IriAction.TRANSMIT, ["Node1", "Node2", "Repeat"])
 
     def _begin_prompt(self, action, fields):
         self.prompt_action = action
+        self.ui_mode = UiMode.PROMPT
         if len(fields) == 1:
-            self.prompt = FieldPrompt(action, [(f"{fields[0]}=", True)])
+            self.prompt = FieldPrompt(action.value, [(f"{fields[0]}=", True)])
         else:
-            self.prompt = FieldPrompt(action, [(f, True) for f in fields])
+            self.prompt = FieldPrompt(action.value, [(f, True) for f in fields])
 
     def _run_prompt(self):
-        action, nums = self.prompt_action, self.prompt.ints()
+        nums = self.prompt.ints()
         try:
-            if action == "kill":
+            if self.prompt_action is IriAction.KILL:
                 self.iri.kill_node(Iridium.num_to_label(nums[0]))
-            elif action == "transmit":
+            elif self.prompt_action is IriAction.TRANSMIT:
                 self.iri.step()
                 self.iri.transmit(Iridium.num_to_label(nums[0]),
                                   Iridium.num_to_label(nums[1]), nums[2])
