@@ -145,3 +145,92 @@ def test_viewer_builds_without_a_display():
     bg = img.pixel(0, 0)
     assert any(img.pixel(x, y) != bg
                for x in range(0, 700, 15) for y in range(0, 600, 15))
+
+
+# -- what covers what ----------------------------------------------------
+# paint() draws in layers: edges, then the operator digits on their punched-out
+# patches, then the balls, then the labels inside them.  Nothing but the order
+# of those loops decides the picture, so these pin the order down.
+
+def _spread_permutograph():
+    """The default permutograph, relaxed until the nodes are apart."""
+    from permuto.loader import make_session
+
+    s = make_session("1234", operators=["12", "+", "23", "+", "34"])
+    for _ in range(200):
+        layout.relax_step(s.graph, alg="rubber")
+    return s.graph
+
+
+def _rgb(img, x, y):
+    c = img.pixelColor(x, y)
+    return (c.red(), c.green(), c.blue())
+
+
+def test_balls_cover_the_edges_that_run_into_them():
+    """Every node's own edges end at its centre, so a centre showing an edge
+    colour would mean the balls were drawn first."""
+    g = _spread_permutograph()
+    size = 700
+    img = render.render_image(g, size, size, op_colors=True)
+    palette = {tuple(c) for c in render._DOS_PALETTE}
+    checked = 0
+    for n, (x, y, _z) in render.project(g, size, size).items():
+        if not (0 <= x < size and 0 <= y < size):
+            continue
+        assert _rgb(img, int(x), int(y)) in palette, \
+            f"node {n}'s centre is not a filled ball"
+        checked += 1
+    assert checked > 5, "no nodes landed on the picture"
+
+
+def test_labels_are_inked_inside_the_balls():
+    """text_mode 1 writes node numbers in black inside the ball -- after it."""
+    g = _spread_permutograph()
+    size = 700
+    img = render.render_image(g, size, size, name_mode=1)
+    r = int(render._scaled(size, 9))          # the radius text_mode 1 uses
+    ink = 0
+    for x, y, _z in render.project(g, size, size).values():
+        for px in range(int(x) - r, int(x) + r + 1):
+            for py in range(int(y) - r, int(y) + r + 1):
+                if 0 <= px < size and 0 <= py < size \
+                        and _rgb(img, px, py) == render.INK:
+                    ink += 1
+    assert ink > 20, "no black label ink inside the balls"
+
+
+def test_the_operator_digit_punches_its_patch_through_the_edge():
+    """The digit sits on a background patch, drawn over the edge.  Under it,
+    the edge would simply paint across the patch again."""
+    g = _spread_permutograph()
+    size = 700
+    pts = render.project(g, size, size)
+
+    def clean_patches(img):
+        """Edges whose midpoint has a 3x3 block of pure background on the line
+        -- only the punched-out patch can produce that."""
+        found = 0
+        for nd in g.ordered():
+            xi, yi, _zi = pts[nd.num]
+            for idx, j in enumerate(nd.links):
+                if j <= nd.num or idx >= len(nd.opno) or not nd.opno[idx]:
+                    continue
+                xj, yj, _zj = pts[j]
+                for t in (0.44, 0.47, 0.5, 0.53, 0.56):
+                    x, y = round(xi + (xj - xi) * t), round(yi + (yj - yi) * t)
+                    if not (1 <= x < size - 1 and 1 <= y < size - 1):
+                        continue
+                    if all(_rgb(img, x + dx, y + dy) == render.BACKGROUND
+                           for dx in (-1, 0, 1) for dy in (-1, 0, 1)):
+                        found += 1
+                        break
+        return found
+
+    with_digits = render.render_image(g, size, size, op_colors=True,
+                                      operator_digits=True)
+    without = render.render_image(g, size, size, op_colors=True,
+                                  operator_digits=False)
+    assert clean_patches(without) == 0, "the bare edge must cover its midpoint"
+    assert clean_patches(with_digits) > 0, \
+        "the digit patch must cover the edge, not sit under it"
