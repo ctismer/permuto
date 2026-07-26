@@ -68,7 +68,7 @@ def test_permutograph_view_paints_in_every_mode(qapp):
         # main
         _repaint(view)
         # program menu (forces node numbers on)
-        view.ui_mode = "program"
+        view.ui_mode = viewer.UiMode.PROGRAM
         _repaint(view)
         # a running SPA program
         view.session.start_spa(1)
@@ -76,19 +76,19 @@ def test_permutograph_view_paints_in_every_mode(qapp):
             view.session.tick()
         _repaint(view)
         # operator editor open
-        view.ui_mode = "edit"
+        view.ui_mode = viewer.UiMode.EDIT
         view.edit_field = ("base",)
         view.edit_buffer = view.session.pm.base
         _repaint(view)
         # a numeric prompt
-        view.ui_mode = "prompt"
+        view.ui_mode = viewer.UiMode.PROMPT
         view.prompt_kind = "node"
         from permuto.ui.prompt import single
         view.prompt = single("StartNode=")
         view.prompt.type_char("1")
         _repaint(view)
         # SelectCard over a node's neighbours
-        view.ui_mode = "select"
+        view.ui_mode = viewer.UiMode.SELECT
         n = 1
         view.select = {"node": n, "action": "break2",
                        "items": list(view.g.nodes[n].links), "pos": 0}
@@ -254,7 +254,7 @@ def test_editing_the_base_leaves_a_full_size_picture(qapp):
     def drive(view):
         view.resize(900, 800)
         view.keyPressEvent(key("e"))                  # into the editor
-        assert view.ui_mode == "edit"
+        assert view.ui_mode is viewer.UiMode.EDIT
         for _ in range(len(view.session.pm.base)):    # clear the field
             view.keyPressEvent(QKeyEvent(QKeyEvent.KeyPress, Qt.Key_Backspace,
                                          Qt.NoModifier, "\b"))
@@ -268,7 +268,7 @@ def test_editing_the_base_leaves_a_full_size_picture(qapp):
         view.close()
 
     viewer.run("1234", operators=["12", "+", "23", "+", "34"], _drive=drive)
-    assert captured["mode"] == "main"
+    assert captured["mode"] is viewer.UiMode.MAIN
     assert captured["nodes"] == 120, "base 12345 must give 5! nodes"
     assert captured["spread"] > 100, "rebuilt graph collapsed to a dot"
 
@@ -326,9 +326,9 @@ def test_escape_asks_before_leaving(qapp):
         captured["closed"] = not view.isVisible()
 
     viewer.run("1234", operators=["12", "+", "23", "+", "34"], _drive=drive)
-    assert captured["asked"] == ("confirm", EXIT_QUESTION)
-    assert captured["after_no"] == "main", "'n' must not quit"
-    assert captured["file_quit"] == "confirm", "(Q)uit must ask too"
+    assert captured["asked"] == (viewer.UiMode.CONFIRM, EXIT_QUESTION)
+    assert captured["after_no"] is viewer.UiMode.MAIN, "'n' must not quit"
+    assert captured["file_quit"] is viewer.UiMode.CONFIRM, "(Q)uit must ask too"
     assert captured["closed"]
 
 
@@ -457,7 +457,8 @@ def test_running_spa_from_the_program_menu_marks_the_path(qapp):
         view.close()
 
     viewer.run("1234", operators=["12", "+", "23", "+", "34"], _drive=drive)
-    assert captured["mode"] == "main", "the menu must close after the program starts"
+    assert captured["mode"] is viewer.UiMode.MAIN, \
+        "the menu must close after the program starts"
     assert captured["discs"] > 10, "the wave edges carry no direction discs"
 
 
@@ -466,7 +467,7 @@ def test_polytop_view_paints_a_plain_nod_graph(qapp):
 
     def drive(view):
         _repaint(view)
-        view.ui_mode = "program"
+        view.ui_mode = viewer.UiMode.PROGRAM
         _repaint(view)
         captured["error"] = view._paint_error
         view.close()

@@ -112,10 +112,11 @@ strict-1:1 rule has done its job and no longer binds. Three things still bind:
 
 Where the seams are, from working in it — observations, not decisions:
 
-* `ui/viewer.py` (~800 lines) holds a nested `QWidget` class and dispatches
-  every key through a `ui_mode` string (`main`/`file`/`program`/`edit`/
-  `prompt`/`select`/`confirm`). That state machine is the obvious thing to make
-  explicit; the two widgets also duplicate their prompt and confirm handling.
+* ~~`ui/viewer.py` holds a nested `QWidget` class and dispatches every key
+  through a `ui_mode` string~~ — done on `phase3-refactor`: the two widgets are
+  module-level classes over a shared `ViewBase`, and the modes are a `UiMode`
+  enum dispatched through one table. Still stringly typed there: `prompt_kind`,
+  the `pending` actions and the `select` dict.
 * `render.paint()` is one long function: edges, operator digits, direction
   discs, balls, labels. The pieces don't share much beyond `pts` and `radius`.
 * `core/pm.py` mixes the operator-table model with the runtime graph editing

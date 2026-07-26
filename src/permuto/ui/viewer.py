@@ -25,6 +25,7 @@ import os
 import pathlib
 import sys
 import traceback
+from enum import Enum
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QPainter
@@ -227,6 +228,28 @@ class ViewBase(QWidget):
         p.setFont(font)
 
 
+class UiMode(Enum):
+    """Which menu the keyboard is talking to.
+
+    The original needed no such state: DOS read its keys inside whichever menu
+    loop was running, so the menu *was* the call stack.  An event-driven viewer
+    has to remember it instead, and every keystroke, both status lines and the
+    forced node numbers read it back.
+    """
+
+    MAIN = "main"
+    FILE = "file"
+    PROGRAM = "program"
+    EDIT = "edit"
+    PROMPT = "prompt"        # typing a file name or a node number
+    SELECT = "select"        # SelectCard: picking a neighbour
+    CONFIRM = "confirm"      # the exit question
+
+
+EDIT_MENU_LINE = ("editing operators: digits, arrows move, "
+                  "Ctrl-Home base, Ctrl-End last, Enter/Esc leave")
+
+
 class PermutographView(ViewBase):
     """The main viewer: the graph, the operator panel and the two menu lines."""
 
@@ -240,7 +263,7 @@ class PermutographView(ViewBase):
         self.session = session
 
         # UI chrome state
-        self.ui_mode = "main"       # main | file | program | edit | prompt
+        self.ui_mode = UiMode.MAIN
         self.labels = False
         self.op_colors = True
         # a load note (e.g. a truncated session) shows in the status line
@@ -267,7 +290,7 @@ class PermutographView(ViewBase):
     # -- the clock -------------------------------------------------
     def _on_timer(self):
         # only relax freely while running; single-step waits for a key
-        if self.ui_mode == "main" and self.session.running:
+        if self.ui_mode is UiMode.MAIN and self.session.running:
             self._run_a_frame()
         elif self.session.program_mode:
             self.session.tick()      # a running program advances on its own
@@ -300,16 +323,16 @@ class PermutographView(ViewBase):
         if self.session.permuto and self.session.pm is not None:
             render.paint_operator_panel(
                 self.session.pm, p, pic_w + 16, 60, self.height(),
-                active_field=self.edit_field if self.ui_mode == "edit" else None,
-                buffer_text=self.edit_buffer if self.ui_mode == "edit" else None)
+                active_field=self.edit_field if self.ui_mode is UiMode.EDIT else None,
+                buffer_text=self.edit_buffer if self.ui_mode is UiMode.EDIT else None)
         self._paint_chrome(p)
 
     def _draw_name_mode(self):
         """Node numbers are forced on whenever a node is being chosen, so
         there is always something to read -- the original drew them before
         the program menu regardless of the current name mode."""
-        picking = self.ui_mode in ("program", "select") or \
-            (self.ui_mode == "prompt" and self.prompt_kind == "node")
+        picking = self.ui_mode in (UiMode.PROGRAM, UiMode.SELECT) or \
+            (self.ui_mode is UiMode.PROMPT and self.prompt_kind == "node")
         return NameMode.NUMBER if picking else self.session.name_mode
 
     def _paint_chrome(self, p):
@@ -323,11 +346,11 @@ class PermutographView(ViewBase):
         p.setPen(QColor(150, 155, 175))
         p.drawText(12, self.height() - 32, self.session.status_line())
         p.setPen(QColor(255, 230, 140))
-        if self.ui_mode == "prompt" and self.prompt:
+        if self.ui_mode is UiMode.PROMPT and self.prompt:
             p.drawText(12, self.height() - 14,
                        self.prompt.display()
                        + (f"    {self.message}" if self.message else ""))
-        elif self.ui_mode == "select" and self.select:
+        elif self.ui_mode is UiMode.SELECT and self.select:
             sel = self.select
             cand = sel["items"][sel["pos"]]
             p.drawText(12, self.height() - 14,
@@ -338,38 +361,32 @@ class PermutographView(ViewBase):
             p.drawText(12, self.height() - 14, self.message)
 
     def _top_line(self):
-        if self.ui_mode == "file":
+        if self.ui_mode is UiMode.FILE:
             return self.session.file_menu_line()
-        if self.ui_mode == "prompt":
+        if self.ui_mode is UiMode.PROMPT:
             return (self.session.file_menu_line()
                     if self.prompt_kind in ("ps", "save", "load")
                     else self.session.program_menu_line())
-        if self.ui_mode in ("program", "select"):
+        if self.ui_mode in (UiMode.PROGRAM, UiMode.SELECT):
             return self.session.program_menu_line()
-        if self.ui_mode == "edit":
-            return ("editing operators: digits, arrows move, "
-                    "Ctrl-Home base, Ctrl-End last, Enter/Esc leave")
-        if self.ui_mode == "confirm":
+        if self.ui_mode is UiMode.EDIT:
+            return EDIT_MENU_LINE
+        if self.ui_mode is UiMode.CONFIRM:
             return EXIT_QUESTION
         return self.session.menu_line()
 
     # ================= input =====================================
     def keyPressEvent(self, ev):
         self.message = ""
-        if self.ui_mode == "edit":
-            self._edit_key(ev)
-        elif self.ui_mode == "prompt":
-            self._prompt_key(ev)
-        elif self.ui_mode == "select":
-            self._select_key(ev)
-        elif self.ui_mode == "file":
-            self._file_key(ev)
-        elif self.ui_mode == "program":
-            self._program_key(ev)
-        elif self.ui_mode == "confirm":
-            self._confirm_key(ev)
-        else:
-            self._main_key(ev)
+        # every mode must name its handler: an unlisted one is a KeyError here,
+        # not a key that silently lands in the main menu
+        {UiMode.MAIN: self._main_key,
+         UiMode.FILE: self._file_key,
+         UiMode.PROGRAM: self._program_key,
+         UiMode.EDIT: self._edit_key,
+         UiMode.PROMPT: self._prompt_key,
+         UiMode.SELECT: self._select_key,
+         UiMode.CONFIRM: self._confirm_key}[self.ui_mode](ev)
         self.update()
 
     def _confirm_key(self, ev):
@@ -377,7 +394,7 @@ class PermutographView(ViewBase):
         if exit_confirmed(ev):
             self.close()
         else:
-            self.ui_mode = "main"
+            self.ui_mode = UiMode.MAIN
 
     # -- main menu -------------------------------------------------
     def _main_key(self, ev):
@@ -396,13 +413,13 @@ class PermutographView(ViewBase):
         elif k == "n":
             s.cycle_name_mode()
         elif k == "f":
-            self.ui_mode = "file"
+            self.ui_mode = UiMode.FILE
         elif k == "p":
-            self.ui_mode = "program"    # numbers are forced on while here
+            self.ui_mode = UiMode.PROGRAM    # numbers are forced on while here
         elif k == "e" and s.permuto:
             self._enter_edit()
         elif ev.key() == Qt.Key_Escape:
-            self.ui_mode = "confirm"
+            self.ui_mode = UiMode.CONFIRM
         elif not s.running:
             s.tick()             # any other key single-steps
 
@@ -412,7 +429,7 @@ class PermutographView(ViewBase):
         if ev.key() == Qt.Key_Escape or k == "q":
             # (Q)uit means quit the program, and so does ESC here -- both
             # ask first, and a "no" drops back to the main menu.
-            self.ui_mode = "confirm"
+            self.ui_mode = UiMode.CONFIRM
         elif k == "o":
             self._begin_prompt("PostScript out = ", "ps")
         elif k == "l":
@@ -425,7 +442,7 @@ class PermutographView(ViewBase):
         k = ev.text().lower()
         s = self.session
         if ev.key() == Qt.Key_Escape:
-            self.ui_mode = "main"
+            self.ui_mode = UiMode.MAIN
         elif k == "n":
             self._ask_node("Node=", ("kill",), "kill/repair")
         elif k == "l":
@@ -438,10 +455,10 @@ class PermutographView(ViewBase):
             self._ask_node("StartNode=", ("spa",), "run SPA from")
         elif k == "t":
             self._guard(s.start_spta)
-            self.ui_mode = "main"
+            self.ui_mode = UiMode.MAIN
         elif k == "p":
             if self._guard(s.start_par_sum):
-                self.ui_mode = "main"
+                self.ui_mode = UiMode.MAIN
 
     def _ask_node(self, label, pending, what):
         """Ask for a node the original way -- type its number and Enter
@@ -452,7 +469,7 @@ class PermutographView(ViewBase):
 
     # -- operator editor -------------------------------------------
     def _enter_edit(self):
-        self.ui_mode = "edit"
+        self.ui_mode = UiMode.EDIT
         self.edit_base_before = self.session.pm.base
         self.edit_field = ("base",)
         self.edit_buffer = self.session.pm.base
@@ -532,12 +549,12 @@ class PermutographView(ViewBase):
             self.session.rebuild_permutograph(base_changed=base_changed)
         except PermutoError as exc:
             self.message = str(exc)
-        self.ui_mode = "main"
+        self.ui_mode = UiMode.MAIN
         self.edit_field = None
 
     # -- text prompt (filenames, node numbers) ---------------------
     def _begin_prompt(self, label, kind):
-        self.ui_mode = "prompt"
+        self.ui_mode = UiMode.PROMPT
         self.prompt_kind = kind
         self.prompt = FieldPrompt(label.strip(), [(label.strip(),
                                                    kind == "node")])
@@ -546,7 +563,7 @@ class PermutographView(ViewBase):
         result = feed_prompt(self.prompt, ev)
         if result == "cancel":
             self.pending = None
-            self.ui_mode = "main"
+            self.ui_mode = UiMode.MAIN
         elif result == "submit":
             self._run_prompt()
 
@@ -557,7 +574,7 @@ class PermutographView(ViewBase):
         if self.prompt_kind == "node":
             if not text.isdigit() or int(text) not in self.g.nodes:
                 self.message = f"no node {text} (1..{self.g.nnodes})"
-                self.ui_mode = "main"
+                self.ui_mode = UiMode.MAIN
                 self.pending = None
                 return
             self._apply_pending(int(text))
@@ -573,7 +590,7 @@ class PermutographView(ViewBase):
                 self._load_session(text)        # sets its own message
         except (PermutoError, OSError) as exc:
             self.message = str(exc)
-        self.ui_mode = "main"
+        self.ui_mode = UiMode.MAIN
 
     def _save_session(self, path):
         pm = self.session.pm
@@ -640,7 +657,7 @@ class PermutographView(ViewBase):
             return
         self.select = {"node": node, "action": action,
                        "items": neighbours, "pos": 0}
-        self.ui_mode = "select"
+        self.ui_mode = UiMode.SELECT
         self.message = f"{what}: space = next, Enter = pick, Esc = cancel"
 
     def _select_key(self, ev):
@@ -664,7 +681,7 @@ class PermutographView(ViewBase):
 
     def _done_pending(self):
         self.pending = None
-        self.ui_mode = "main"
+        self.ui_mode = UiMode.MAIN
 
     def _toggle_broken(self, n1, n2):
         for a, b in ((n1, n2), (n2, n1)):
