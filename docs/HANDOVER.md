@@ -1,6 +1,8 @@
 # Handover — permuto (Modula-2 → Python port)
 
-Read this first, then `docs/ARCHITECTURE.md` and `git log --oneline`.
+Read this first, then `CLAUDE.md`, `docs/ARCHITECTURE.md` and
+`git log --oneline`. Last updated 2026-07-26, at the end of the session that
+finished phase 2.
 
 ## Where we are
 
@@ -11,8 +13,13 @@ original did and where the port decided otherwise.
 
 - `main` is the port; `recovered-original` holds the pristine 1995 import.
 - **Remote**: `origin = git@github.com:ctismer/permuto.git` (public, MIT).
-  Christian pushes; check `git status` for unpushed commits.
-- `python -m pytest` — 217 tests.
+  Christian pushes himself (passphrase-protected key) — hand him the command,
+  never run it. Check `git status` for unpushed commits.
+- `python -m pytest` — 226 cases from 136 functions.
+- **Serena is set up for this project** (2026-07-26). Read the memory
+  `project-conventions` first; it says which tool to use where. In short:
+  semantic tools for `src/` and `tests/`, Read/Grep for `legacy/`, which is
+  Modula-2 (no language server exists) and CP437.
 - **This port is the reference implementation.** The 1990s program still runs
   under DOSBox, which makes it an excellent place to look up *what the original
   did* — menu layout, colours, what a key actually does — so ask for a run or a
@@ -49,9 +56,26 @@ original did and where the port decided otherwise.
 
 ## What the port deliberately does differently
 Real errors instead of `HALT` (PORT-GAPS §0), `.pms` text sessions instead of a
-memory dump (§3), dimmed back edges instead of the `colour + 8` palette trick
-(§6), and no `InputStr` overwrite typing — a DOS-terminal habit, not a feature
-(§9). Everything else follows the original.
+memory dump (§3), dimmed back *edges* instead of the `colour + 8` palette trick
+— the balls do use it (§6), `N` skips the display mode until SPA has put
+something in it (§2), and no `InputStr` overwrite typing — a DOS-terminal habit,
+not a feature (§9). Everything else follows the original.
+
+### Settled on screen, do not re-open
+The look was gone through with the author on 2026-07-26, at the picture, not in
+the abstract. These were tried and rejected; PORT-GAPS §6 has the detail:
+
+* choosing the label ink per ball (by brightness or by contrast ratio) — reads
+  as restless;
+* levelling the balls into one light band so a single ink always works — washed
+  out;
+* dropping the ball colours altogether — the colour is information (which
+  character the permutation starts with), not decoration.
+
+What stands: palette colours on the balls, bright half for the front, **labels
+always black**, centred inside. If a colour looks wrong, check `ball_color()` —
+it cycles 1..7 with the bright twins 9..15 so that a graph past the palette
+(`ikosa9`, 812 nodes) never lands on 0 = black = an invisible node.
 
 Not viewer features, and not needed for parity (verified standalone
 experiments): `ham1`, `h`, `pmtest`, `pm5`. `kugel` was one of them and got
@@ -75,12 +99,39 @@ python -m permuto export pgl4 out.ps 600
 
 ## Next — phase 3 = pythonic refactor
 Parity was the floor and it is reached, so improvements are now allowed — the
-strict-1:1 rule has done its job and no longer binds. What does still bind: the
-core stays **UI-free**, and the golden tests against `legacy/modula/nod/*` and
-the 1995 `.ply` files must stay green through any refactor. They are what makes
-it safe.
+strict-1:1 rule has done its job and no longer binds. Three things still bind:
+
+1. The core stays **UI-free** (a web frontend later is just another frontend),
+   and `studies/` stays free of viewer imports in both directions.
+2. The golden tests against `legacy/modula/nod/*` and the 1995 `.ply` files
+   must stay green. They are what makes a refactor safe — never adjust a golden
+   expectation to make a change pass.
+3. Tests are there so features don't break, so prefer driving the widget over
+   poking internals (`viewer.run(..., _drive=...)`, real keystrokes, then look
+   at the pixels). See `CLAUDE.md`.
+
+Where the seams are, from working in it — observations, not decisions:
+
+* `ui/viewer.py` (~800 lines) holds a nested `QWidget` class and dispatches
+  every key through a `ui_mode` string (`main`/`file`/`program`/`edit`/
+  `prompt`/`select`/`confirm`). That state machine is the obvious thing to make
+  explicit; the two widgets also duplicate their prompt and confirm handling.
+* `render.paint()` is one long function: edges, operator digits, direction
+  discs, balls, labels. The pieces don't share much beyond `pts` and `radius`.
+* `core/pm.py` mixes the operator-table model with the runtime graph editing
+  (`connect`/`collapse`/`uncollapse`).
+* `session.py` came out clean and is a good model for the rest: UI-free, small,
+  tested on its own.
 
 Afterwards: optionally TypeScript/browser on the cleaned core.
+
+### Loose thread worth picking up
+Christian wrote a Conway **Game of Life** around the same time as the rest, and
+used the `kugel` study to design its scalable little balls — the connection to
+`studies/kugel` is his own. That source is not in the recovered archive
+(checked: nothing matching life/Conway in all 233 entries of
+`Poly_decrypted.zip`), but he thinks he can find it. If it turns up, it belongs
+in `studies/` next to `kugel`, and there is something to build from it.
 
 ## Gotchas
 - **Coordinates always need a scale.** `NORM = 2**24`, and anything much
