@@ -82,8 +82,8 @@ The original is one program with three modes; the port has all three.
 | Mode | Start | Port |
 |---|---|---|
 | Polytop | `polytop <file.nod>` — load a finished graph | `permuto show <name>` |
-| Permutograph | `polytop /PG` — build permutographs interactively, default base `1234`, ops `12 23 34` | `permuto` (no argument) |
-| Iridium | `polytop /I` | `permuto iridium` |
+| Permutograph | `polytop /PG` — build permutographs interactively, default base `1234`, ops `12 23 34` | `permuto` (no argument), `permuto /PG`, `permuto --pg` |
+| Iridium | `polytop /I` | `permuto iridium`, `permuto /I`, `permuto --iridium` |
 
 `Running = FALSE` is the **start state**: every iteration blocks on a keypress,
 so any unbound key single-steps the relaxation. Reproduced.

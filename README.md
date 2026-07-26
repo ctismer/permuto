@@ -75,6 +75,10 @@ python -m permuto show session.pms          # resume a saved session
 python -m permuto iridium                   # the SIMONE / Iridium simulation
 ```
 
+The original's switches work too, in either spelling: `/PG` or `--pg` for the
+permutograph mode (which is also what no arguments does), `/I` or `--iridium`
+for SIMONE. `permuto <command> --help` explains each command.
+
 Non-interactive:
 
 ```bash
