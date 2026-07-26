@@ -318,6 +318,45 @@ genannt" — a backronym for a name he had reason to like at the time. Keep the
 name in the port; it is part of the program's history, like the `Poly.cry`
 provenance.
 
+### Where it comes from: `legacy/modula/salzdemo.txt`
+
+The design is written down, and it survived. `salzdemo.txt` is the plan for a
+demo made in and for **Salzburg**, where **Prof. Bernhard Mitterauer** lived —
+he was with the group now and then. Forty lines, in two parts, recovered here
+2026-07-26 with the author's account of who is who.
+
+Part b), *"Katzenminze"*, is `Iri` before it was written:
+
+> Alle Knoten erfragen periodisch die Verfügbarkeitscodes ihrer Nachbarn.
+> Zerstörte Knoten antworten dabei garnicht, was als eine Verfügbarkeit von 0
+> gerechnet wird. […] Each time a link is used, its availability decreases. The
+> availability also increases automatically, like the charging of a capacitor.
+> […] a broken node smears its unavailability out into its neighbourhood, and
+> an information packet will be refracted on its route to walk around this area.
+
+That is, line for line, `avail = 0.65·avail + 0.30·mean(neighbours) + 500`, the
+discharge to 80 % on use, and the detour around dead satellites.
+
+It also explains **SPTA**, the menu entry that answers "sorry, SPTA not yet
+available": it was meant to be the locally shortest path *plus* the availability
+code. `Iri` got that instead, as its own module — which is why the Iridium
+display runs under `progsel = P_SPTA` in `PmDisp`.
+
+One idea from it never got built, and it is credited in the file to "Jeff" —
+**Jeff Myers**, senior at Motorola, whom the group visited in the USA when they
+pitched around the early Iridium project:
+
+> Depending on the priority of a message, it will take the availability code
+> into account more or less. Urgent messages will take the shortest paths
+> whenever possible. Less urgent messages try to avoid areas of low
+> availability. That increases the overall availability and avoids local
+> overloading.
+
+Part a) is unbuilt too: generalised operators over "Platz- und Wertkontexturen",
+a first step towards the Keno operator where **two nodes are linked when a
+certain string match holds between them** — rather than by applying a cycle —
+plus a zoom, computing on demand, and hiding individual operators.
+
 - **Grid**: labels `"abc"` with `a+b+c = Freq = 9`; `limit = (F+1)(F+2)/2 = 55`
   nodes. Built by a boustrophedon `Sweep` (`"090"`, `"081" "180"`,
   `"270" "171" "072"`, …), 6 neighbour `Operate`s (one coordinate +1, one −1),

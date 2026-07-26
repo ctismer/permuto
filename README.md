@@ -16,9 +16,12 @@ satellite constellation with adaptive packet routing, on the same engine.
 
 Written 1990–95 (TopSpeed / JPI Modula-2, DOS) by a small research group —
 Gerhard G. Thomas, Horst Hüske, and Christian Tismer — exploring Gotthard
-Günther's *negation cycles / permutographs*. The group even visited Motorola to
+Günther's *negation cycles / permutographs*, with Prof. Bernhard Mitterauer in
+Salzburg joining now and then. The group even visited Motorola — Jeff Myers — to
 pitch ideas around the early **Iridium** satellite project (77, then 66
-satellites), which is where the SIMONE routing simulation comes from.
+satellites), which is where the SIMONE routing simulation comes from; the design
+notes that came back from that trip are still in the archive as
+`legacy/modula/salzdemo.txt`.
 
 The original source was deleted years ago and survived only as an encrypted ZIP
 attached to a 1997 e-mail, recovered from a Thunderbird archive in 2026 and
