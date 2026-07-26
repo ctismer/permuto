@@ -1,8 +1,8 @@
 # Handover — permuto (Modula-2 → Python port)
 
 Read this first, then `CLAUDE.md`, `docs/ARCHITECTURE.md` and
-`git log --oneline`. Last updated 2026-07-26, at the end of the session that
-finished phase 2.
+`git log --oneline`. Last updated 2026-07-26, at the end of the first session
+of phase 3 — the refactor lives on the branch `phase3-refactor`, see below.
 
 ## Where we are
 
@@ -15,7 +15,7 @@ original did and where the port decided otherwise.
 - **Remote**: `origin = git@github.com:ctismer/permuto.git` (public, MIT).
   Christian pushes himself (passphrase-protected key) — hand him the command,
   never run it. Check `git status` for unpushed commits.
-- `python -m pytest` — 226 cases from 136 functions.
+- `python -m pytest` — all green. `--cov=permuto` for where the holes are.
 - **Serena is set up for this project** (2026-07-26). Read the memory
   `project-conventions` first; it says which tool to use where. In short:
   semantic tools for `src/` and `tests/`, Read/Grep for `legacy/`, which is
@@ -90,39 +90,107 @@ ported anyway — see below.
 ```bash
 pip install -e .                 # or prefix commands with PYTHONPATH=src
 python -m pytest
-permuto                          # /PG mode, base 1234 -- no arguments needed
+permuto                          # permutograph mode (or --pg), base 1234
 permuto show pgl4                # keys: a c r h s n f p e · ESC quits
-permuto iridium                  # /I mode (SIMONE)
+permuto iridium                  # SIMONE (or --iridium)
+permuto render --help            # every command explains itself
 python -m permuto render pgl5 out.png 700
 python -m permuto export pgl4 out.ps 600
 ```
 
-## Next — phase 3 = pythonic refactor
-Parity was the floor and it is reached, so improvements are now allowed — the
-strict-1:1 rule has done its job and no longer binds. Three things still bind:
+## Phase 3 — the refactor, on `phase3-refactor`
+
+**19 commits, not pushed, and read by nobody but the author.** Tests green at
+every commit; `python -m pytest --cov=permuto` reports 92%.
+
+Three rules still bind, unchanged from when phase 3 started:
 
 1. The core stays **UI-free** (a web frontend later is just another frontend),
    and `studies/` stays free of viewer imports in both directions.
 2. The golden tests against `legacy/modula/nod/*` and the 1995 `.ply` files
-   must stay green. They are what makes a refactor safe — never adjust a golden
-   expectation to make a change pass.
-3. Tests are there so features don't break, so prefer driving the widget over
-   poking internals (`viewer.run(..., _drive=...)`, real keystrokes, then look
-   at the pixels). See `CLAUDE.md`.
+   must stay green — never adjust a golden expectation to make a change pass.
+3. Prefer driving the widget over poking internals
+   (`viewer.run(..., _drive=...)`, real keystrokes, then look at the pixels).
 
-Where the seams are, from working in it — observations, not decisions:
+### What the branch did
 
-* ~~`ui/viewer.py` holds a nested `QWidget` class and dispatches every key
-  through a `ui_mode` string~~ — done on `phase3-refactor`: the two widgets are
-  module-level classes over a shared `ViewBase`, and the modes are a `UiMode`
-  enum dispatched through one table. Still stringly typed there: `prompt_kind`,
-  the `pending` actions and the `select` dict.
-* `render.paint()` is one long function: edges, operator digits, direction
-  discs, balls, labels. The pieces don't share much beyond `pts` and `radius`.
-* `core/pm.py` mixes the operator-table model with the runtime graph editing
-  (`connect`/`collapse`/`uncollapse`).
-* `session.py` came out clean and is a good model for the rest: UI-free, small,
-  tested on its own.
+* **The two `QWidget`s are module-level classes** over a shared `ViewBase`
+  (window, frame timer, crash-proof `paintEvent`, chrome font). They used to be
+  nested inside `run()` / `run_iridium()`, where no language server could see
+  them — which is why this was step one.
+* **Nothing in the UI is stringly typed any more.** `UiMode`, `PromptKind`,
+  `NodeAction`, `Selection`, `OpField`, `IriPhase`, `IriAction` and
+  `layout.Algorithm` replace strings, a one-element tuple everybody indexed
+  with `[0]`, and a four-key dict. Keys go through one dispatch table per view:
+  a mode nobody handles is a `KeyError`, not a key that quietly lands in the
+  main menu.
+* **Logic left the widget** into UI-free modules — `editor.py` (the operator
+  editor's cursor and its rules) and `loader.py` (file resolution, session save
+  and load, which the widget had a second, disagreeing copy of). `Session` took
+  the menu state machine (`top_line`, `label_mode`), the HurryUp cadence
+  (`advance_frame`) and the program menu's edits (`kill_node`, `toggle_line`,
+  `collapse`, `uncollapse`).
+* **`render.paint()` became `Picture`** — one frame's state as fields, five
+  layer methods, and `draw()` is the layer order in five lines.
+* **`Graph` owns its edges** (`find_link`, `is_linked`, `links_avail`,
+  `disconnect`, plus `Node.remove_link`, which keeps every per-link array
+  shifting together). They sat in `pm.py` under a comment saying they needed no
+  PM state. `connect`/`collapse`/`uncollapse` stayed on `PM`: `connect` asks
+  `which_operator` to label the new edge, so they genuinely need the table.
+* **The CLI is argparse** with a subparser per command; `--pg` and `--iridium`
+  for the two modes. The DOS spellings `/PG` and `/I` are gone.
+
+### Four defects found — each has its own test, each was red first
+
+| What went wrong | Test that pins it |
+|---|---|
+| The operator digits ignored the name mode, so cycling `N` to "write nothing" still wrote numbers on the links; and they were hidden during SPA/ParSum, which the original showed. `pmdisp.mod:94` guards both with the same `names>0`; the port asked "is a program running" instead | `test_no_names_means_no_operator_numbers_on_the_edges` |
+| `(C)ollapse` / `(U)ncollapse` on a `.nod` graph reached through a `pm` that is `None` and threw `AttributeError` out of the key handler. The program menu offers them for any graph, as it did in 1995 | `test_the_table_only_actions_refuse_politely_on_a_plain_graph` |
+| A three-field prompt (Iridium `T`) closed after the first Enter — `"more"` was treated as an ending. **Introduced by this refactor**, caught by the key tests written in the same commit | `test_a_three_field_prompt_stays_open_until_the_last_field` |
+| `PM.Disconnect` shifts `links`/`opno` but leaves `state.lines`/`broken` at their old indices, although they address the same link numbers — the 1995 bug, already fixed in the port, now recorded with its source lines in PORT-GAPS §0 | `test_broken_marks_follow_their_edge_through_a_disconnect` |
+
+Two of those four turned up by accident — one from a user question, one while
+moving code. Nobody went looking for them.
+
+### Measured
+
+```
+src     main 5071 -> 5464   of which executable code +108 (+3.6%)
+tests   main 2519 -> 3133   (+614)
+Qt-bound (ui/viewer.py + ui/render.py)  1229 -> 1087   = 24% -> 20% of src
+ui/viewer.py  829 -> 643     PermutographView  369 -> 316 lines, 29 -> 25 methods
+```
+
+The refactor did **not** make the code shorter. What moved is where the logic
+lives and whether a mistake is caught.
+
+### What to do next, in this order
+
+1. **`loader.py` (84%) — the file-resolution rules have no test**, and they are
+   code that moved house today. Uncovered: `.pgd` wins over `.nod` (the build
+   recipe beats its result), a session file recognised by its content rather
+   than its extension (`f.read(15) == b"permuto session"`), and `_nod_dir`'s
+   fallback to `legacy/` when the bundled samples are missing. Each is a
+   decision with a reason and none of them runs.
+2. **`ui/render.py` (82%) — the direction discs are never drawn** in any test.
+   They are a deliberate addition of the port (PORT-GAPS §6: colour says *that*
+   an edge carries the wave, the disc says *which way*). Dead nodes (hollow
+   ball, black rim) and the white ring on active ones are unpainted too — that
+   is the visible result of `P`→`N`, itself an untested key path.
+3. **`formats/pmsfile.py` (88%) — the refusals.** The open lines are the
+   `FileFormatError` branches. "Reject with a reason instead of swallowing it"
+   is the port's stated advantage over the original; nobody checks the reasons
+   arrive.
+4. **Have someone else read the branch diff** before it lands on `main`.
+
+### What not to do
+
+Do not split `PermutographView` further. At 316 lines and 25 methods it is not
+pretty, but what is left in it is keys and pixels. A class per `UiMode` was
+considered and rejected: the modes are not independent (program menu → node
+number → neighbour → act is *one* flow with shared state), most handlers are
+four to eight lines, and Qt key codes would end up in every one of them, so a
+second frontend would gain nothing.
 
 Afterwards: optionally TypeScript/browser on the cleaned core.
 
@@ -142,7 +210,16 @@ in `studies/` next to `kugel`, and there is something to build from it.
   re-add `normalize()` calls at the use sites; add them at the producer.
 - `HurryUp` is "compute fast, look seldom" — it suppresses the spin *while
   calculating* (`polytop.mod:299`), so it must earn that back in iterations.
-  The viewer's `_run_a_frame` runs a whole checkpoint per timer tick.
+  `Session.advance_frame` runs a whole checkpoint per timer tick.
+- **A stale `.pyc` can survive a `git checkout`.** Python compares mtime *and
+  size* only. An edit that keeps the size (swapping two equal-length strings)
+  and a checkout in the same second leave the old bytecode in place, so the
+  file on disk and the code being run disagree. If something stays red that
+  cannot possibly be red, delete `__pycache__` before believing anything else.
+- An `Enum` whose members carry extra data must set `_value_` in **`__new__`**,
+  not `__init__`: the by-value map is filled from the tuple that was assigned,
+  so with `__init__` the lookup `Algorithm("rubber")` raises `ValueError`.
+  `core/layout.py` has it right and says why.
 - The sizes `TrueDisc`/`TrueCircle` were called with are **radii**, not
   diameters — the ball is sized around the label that goes inside it. See
   PORT-GAPS §6; `Graph`'s source is lost, so this was read off the call sites.
