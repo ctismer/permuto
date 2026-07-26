@@ -82,7 +82,7 @@ def test_permutograph_view_paints_in_every_mode(qapp):
         _repaint(view)
         # a numeric prompt
         view.ui_mode = viewer.UiMode.PROMPT
-        view.prompt_kind = "node"
+        view.prompt_kind = viewer.PromptKind.NODE
         from permuto.ui.prompt import single
         view.prompt = single("StartNode=")
         view.prompt.type_char("1")
@@ -90,8 +90,8 @@ def test_permutograph_view_paints_in_every_mode(qapp):
         # SelectCard over a node's neighbours
         view.ui_mode = viewer.UiMode.SELECT
         n = 1
-        view.select = {"node": n, "action": "break2",
-                       "items": list(view.g.nodes[n].links), "pos": 0}
+        view.select = viewer.Selection(node=n, action=viewer.NodeAction.BREAK,
+                                       items=list(view.g.nodes[n].links))
         _repaint(view)
         captured["error"] = view._paint_error
         view.close()

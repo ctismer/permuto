@@ -25,7 +25,9 @@ import os
 import pathlib
 import sys
 import traceback
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import List
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QPainter
@@ -250,6 +252,47 @@ EDIT_MENU_LINE = ("editing operators: digits, arrows move, "
                   "Ctrl-Home base, Ctrl-End last, Enter/Esc leave")
 
 
+class PromptKind(Enum):
+    """What the text prompt is collecting."""
+
+    PS = "ps"                # a PostScript output file
+    SAVE = "save"
+    LOAD = "load"
+    NODE = "node"            # a node number (``UserIO.ReadInt``)
+
+
+class NodeAction(Enum):
+    """What a typed node number is for -- the program menu's five actions.
+
+    ``BREAK`` and ``COLLAPSE`` need a second node and carry on into
+    :class:`Selection`; which of the two steps is running is already in
+    :class:`UiMode`, so the action itself does not repeat it.
+    """
+
+    KILL = "kill"
+    BREAK = "break"                # then pick the other end
+    COLLAPSE = "collapse"          # then pick the node to collapse onto
+    UNCOLLAPSE = "uncollapse"
+    SPA = "spa"
+
+
+@dataclass
+class Selection:
+    """``UserIO.SelectCard``: cycling a node's neighbours to pick one."""
+
+    node: int
+    action: NodeAction
+    items: List[int] = field(default_factory=list)
+    pos: int = 0
+
+    @property
+    def current(self) -> int:
+        return self.items[self.pos]
+
+    def advance(self) -> None:
+        self.pos = (self.pos + 1) % len(self.items)
+
+
 class PermutographView(ViewBase):
     """The main viewer: the graph, the operator panel and the two menu lines."""
 
@@ -268,7 +311,7 @@ class PermutographView(ViewBase):
         self.op_colors = True
         # a load note (e.g. a truncated session) shows in the status line
         self.message = "; ".join(session.load_warnings)
-        self.pending = None         # (action, ...) awaiting a node click
+        self.pending = None         # a NodeAction awaiting its node number
 
         # operator editor state
         self.edit_field = None      # ('base',) or ('op', i, j)
@@ -332,7 +375,8 @@ class PermutographView(ViewBase):
         there is always something to read -- the original drew them before
         the program menu regardless of the current name mode."""
         picking = self.ui_mode in (UiMode.PROGRAM, UiMode.SELECT) or \
-            (self.ui_mode is UiMode.PROMPT and self.prompt_kind == "node")
+            (self.ui_mode is UiMode.PROMPT
+             and self.prompt_kind is PromptKind.NODE)
         return NameMode.NUMBER if picking else self.session.name_mode
 
     def _paint_chrome(self, p):
@@ -351,10 +395,8 @@ class PermutographView(ViewBase):
                        self.prompt.display()
                        + (f"    {self.message}" if self.message else ""))
         elif self.ui_mode is UiMode.SELECT and self.select:
-            sel = self.select
-            cand = sel["items"][sel["pos"]]
             p.drawText(12, self.height() - 14,
-                       f" neighbour: node {cand}   "
+                       f" neighbour: node {self.select.current}   "
                        f"(space = next, Enter = pick, Esc = cancel)")
         elif self.message:
             p.setPen(QColor(255, 210, 140))
@@ -364,9 +406,10 @@ class PermutographView(ViewBase):
         if self.ui_mode is UiMode.FILE:
             return self.session.file_menu_line()
         if self.ui_mode is UiMode.PROMPT:
-            return (self.session.file_menu_line()
-                    if self.prompt_kind in ("ps", "save", "load")
-                    else self.session.program_menu_line())
+            # a node number belongs to the program menu, a file name to F
+            return (self.session.program_menu_line()
+                    if self.prompt_kind is PromptKind.NODE
+                    else self.session.file_menu_line())
         if self.ui_mode in (UiMode.PROGRAM, UiMode.SELECT):
             return self.session.program_menu_line()
         if self.ui_mode is UiMode.EDIT:
@@ -431,11 +474,11 @@ class PermutographView(ViewBase):
             # ask first, and a "no" drops back to the main menu.
             self.ui_mode = UiMode.CONFIRM
         elif k == "o":
-            self._begin_prompt("PostScript out = ", "ps")
+            self._begin_prompt("PostScript out = ", PromptKind.PS)
         elif k == "l":
-            self._begin_prompt("Load (.pms/.ply) = ", "load")
+            self._begin_prompt("Load (.pms/.ply) = ", PromptKind.LOAD)
         elif k == "s":
-            self._begin_prompt("Save .pms = ", "save")
+            self._begin_prompt("Save .pms = ", PromptKind.SAVE)
 
     # -- program menu ----------------------------------------------
     def _program_key(self, ev):
@@ -444,15 +487,15 @@ class PermutographView(ViewBase):
         if ev.key() == Qt.Key_Escape:
             self.ui_mode = UiMode.MAIN
         elif k == "n":
-            self._ask_node("Node=", ("kill",), "kill/repair")
+            self._ask_node("Node=", NodeAction.KILL, "kill/repair")
         elif k == "l":
-            self._ask_node("Node 1=", ("break1",), "break/repair a line")
+            self._ask_node("Node 1=", NodeAction.BREAK, "break/repair a line")
         elif k == "c":
-            self._ask_node("Collapse node=", ("collapse1",), "collapse")
+            self._ask_node("Collapse node=", NodeAction.COLLAPSE, "collapse")
         elif k == "u":
-            self._ask_node("Uncollapse node=", ("uncollapse",), "uncollapse")
+            self._ask_node("Uncollapse node=", NodeAction.UNCOLLAPSE, "uncollapse")
         elif k == "s":
-            self._ask_node("StartNode=", ("spa",), "run SPA from")
+            self._ask_node("StartNode=", NodeAction.SPA, "run SPA from")
         elif k == "t":
             self._guard(s.start_spta)
             self.ui_mode = UiMode.MAIN
@@ -460,11 +503,11 @@ class PermutographView(ViewBase):
             if self._guard(s.start_par_sum):
                 self.ui_mode = UiMode.MAIN
 
-    def _ask_node(self, label, pending, what):
+    def _ask_node(self, label, action, what):
         """Ask for a node the original way -- type its number and Enter
         (``UserIO.ReadInt``).  The DOS program had no mouse."""
-        self.pending = pending
-        self._begin_prompt(f" {label}", "node")
+        self.pending = action
+        self._begin_prompt(f" {label}", PromptKind.NODE)
         self.message = f"type a node number and Enter to {what}"
 
     # -- operator editor -------------------------------------------
@@ -556,8 +599,8 @@ class PermutographView(ViewBase):
     def _begin_prompt(self, label, kind):
         self.ui_mode = UiMode.PROMPT
         self.prompt_kind = kind
-        self.prompt = FieldPrompt(label.strip(), [(label.strip(),
-                                                   kind == "node")])
+        self.prompt = FieldPrompt(label.strip(),
+                                  [(label.strip(), kind is PromptKind.NODE)])
 
     def _prompt_key(self, ev):
         result = feed_prompt(self.prompt, ev)
@@ -571,7 +614,7 @@ class PermutographView(ViewBase):
         text = self.prompt.text()
         if not text:
             return
-        if self.prompt_kind == "node":
+        if self.prompt_kind is PromptKind.NODE:
             if not text.isdigit() or int(text) not in self.g.nodes:
                 self.message = f"no node {text} (1..{self.g.nnodes})"
                 self.ui_mode = UiMode.MAIN
@@ -580,13 +623,13 @@ class PermutographView(ViewBase):
             self._apply_pending(int(text))
             return
         try:
-            if self.prompt_kind == "ps":
+            if self.prompt_kind is PromptKind.PS:
                 save_ps(self.g, text)
                 self.message = f"wrote {text}"
-            elif self.prompt_kind == "save":
+            elif self.prompt_kind is PromptKind.SAVE:
                 written = self._save_session(text)
                 self.message = f"saved {written}"
-            elif self.prompt_kind == "load":
+            elif self.prompt_kind is PromptKind.LOAD:
                 self._load_session(text)        # sets its own message
         except (PermutoError, OSError) as exc:
             self.message = str(exc)
@@ -629,18 +672,18 @@ class PermutographView(ViewBase):
     def _apply_pending(self, node):
         """Act on a node number just entered (``ReadInt`` returned)."""
         s = self.session
-        action = self.pending[0]
-        if action == "kill":
+        action = self.pending
+        if action is NodeAction.KILL:
             self.g.nodes[node].state.dead = not self.g.nodes[node].state.dead
             self._done_pending()
-        elif action == "break1":
-            self._begin_select(node, "break2", "select the other end")
-        elif action == "collapse1":
-            self._begin_select(node, "collapse2", "select the node to collapse onto")
-        elif action == "uncollapse":
+        elif action is NodeAction.BREAK:
+            self._begin_select(node, action, "select the other end")
+        elif action is NodeAction.COLLAPSE:
+            self._begin_select(node, action, "select the node to collapse onto")
+        elif action is NodeAction.UNCOLLAPSE:
             self._guard(lambda: s.pm.uncollapse(self.g, node))
             self._done_pending()
-        elif action == "spa":
+        elif action is NodeAction.SPA:
             self._guard(lambda: s.start_spa(node))
             self._done_pending()
 
@@ -655,8 +698,7 @@ class PermutographView(ViewBase):
             self.message = f"node {node} has no neighbours"
             self._done_pending()
             return
-        self.select = {"node": node, "action": action,
-                       "items": neighbours, "pos": 0}
+        self.select = Selection(node=node, action=action, items=neighbours)
         self.ui_mode = UiMode.SELECT
         self.message = f"{what}: space = next, Enter = pick, Esc = cancel"
 
@@ -665,14 +707,13 @@ class PermutographView(ViewBase):
         if ev.key() == Qt.Key_Escape:
             self._end_select()
         elif ev.key() == Qt.Key_Space:
-            sel["pos"] = (sel["pos"] + 1) % len(sel["items"])
+            sel.advance()
         elif ev.key() in (Qt.Key_Return, Qt.Key_Enter):
-            chosen = sel["items"][sel["pos"]]
-            if sel["action"] == "break2":
-                self._toggle_broken(sel["node"], chosen)
-            elif sel["action"] == "collapse2":
-                self._guard(
-                    lambda: self.session.pm.collapse(self.g, sel["node"], chosen))
+            if sel.action is NodeAction.BREAK:
+                self._toggle_broken(sel.node, sel.current)
+            elif sel.action is NodeAction.COLLAPSE:
+                self._guard(lambda: self.session.pm.collapse(
+                    self.g, sel.node, sel.current))
             self._end_select()
 
     def _end_select(self):
