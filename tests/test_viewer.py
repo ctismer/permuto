@@ -861,3 +861,28 @@ def test_a_three_field_prompt_stays_open_until_the_last_field(qapp):
     assert captured["after_2nd"] == (viewer.UiMode.PROMPT, True)
     assert captured["after_3rd"] == (viewer.UiMode.MAIN, True)
     assert captured["arrived"] >= 2, "and only then does the packet exist"
+
+
+@pytest.mark.parametrize("key", ["u", "c"])
+def test_the_table_only_actions_refuse_politely_on_a_plain_graph(qapp, key):
+    """A .nod graph carries no operator table, so collapse and uncollapse have
+    nothing to rebuild the canonical edges from.  The program menu offers them
+    anyway, as it did in 1995 -- so they have to say no.  They used to reach
+    through a `pm` that is None and crash the key handler."""
+    captured = {}
+
+    def drive(view):
+        assert view.session.pm is None, "a .nod graph has no operator table"
+        _press(view, "p")
+        _press(view, key)
+        _press(view, "1")
+        _press(view, "enter")
+        if view.ui_mode is viewer.UiMode.SELECT:   # collapse asks for the other end
+            _press(view, "enter")
+        captured["message"] = view.message
+        captured["mode"] = view.ui_mode
+        view.close()
+
+    viewer.run("wuerfel", seed=1, _drive=drive)
+    assert "permutograph" in captured["message"].lower(), captured["message"]
+    assert captured["mode"] is viewer.UiMode.MAIN

@@ -38,7 +38,8 @@ from ..editor import OperatorEditor
 from ..errors import PermutoError
 from ..formats import save_ps
 from ..loader import make_session, session_from_file, write_session
-from ..session import (EXIT_QUESTION, PromptKind, UiMode, confirms_exit)
+from ..session import (EXIT_QUESTION, NodeAction, PromptKind, Selection,
+                       UiMode, confirms_exit)
 from . import render
 from .prompt import FieldPrompt
 
@@ -153,38 +154,6 @@ class ViewBase(QWidget):
 #: the editor's cursor keys, as :meth:`OperatorEditor.move` names them
 _EDIT_MOVES = {Qt.Key_Up: "up", Qt.Key_Down: "down",
                Qt.Key_Home: "first", Qt.Key_End: "last"}
-
-
-class NodeAction(Enum):
-    """What a typed node number is for -- the program menu's five actions.
-
-    ``BREAK`` and ``COLLAPSE`` need a second node and carry on into
-    :class:`Selection`; which of the two steps is running is already in
-    :class:`UiMode`, so the action itself does not repeat it.
-    """
-
-    KILL = "kill"
-    BREAK = "break"                # then pick the other end
-    COLLAPSE = "collapse"          # then pick the node to collapse onto
-    UNCOLLAPSE = "uncollapse"
-    SPA = "spa"
-
-
-@dataclass
-class Selection:
-    """``UserIO.SelectCard``: cycling a node's neighbours to pick one."""
-
-    node: int
-    action: NodeAction
-    items: List[int] = field(default_factory=list)
-    pos: int = 0
-
-    @property
-    def current(self) -> int:
-        return self.items[self.pos]
-
-    def advance(self) -> None:
-        self.pos = (self.pos + 1) % len(self.items)
 
 
 class PermutographView(ViewBase):
@@ -449,18 +418,14 @@ class PermutographView(ViewBase):
         """Act on a node number just entered (``ReadInt`` returned)."""
         s = self.session
         action = self.pending
-        if action is NodeAction.KILL:
-            self.g.nodes[node].state.dead = not self.g.nodes[node].state.dead
-            self._done_pending()
-        elif action is NodeAction.BREAK:
+        if action is NodeAction.BREAK:
             self._begin_select(node, action, "select the other end")
         elif action is NodeAction.COLLAPSE:
             self._begin_select(node, action, "select the node to collapse onto")
-        elif action is NodeAction.UNCOLLAPSE:
-            self._guard(lambda: s.pm.uncollapse(self.g, node))
-            self._done_pending()
-        elif action is NodeAction.SPA:
-            self._guard(lambda: s.start_spa(node))
+        else:
+            self._guard({NodeAction.KILL: lambda: s.kill_node(node),
+                         NodeAction.UNCOLLAPSE: lambda: s.uncollapse(node),
+                         NodeAction.SPA: lambda: s.start_spa(node)}[action])
             self._done_pending()
 
     def _begin_select(self, node, action, what):
@@ -486,10 +451,9 @@ class PermutographView(ViewBase):
             sel.advance()
         elif ev.key() in (Qt.Key_Return, Qt.Key_Enter):
             if sel.action is NodeAction.BREAK:
-                self._toggle_broken(sel.node, sel.current)
+                self.session.toggle_line(sel.node, sel.current)
             elif sel.action is NodeAction.COLLAPSE:
-                self._guard(lambda: self.session.pm.collapse(
-                    self.g, sel.node, sel.current))
+                self._guard(lambda: self.session.collapse(sel.node, sel.current))
             self._end_select()
 
     def _end_select(self):
@@ -499,13 +463,6 @@ class PermutographView(ViewBase):
     def _done_pending(self):
         self.pending = None
         self.ui_mode = UiMode.MAIN
-
-    def _toggle_broken(self, n1, n2):
-        for a, b in ((n1, n2), (n2, n1)):
-            k = self.g.find_link(a, b)
-            if k:
-                st = self.g.nodes[a].state
-                st.broken ^= {k}
 
     # -- helpers ---------------------------------------------------
     def _guard(self, fn) -> bool:

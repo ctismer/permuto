@@ -121,6 +121,42 @@ EDIT_MENU_LINE = ("editing operators: digits, arrows move, "
                   "Ctrl-Home base, Ctrl-End last, Enter/Esc leave")
 
 
+class NodeAction(Enum):
+    """What a node number typed into the program menu is for.
+
+    ``BREAK`` and ``COLLAPSE`` need a second node and carry on into
+    :class:`Selection`; which of the two steps is running is already in
+    :class:`UiMode`, so the action itself does not repeat it.
+    """
+
+    KILL = "kill"
+    BREAK = "break"                # then pick the other end
+    COLLAPSE = "collapse"          # then pick the node to collapse onto
+    UNCOLLAPSE = "uncollapse"
+    SPA = "spa"
+
+
+@dataclass
+class Selection:
+    """``UserIO.SelectCard``: cycling a node's neighbours to pick one.
+
+    The DOS program had no mouse, so the second node of a line-break or a
+    collapse is chosen by walking the link list.
+    """
+
+    node: int
+    action: NodeAction
+    items: List[int] = field(default_factory=list)
+    pos: int = 0
+
+    @property
+    def current(self) -> int:
+        return self.items[self.pos]
+
+    def advance(self) -> None:
+        self.pos = (self.pos + 1) % len(self.items)
+
+
 @dataclass
 class Session:
     """The running program: a graph, how it is being computed, and what is shown."""
@@ -291,6 +327,41 @@ class Session:
         self.program_mode = False
         self.program = Program.IDLE
         self.changed = True
+
+    # -- the program menu's edits on the graph ---------------------------
+    def kill_node(self, node: int) -> bool:
+        """``Kill/Repair (N)ode`` -- toggle a node dead; True if it is now."""
+        state = self.graph.nodes[node].state
+        state.dead = not state.dead
+        return state.dead
+
+    def toggle_line(self, n1: int, n2: int) -> None:
+        """``Kill/Repair (L)ine`` -- mark the edge broken, or mend it.
+
+        Both ends carry their own mark, indexed by their own link number, so
+        the edge has to be found from each side.
+        """
+        for a, b in ((n1, n2), (n2, n1)):
+            k = self.graph.find_link(a, b)
+            if k:
+                self.graph.nodes[a].state.broken ^= {k}
+
+    def _table(self) -> PM:
+        """The operator table, or a refusal: a ``.nod`` graph has none, and the
+        program menu offers its actions all the same."""
+        if self.pm is None:
+            raise ProgramStateError(
+                "this graph has no operator table -- collapsing needs "
+                "permutograph mode, where the edges can be rebuilt")
+        return self.pm
+
+    def collapse(self, n1: int, n2: int) -> int:
+        """``(C)ollapse`` -- merge *n1* onto *n2*; returns the edges lost."""
+        return self._table().collapse(self.graph, n1, n2)
+
+    def uncollapse(self, node: int) -> None:
+        """``(U)ncollapse`` -- drop a node's edges and restore the canonical ones."""
+        self._table().uncollapse(self.graph, node)
 
     # -- the two status lines --------------------------------------------
     def menu_line(self) -> str:
