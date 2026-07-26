@@ -76,6 +76,22 @@ class PermutographView(ViewBase):
     def g(self):
         return self.session.graph
 
+    def _shows_operators(self) -> bool:
+        return self.session.permuto and self.session.pm is not None
+
+    def picture_width(self) -> int:
+        """How much of the window the graph gets.
+
+        The rest is the operator table, which takes the room its text needs and
+        no more -- it used to reserve a flat 260 px whether it was a four-place
+        base or empty.  Public because it is what "where is node 5 on screen"
+        depends on, and every caller used to re-derive it from that 260.
+        """
+        if not self._shows_operators():
+            return self.width()
+        return self.width() - int(
+            render.operator_panel_width(self.session.pm, self.height()))
+
     # -- the clock -------------------------------------------------
     def _on_timer(self):
         # only relax freely while running; single-step waits for a key
@@ -87,15 +103,15 @@ class PermutographView(ViewBase):
 
     # ================= painting ==================================
     def _paint(self, p):
-        pic_w = self.width() - (260 if self.session.permuto else 0)
+        pic_w = self.picture_width()
         render.paint(self.g, p, pic_w, self.height(),
                      op_colors=True,      # the viewer always colours by operator
                      program=self.session.program_mode,
                      name_mode=self.session.label_mode(self.ui_mode,
                                                        self.prompt_kind))
-        if self.session.permuto and self.session.pm is not None:
+        if self._shows_operators():
             render.paint_operator_panel(
-                self.session.pm, p, pic_w + 16, 60, self.height(),
+                self.session.pm, p, pic_w, 60, self.height(),
                 active_field=self.editor.field if self.editor else None,
                 buffer_text=self.editor.buffer if self.editor else None)
         self._paint_chrome(p)

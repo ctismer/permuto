@@ -14,8 +14,8 @@ from __future__ import annotations
 import os
 
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import (QBrush, QColor, QFont, QGuiApplication, QImage,
-                           QPainter, QPen)
+from PySide6.QtGui import (QBrush, QColor, QFont, QFontMetricsF,
+                           QGuiApplication, QImage, QPainter, QPen)
 
 from .. import scene
 from ..scene import (BACKGROUND, INK, Scene, mark_size, operator_panel_rows,
@@ -28,8 +28,8 @@ _DOS_PALETTE = scene.DOS_PALETTE
 UI_SCALE = scene.UI_SCALE
 
 __all__ = ["project", "paint", "paint_iridium", "operator_panel_rows",
-           "paint_operator_panel", "render_image", "save_png",
-           "indexed_image", "BACKGROUND", "INK", "draw_scene"]
+           "operator_panel_width", "paint_operator_panel", "render_image",
+           "save_png", "indexed_image", "BACKGROUND", "INK", "draw_scene"]
 
 
 def _ensure_gui_app():
@@ -143,16 +143,40 @@ def paint_iridium(g, painter, width: int, height: int) -> None:
 
 # -- the operator panel beside the picture ----------------------------------
 
+def _panel_metrics(pm, height):
+    """Row height, font, where the value column starts, and how wide it gets."""
+    line_px = mark_size(height, 11)
+    font = _menlo(line_px * 0.7)
+    fm = QFontMetricsF(font)
+    widest = max((fm.horizontalAdvance((value or "·") + "_")   # + the cursor
+                  for _, value, field in operator_panel_rows(pm)
+                  if field is not None), default=0.0)
+    return line_px, font, line_px * 3, widest
+
+
+def operator_panel_width(pm, height) -> float:
+    """How much of the window to leave beside the picture for the table.
+
+    Measured from what is in it -- the label column, the widest cycle, room for
+    the edit cursor, and a margin either side.  It used to be a flat 260 px
+    whatever the table held, two thirds of it empty, and the picture paid.
+    """
+    line_px, _font, value_x, widest = _panel_metrics(pm, height)
+    return 2 * line_px + value_x + widest
+
+
 def paint_operator_panel(pm, painter, x, y, height, *,
                          active_field=None, buffer_text=None):
-    """Draw the operator table beside the picture.
+    """Draw the operator table beside the picture, *x* being the left edge of
+    the room :func:`operator_panel_width` asked for.
 
     In the original this is permanently visible in permutograph mode; with
     ``active_field`` set it shows the edit cursor, and ``buffer_text`` is the
     digits being typed into that field.
     """
-    line_px = mark_size(height, 11)
-    painter.setFont(_menlo(line_px * 0.7))
+    line_px, font, value_x, _widest = _panel_metrics(pm, height)
+    painter.setFont(font)
+    x += line_px                                  # the left margin
     for row, (label, value, field) in enumerate(operator_panel_rows(pm)):
         cy = y + row * line_px
         if label:
@@ -165,7 +189,7 @@ def paint_operator_panel(pm, painter, x, y, height, *,
                 shown = buffer_text
             painter.setPen(QColor(255, 230, 140) if editing
                            else QColor(215, 215, 230))
-            painter.drawText(QPointF(x + line_px * 3, cy),
+            painter.drawText(QPointF(x + value_x, cy),
                              (shown or "·") + ("_" if editing else ""))
 
 

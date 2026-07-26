@@ -56,8 +56,8 @@ RING: RGB = (255, 255, 255)          # the white ring on an active node
 
 PICTURE_PIXELS = 320   # the original picture area was 479 x 320 (pmdisp.def)
 
-#: The picture extent at which marks stop growing -- the size the viewer opens
-#: with (a 1000x860 window, 260 of which is the operator panel).
+#: The picture extent at which marks stop growing: the size their proportions
+#: were judged at, and roughly what the viewer opens with.
 #:
 #: Past it, pulling the window open buys *distance between the nodes*, not
 #: bigger balls.  Marks that keep a constant fraction of the picture make

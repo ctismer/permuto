@@ -55,7 +55,7 @@ def _node_pixels(view, img):
     """The colour drawn at each node's centre, as the user sees it."""
     from permuto.ui import render
 
-    pic_w = view.width() - (260 if view.session.permuto else 0)
+    pic_w = view.picture_width()
     out = []
     for x, y, _z in render.project(view.g, pic_w, view.height()).values():
         if 0 <= x < img.width() and 0 <= y < img.height():
@@ -386,7 +386,7 @@ def test_the_picture_shows_coloured_balls_with_black_labels(qapp):
                                    if (c.red(), c.green(), c.blue()) == (0, 0, 0)]
         # the label is black, and it is *inside* the ball
         from permuto.ui import render
-        pic_w = view.width() - 260
+        pic_w = view.picture_width()
         pts = render.project(view.g, pic_w, view.height())
         r = int(render._scaled(view.height(), 12))
         box = range(-r + 1, r)
@@ -435,7 +435,7 @@ def test_running_spa_from_the_program_menu_marks_the_path(qapp):
         img = _repaint(view)
         from permuto.core.graph import L_INPUT, L_OUTPUT
         from permuto.ui import render
-        pic_w = view.width() - 260
+        pic_w = view.picture_width()
         pts = render.project(view.g, pic_w, view.height())
         greens = 0
         for nd in view.g.ordered():
@@ -542,7 +542,7 @@ def _edges_with_a_digit_patch(view):
     from permuto.ui import render
 
     img = _repaint(view)
-    pic_w = view.width() - (260 if view.session.permuto else 0)
+    pic_w = view.picture_width()
     pts = render.project(view.g, pic_w, view.height())
     found = 0
     for nd in view.g.ordered():
@@ -599,7 +599,7 @@ def _black_pixels_on_edge(view, n1, n2):
     from permuto.ui import render
 
     img = _repaint(view)
-    pic_w = view.width() - (260 if view.session.permuto else 0)
+    pic_w = view.picture_width()
     pts = render.project(view.g, pic_w, view.height())
     x1, y1, _z1 = pts[n1]
     x2, y2, _z2 = pts[n2]
@@ -885,3 +885,35 @@ def test_the_table_only_actions_refuse_politely_on_a_plain_graph(qapp, key):
     viewer.run("wuerfel", seed=1, _drive=drive)
     assert "permutograph" in captured["message"].lower(), captured["message"]
     assert captured["mode"] is viewer.UiMode.MAIN
+
+
+def test_the_operator_table_takes_only_the_room_its_text_needs(qapp):
+    """It reserved a flat 260 px whatever it held -- two thirds of it empty,
+    and the picture paid.  Now it is measured from the text, so the reserve has
+    to contain the table and little else, and grow when the table does."""
+    from permuto.core.pm import PM
+    from permuto.ui import render
+
+    captured = {}
+
+    def drive(view):
+        img = _repaint(view)
+        lit = [x for x in range(view.width())
+               for y in range(60, view.height() - 40)
+               if _rgb(img, x, y) != render.BACKGROUND]
+        captured["rightmost"] = max(lit, default=0)
+        captured["reserve"] = view.width() - view.picture_width()
+        captured["window"] = view.width()
+        view.close()
+
+    viewer.run("1234", operators=["12", "+", "23", "+", "34"], _drive=drive)
+
+    reserve = captured["reserve"]
+    assert reserve < 200, f"still reserving {reserve} px for a four-place base"
+    assert captured["rightmost"] < captured["window"], "the table ran off the edge"
+    # and it really is the text that sets the size: a wider table needs more
+    narrow = render.operator_panel_width(PM(base="123"), 860)
+    wide = render.operator_panel_width(
+        PM(base="123456",
+           optable=[["123456", "", ""]] + [["", "", ""] for _ in range(5)]), 860)
+    assert wide > narrow
