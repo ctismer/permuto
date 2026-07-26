@@ -519,7 +519,7 @@ class IridiumView(ViewBase):
 
     def _relax(self):
         layout.backup(self.graph)
-        layout.contract(self.graph, "new")
+        layout.contract(self.graph, layout.Algorithm.NEW)
         layout.normalize(self.graph)
 
     def _on_timer(self):

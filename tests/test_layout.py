@@ -34,3 +34,35 @@ def test_dimension_falls_to_true_dimension():
         if g.dimensions <= 3:
             break
     assert g.dimensions <= 3, f"icosahedron stuck at {g.dimensions}"
+
+
+def _spread(g):
+    """How far apart the extremes sit, per dimension -- 0 means collapsed."""
+    return max(max(nd.pos[d] for nd in g.nodes.values())
+               - min(nd.pos[d] for nd in g.nodes.values())
+               for d in range(g.dimensions))
+
+
+def test_every_algorithm_the_A_key_offers_keeps_the_picture_sane():
+    """`A` cycles all five of PCalc's algorithms, but only Rubber (here and in
+    the CLI) and New (Iridium) were ever run.  Each has to survive its own
+    arithmetic: no overflow, and no collapse to a single point."""
+    import pytest
+
+    for alg in layout.ALGORITHMS:
+        g = Graph.load_nod(modula_dir() / "nod" / "wuerfel.nod",
+                           dimensions=iv.MAXDIMEN, seed=1)
+        before = _spread(g)
+        for _ in range(60):
+            layout.relax_step(g, alg=alg)
+        after = _spread(g)
+        assert 0 < after <= 3 * iv.NORM, f"{alg}: spread {after} after 60 steps"
+        assert before > 0
+        for nd in g.nodes.values():
+            for d in range(g.dimensions):
+                assert abs(nd.pos[d]) <= 2 * iv.NORM, \
+                    f"{alg}: node {nd.num} ran away in dimension {d}"
+
+    with pytest.raises(ValueError):
+        layout.relax_step(Graph.load_nod(modula_dir() / "nod" / "wuerfel.nod"),
+                          alg="nonesuch")

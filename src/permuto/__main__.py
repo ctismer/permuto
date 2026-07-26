@@ -117,7 +117,7 @@ def _relaxed(name: str, steps: int):
 
     g = load_graph(name, seed=1)
     for _ in range(steps):
-        layout.relax_step(g, alg="rubber")
+        layout.relax_step(g, alg=layout.Algorithm.RUBBER)
     return g
 
 

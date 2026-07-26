@@ -31,15 +31,6 @@ from .core.graph import Graph
 from .core.pm import PM
 from .errors import ProgramStateError
 
-# PCalc.AlgNames -- padded exactly as the original prints them
-ALG_NAMES = {
-    "rubber": "Rubber ",
-    "rubber2": "Rubber2",
-    "ribbon": "Ribbon ",
-    "mean": "Mean   ",
-    "new": "New    ",
-}
-
 DIMENSION_CHECK_INTERVAL = 25   # "IF Iteration MOD 25 = 0 THEN Changed := TRUE"
 
 EXIT_QUESTION = "Do You want to exit? (Y/N)"   # UserIO, capital You and all
@@ -194,7 +185,7 @@ class Session:
 
     # -- derived ---------------------------------------------------------
     @property
-    def algorithm(self) -> str:
+    def algorithm(self) -> "layout.Algorithm":
         return layout.ALGORITHMS[self.algorithm_index]
 
     @property
@@ -220,7 +211,7 @@ class Session:
         if self.calculating:
             layout.contract(g, self.algorithm)
             layout.squeeze(g)
-            if self.algorithm == "rubber":
+            if self.algorithm is layout.Algorithm.RUBBER:
                 layout.punish(g)
 
         if self.spinning and g.dimensions >= 3 \
@@ -273,7 +264,7 @@ class Session:
             self.program = Program.IDLE
 
     # -- toggles ---------------------------------------------------------
-    def next_algorithm(self) -> str:
+    def next_algorithm(self) -> "layout.Algorithm":
         self.algorithm_index = (self.algorithm_index + 1) % len(layout.ALGORITHMS)
         self.changed = True
         return self.algorithm
@@ -382,7 +373,7 @@ class Session:
         """The bottom line: ``iter=N dim=D nodes=N  A=Alg``."""
         return (f" iter={self.iteration} dim={self.graph.dimensions}"
                 f" nodes={self.graph.nnodes}"
-                f"  A={ALG_NAMES[self.algorithm]}    ")
+                f"  A={self.algorithm.label}    ")
 
     def file_menu_line(self) -> str:
         return "(Q)uit  (O)utput  (L)oad  (S)ave"

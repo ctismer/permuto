@@ -13,11 +13,36 @@ The main-loop cadence follows ``polytop.mod``::
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import List
 
 from . import intvector as iv
 
-ALGORITHMS = ("rubber", "rubber2", "ribbon", "mean", "new")
+class Algorithm(Enum):
+    """``PCalc``'s five relaxation algorithms, in the order ``A`` cycles them.
+
+    Each carries the name the status line prints, padded exactly as
+    ``PCalc.AlgNames`` printed it -- one list instead of a tuple here and a
+    lookup table in the session that had to agree with it.
+    """
+
+    def __new__(cls, value: str, label: str):
+        # __new__, not __init__: only this way does Algorithm("rubber") find
+        # the member, so a plain name still works wherever one is handier
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.label = label
+        return obj
+
+    RUBBER = ("rubber", "Rubber ")
+    RUBBER2 = ("rubber2", "Rubber2")
+    RIBBON = ("ribbon", "Ribbon ")
+    MEAN = ("mean", "Mean   ")
+    NEW = ("new", "New    ")
+
+
+#: in cycling order, for the ``A`` key
+ALGORITHMS = tuple(Algorithm)
 
 
 def backup(g) -> None:
@@ -26,80 +51,98 @@ def backup(g) -> None:
         nd.old = list(nd.pos)
 
 
-def contract(g, alg: str = "rubber") -> None:
-    iv.set_dimensions(g.dimensions)
-    NORM = iv.NORM
-
-    mean = 0
-    if alg == "new":
-        lsum = lcount = 0
-        for nd in g.ordered():
-            for j in nd.links:
-                tmp = list(g.nodes[j].old)
-                iv.sub_vector(tmp, nd.pos)
-                lsum += iv.vector_length(tmp)
-                lcount += 1
-        if lcount:
-            mean = lsum // lcount
-
+def _mean_edge_length(g) -> int:
+    """The average edge length, which only ``New`` needs."""
+    lsum = lcount = 0
     for nd in g.ordered():
-        nlink = nd.nlink
-        if nlink == 0:
+        for j in nd.links:
+            tmp = list(g.nodes[j].old)
+            iv.sub_vector(tmp, nd.pos)
+            lsum += iv.vector_length(tmp)
+            lcount += 1
+    return lsum // lcount if lcount else 0
+
+
+def _rubber(g, nd, nlink, mean) -> None:
+    """Pull toward the neighbours, all edges equally."""
+    vec = iv.new_vector()
+    for j in nd.links:
+        tmp = list(g.nodes[j].old)
+        iv.sub_vector(tmp, nd.pos)
+        iv.add_vector(vec, tmp)
+    iv.scale_vector(vec, 1, 3 * nlink)
+    iv.add_vector(nd.pos, vec)
+
+
+def _rubber2(g, nd, nlink, mean) -> None:
+    """As Rubber, but each pull weighted by its own length."""
+    vec = iv.new_vector()
+    for j in nd.links:
+        tmp = list(g.nodes[j].old)
+        iv.sub_vector(tmp, nd.pos)
+        length = iv.vector_length(tmp)
+        iv.scale_vector(tmp, length, nlink * iv.NORM)
+        iv.add_vector(vec, tmp)
+    iv.scale_vector(vec, 1, 3 * nlink)
+    iv.add_vector(nd.pos, vec)
+
+
+def _ribbon(g, nd, nlink, mean) -> None:
+    """Move along the longest edge only, by how much it exceeds the shortest."""
+    vec = iv.new_vector()
+    mx, mn = 1, 1 << 30
+    for j in nd.links:
+        cmp = list(g.nodes[j].old)
+        iv.sub_vector(cmp, nd.pos)
+        length = iv.vector_length(cmp)
+        if length > mx:
+            mx = length
+            vec = list(cmp)
+        if length < mn:
+            mn = length
+    iv.scale_vector(vec, (mx - mn) // 100, mx)
+    iv.add_vector(nd.pos, vec)
+
+
+def _mean(g, nd, nlink, mean) -> None:
+    """Add the neighbours outright -- Normalize scales the result back."""
+    for j in nd.links:
+        iv.add_vector(nd.pos, g.nodes[j].old)
+
+
+def _new(g, nd, nlink, mean) -> None:
+    """Gather gently, then contract the over-long edges -- twice."""
+    vec = iv.new_vector()
+    for j in nd.links:
+        iv.add_vector(vec, g.nodes[j].old)
+    iv.scale_vector(vec, 1, 20 * nlink)
+    iv.add_vector(nd.pos, vec)
+    for _ in range(2):  # "nochmal!" -- contract long edges twice
+        for j in nd.links:
+            tmp = list(g.nodes[j].old)
+            iv.sub_vector(tmp, nd.pos)
+            length = iv.vector_length(tmp)
+            if length > mean:
+                iv.scale_vector(tmp, (length - mean) // nlink, 2 * length)
+                iv.add_vector(nd.pos, tmp)
+
+
+_CONTRACTIONS = {Algorithm.RUBBER: _rubber, Algorithm.RUBBER2: _rubber2,
+                 Algorithm.RIBBON: _ribbon, Algorithm.MEAN: _mean,
+                 Algorithm.NEW: _new}
+
+
+def contract(g, alg: Algorithm = Algorithm.RUBBER) -> None:
+    """One contraction pass over every node, by the chosen algorithm."""
+    alg = Algorithm(alg)          # a name still works, and rejects a wrong one
+    iv.set_dimensions(g.dimensions)
+    step = _CONTRACTIONS[alg]
+    mean = _mean_edge_length(g) if alg is Algorithm.NEW else 0
+    for nd in g.ordered():
+        if nd.nlink == 0:
             iv.zero_vector(nd.pos)
             continue
-        vec = iv.new_vector()
-
-        if alg == "rubber":
-            for j in nd.links:
-                tmp = list(g.nodes[j].old)
-                iv.sub_vector(tmp, nd.pos)
-                iv.add_vector(vec, tmp)
-            iv.scale_vector(vec, 1, 3 * nlink)
-            iv.add_vector(nd.pos, vec)
-
-        elif alg == "rubber2":
-            for j in nd.links:
-                tmp = list(g.nodes[j].old)
-                iv.sub_vector(tmp, nd.pos)
-                length = iv.vector_length(tmp)
-                iv.scale_vector(tmp, length, nlink * NORM)
-                iv.add_vector(vec, tmp)
-            iv.scale_vector(vec, 1, 3 * nlink)
-            iv.add_vector(nd.pos, vec)
-
-        elif alg == "ribbon":
-            mx, mn = 1, 1 << 30
-            for j in nd.links:
-                cmp = list(g.nodes[j].old)
-                iv.sub_vector(cmp, nd.pos)
-                length = iv.vector_length(cmp)
-                if length > mx:
-                    mx = length
-                    vec = list(cmp)
-                if length < mn:
-                    mn = length
-            iv.scale_vector(vec, (mx - mn) // 100, mx)
-            iv.add_vector(nd.pos, vec)
-
-        elif alg == "mean":
-            for j in nd.links:
-                iv.add_vector(nd.pos, g.nodes[j].old)
-
-        elif alg == "new":
-            for j in nd.links:
-                iv.add_vector(vec, g.nodes[j].old)
-            iv.scale_vector(vec, 1, 20 * nlink)
-            iv.add_vector(nd.pos, vec)
-            for _ in range(2):  # "nochmal!" -- contract long edges twice
-                for j in nd.links:
-                    tmp = list(g.nodes[j].old)
-                    iv.sub_vector(tmp, nd.pos)
-                    length = iv.vector_length(tmp)
-                    if length > mean:
-                        iv.scale_vector(tmp, (length - mean) // nlink, 2 * length)
-                        iv.add_vector(nd.pos, tmp)
-        else:
-            raise ValueError(f"unknown algorithm {alg!r}")
+        step(g, nd, nd.nlink, mean)
 
 
 def squeeze(g) -> None:
@@ -189,14 +232,15 @@ def can_shrink(g) -> bool:
     return vec[d - 1] <= vec[0] // 100
 
 
-def relax_step(g, alg: str = "rubber", calculating: bool = True,
+def relax_step(g, alg: Algorithm = Algorithm.RUBBER, calculating: bool = True,
                spinning: bool = True) -> int:
     """One iteration of the main loop. Returns how many dimensions were shed."""
+    alg = Algorithm(alg)
     backup(g)
     if calculating:
         contract(g, alg)
         squeeze(g)
-        if alg == "rubber":
+        if alg is Algorithm.RUBBER:
             punish(g)
     if spinning and g.dimensions >= 3:
         spin(g)

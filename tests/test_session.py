@@ -36,7 +36,7 @@ def test_the_program_starts_in_single_step(polytop):
     assert polytop.single_stepping
     assert (polytop.calculating, polytop.spinning, polytop.hurry_up) == \
         (True, True, False)
-    assert polytop.algorithm == "rubber"
+    assert polytop.algorithm is layout.Algorithm.RUBBER
     assert polytop.name_mode == NameMode.NONE
 
 
