@@ -15,10 +15,6 @@ from permuto.core.graph import Graph, Node  # noqa: E402
 from permuto.ui import render  # noqa: E402
 
 
-def test_import_viewer():
-    import permuto.ui.viewer  # noqa: F401  (import must not raise)
-
-
 def test_render_produces_nonempty_image():
     g = Graph.load_nod(modula_dir() / "nod" / "tetraede.nod",
                        dimensions=iv.MAXDIMEN, seed=1)
@@ -47,6 +43,43 @@ def test_projection_is_isotropic_so_shapes_do_not_distort():
         dx = abs(pts[1][0] - w // 2)      # x offset of the pos[0]=NORM node
         dy = abs(pts[2][1] - h // 2)      # y offset of the pos[1]=NORM node
         assert dx == dy, f"anisotropic at {w}x{h}: {dx} != {dy}"
+
+
+def _painted(g, w, h, **kw):
+    from PySide6.QtGui import QImage, QPainter
+
+    img = QImage(w, h, QImage.Format.Format_ARGB32)
+    img.fill(0)
+    p = QPainter(img)
+    render.paint(g, p, w, h, **kw)
+    p.end()
+    return img
+
+
+def _relaxed_permutograph(steps=200):
+    g = Graph.build("1234", ["12", "+", "23", "+", "34"], seed=1)
+    for _ in range(steps):
+        layout.relax_step(g, alg="rubber")
+    return g
+
+
+def test_a_node_carries_the_colour_of_its_class():
+    """What the eye reads off the picture has to be in the data first:
+    ``color := Str.Pos(BasePerm, perm[0]) + 1`` groups the permutations by
+    first character, and a ``.nod`` graph, having no permutations, falls back
+    to blocks of the node numbering (``SetupPolytope``).  Whether the drawing
+    then uses it is checked from the viewer, in test_viewer.py."""
+    g = _relaxed_permutograph(steps=1)
+    by_first = {}
+    for nd in g.nodes.values():
+        by_first.setdefault(nd.perm[0], set()).add(nd.color)
+    assert len(by_first) == 4, "base 1234 has four classes"
+    assert all(len(cols) == 1 for cols in by_first.values()), "one colour each"
+
+    plain = Graph.load_nod(modula_dir() / "nod" / "tetraede.nod", seed=1)
+    assert plain.nnodes <= 24
+    assert [plain.nodes[n].color for n in sorted(plain.nodes)] == \
+           [1 + (n - 1) // 6 for n in sorted(plain.nodes)]
 
 
 def test_operator_panel_lists_the_base_and_operators():

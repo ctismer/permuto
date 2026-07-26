@@ -254,7 +254,15 @@ class PM:
         With ``reset`` the nodes are created from scratch; without it only the
         links are recomputed and the existing positions are kept, which is what
         makes changing an operator look like a move rather than a jump.
+
+        Fresh nodes are seeded from the link numbers -- tens of units, which at
+        the current ``NORM`` would project to a single dot -- so a rebuilt
+        graph is framed before it is handed back.  Kept positions are already
+        at scale and are left exactly as they were, perturbation and all.
         """
+        from . import layout
+
+        fresh = reset or g is None
         if reset or g is None:
             g = Graph()
             g.nnodes = len(self._perms)
@@ -278,6 +286,8 @@ class PM:
         self._link_nodes(g)
         self._seed_positions(g, last_dimension)
         g.pack_nodes()
+        if fresh:
+            layout.frame(g)
         return g
 
     def _link_nodes(self, g: Graph) -> None:

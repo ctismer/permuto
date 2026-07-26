@@ -47,18 +47,26 @@ def test_perm_labels_are_skipped_without_permutation_strings(polytop):
     and the original cycles straight past it."""
     seen = [polytop.cycle_name_mode() for _ in range(6)]
     assert NameMode.PERM not in seen
-    assert seen[:3] == [NameMode.NUMBER, NameMode.DISPLAY, NameMode.NONE]
+    assert seen[:2] == [NameMode.NUMBER, NameMode.NONE]
 
 
 def test_perm_labels_are_offered_in_permutograph_mode(permuto):
-    seen = [permuto.cycle_name_mode() for _ in range(4)]
-    assert seen == [NameMode.NUMBER, NameMode.PERM, NameMode.DISPLAY,
-                    NameMode.NONE]
+    seen = [permuto.cycle_name_mode() for _ in range(3)]
+    assert seen == [NameMode.NUMBER, NameMode.PERM, NameMode.NONE]
+
+
+def test_the_display_mode_appears_only_once_it_has_something_to_show(permuto):
+    """Mode 3 is ``state.display``, all zeroes until SPA or ParSum filled it.
+    Showing a graph full of noughts is the same kind of uselessness the
+    original avoided for mode 2, so it is skipped the same way."""
+    assert NameMode.DISPLAY not in [permuto.cycle_name_mode() for _ in range(6)]
+    permuto.start_spa(1)
+    assert NameMode.DISPLAY in [permuto.cycle_name_mode() for _ in range(4)]
 
 
 # --- the status lines --------------------------------------------------
 
-def test_menu_line_shows_the_toggles_and_hides_edit_outside_permuto(polytop):
+def test_menu_line_reports_the_toggles(polytop):
     assert polytop.menu_line() == (
         "(A)lgo  (C)alc T  (R)un F  (H)urry F  (F)ile  (S)pin T"
         "  (N)ame  (P)rog")

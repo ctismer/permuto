@@ -100,6 +100,9 @@ def _scaled(height: int, picture_pixels: float) -> float:
     return max(1.0, picture_pixels * height / _PICTURE_PIXELS * UI_SCALE)
 
 
+INK = (0, 0, 0)     # PlotCenteredStr(px, py, str, 0) -- labels are always black
+
+
 def _line(height: int, picture_pixels: float) -> float:
     """Like :func:`_scaled` but for pen widths, which may go below 1 px so that
     a busy sphere of edges does not turn into a solid blob."""
@@ -113,6 +116,8 @@ def paint(g, painter, width: int, height: int, *,
     from PySide6.QtCore import QPointF, QRectF, Qt
     from PySide6.QtGui import QBrush, QColor, QFont, QPen
 
+    from ..core.graph import L_INPUT, L_OUTPUT
+
     pts = project(g, width, height)
     painter.setRenderHint(painter.RenderHint.Antialiasing, True)
 
@@ -124,6 +129,7 @@ def paint(g, painter, width: int, height: int, *,
 
     # edges, each undirected pair once; remember midpoints for the op digit
     digit_spots = []   # (x, y, op, front)
+    disc_spots = []    # (x, y, colour) -- the direction disc of a wave edge
     for nd in g.ordered():
         xi, yi, zi = pts[nd.num]
         for idx, j in enumerate(nd.links):
@@ -147,10 +153,28 @@ def paint(g, painter, width: int, height: int, *,
             if pen is not None:
                 painter.setPen(pen)
             painter.drawLine(QPointF(xi, yi), QPointF(xj, yj))
+            # Which way does the wave run?  A disc at 1/6 of the edge answers
+            # that: near this node for an input, near the neighbour for an
+            # output.  Colour alone (green) only says "on the path".
+            if program and not broken and idx < len(nd.state.lines) \
+                    and nd.state.lines[idx] in (L_INPUT, L_OUTPUT):
+                if nd.state.lines[idx] == L_INPUT:
+                    qx, qy = (5 * xi + xj) / 6, (5 * yi + yj) / 6
+                else:
+                    qx, qy = (5 * xj + xi) / 6, (5 * yj + yi) / 6
+                disc_spots.append((qx, qy, _state_color(nd.state.lines[idx], front)))
             if operator_digits and have_ops and not program and not broken \
                     and idx < len(nd.opno) and nd.opno[idx]:
                 digit_spots.append(((xi + xj) / 2, (yi + yj) / 2,
                                     nd.opno[idx], front))
+
+    # the direction discs, on top of the edges they belong to
+    if disc_spots:
+        disc_r = _scaled(height, 3)
+        painter.setPen(Qt.NoPen)
+        for x, y, colour in disc_spots:
+            painter.setBrush(QBrush(colour))
+            painter.drawEllipse(QPointF(x, y), disc_r, disc_r)
 
     # operator number at each edge midpoint, on a punched-out background patch
     if digit_spots:
@@ -166,9 +190,34 @@ def paint(g, painter, width: int, height: int, *,
             painter.drawText(QRectF(x - pad, y - pad * 1.25, pad * 2, pad * 2.5),
                              Qt.AlignCenter, str(op))
 
-    # nodes: diameter follows the name mode, dead ones hollow, active ringed
-    diam = {0: 5, 1: 9, 2: 12, 3: 9}.get(name_mode, 5)
-    radius = _scaled(height, diam) / 2
+    # What goes inside the balls decides how big they are -- one `names` drives
+    # both in ``PmDisp.DrawNodes``.
+    text_mode = name_mode if name_mode else (2 if labels else 0)
+    if program:
+        text_mode = 3
+    # 5 / 9 / 12 / 9 are the values ``TrueDisc`` was called with, and they are
+    # radii, not diameters: ``TrueCircle(diam+1)`` rings the ball one pixel
+    # further out, and a four-character perm in the 6x8 cell is 24 px wide --
+    # it only fits inside a ball of radius 12, which is where it was drawn.
+    radius = _scaled(height, {0: 5, 1: 9, 2: 12, 3: 9}[text_mode])
+
+    def ball_color(nd) -> int:
+        """The palette entry a node's ball is filled with.
+
+        ``color`` says which character the permutation starts with, so the
+        classes are visible in the picture.  Front nodes take the bright half
+        -- ``farbe := (color+8) MOD 16`` -- which is the depth cue.
+
+        Only 1..7 and their bright twins 9..15 are usable: 0 is black and 8 is
+        dark grey, and a graph big enough to run past the palette would land on
+        them (``ikosa9`` has 812 nodes, hence colours up to 34).  Cycling
+        through seven keeps the pairs intact and never draws a black ball.
+        """
+        colour = 1 + (nd.color - 1) % 7
+        if g.dimensions >= 3 and pts[nd.num][2] >= 0:
+            colour += 8
+        return colour
+
     for nd in g.ordered():
         x, y, _z = pts[nd.num]
         if nd.state.dead:
@@ -182,34 +231,36 @@ def paint(g, painter, width: int, height: int, *,
             painter.drawEllipse(QPointF(x, y), radius, radius)
         else:
             painter.setPen(Qt.NoPen)
-            painter.setBrush(QBrush(QColor(235, 235, 245)))
+            painter.setBrush(QBrush(QColor(*_DOS_PALETTE[ball_color(nd)])))
             painter.drawEllipse(QPointF(x, y), radius, radius)
         if nd.state.active:
             pen = QPen(QColor(255, 255, 255))
             pen.setWidthF(_line(height, 0.8))
             painter.setPen(pen)
             painter.setBrush(Qt.NoBrush)
-            painter.drawEllipse(QPointF(x, y), radius + 1, radius + 1)
+            ring = radius + _scaled(height, 1)
+            painter.drawEllipse(QPointF(x, y), ring, ring)
 
-    # labels inside/next to the balls: node number / perm / SPA display value
-    text_mode = name_mode if name_mode else (2 if labels else 0)
-    if program:
-        text_mode = 3
+    # labels inside the balls: node number / perm / SPA display value.  "we plot
+    # text inside the balls, therefore black is a good choice" -- PmDisp
     if text_mode:
         label_font = QFont("Menlo")
-        label_font.setPixelSize(int(_scaled(height, 7)))
+        label_font.setPixelSize(int(_scaled(height, 8)))   # the 6x8 font cell
         painter.setFont(label_font)
-        painter.setPen(QColor(215, 215, 230))
-        for nd in g.nodes.values():
+        painter.setPen(QColor(*INK))
+        for nd in g.ordered():
             if text_mode == 1:
                 text = str(nd.num)
             elif text_mode == 2:
                 text = nd.perm
             else:
                 text = str(nd.state.display)
-            if text:
-                x, y, _z = pts[nd.num]
-                painter.drawText(QPointF(x + radius + 2, y - radius), str(text))
+            if not text:
+                continue
+            x, y, _z = pts[nd.num]
+            painter.drawText(
+                QRectF(x - radius, y - radius, 2 * radius, 2 * radius),
+                Qt.AlignCenter, str(text))
 
 
 # The standard DOS 16-colour palette, by index -- Iridium/SIMONE colours nodes
@@ -330,3 +381,20 @@ def render_image(g, width: int = 800, height: int = 800, **kw):
 def save_png(g, path, width: int = 800, height: int = 800, **kw):
     render_image(g, width, height, **kw).save(str(path), "PNG")
     return path
+
+
+def indexed_image(indices, palette):
+    """Palette indices ``[y][x]`` plus an RGB table -> a QImage.
+
+    A plain pixel writer: it knows nothing about what produced the indices.
+    """
+    _ensure_gui_app()
+    from PySide6.QtGui import QColor, QImage
+
+    height, width = len(indices), len(indices[0])
+    img = QImage(width, height, QImage.Format.Format_ARGB32)
+    rgb = [QColor(*c).rgb() for c in palette]
+    for y, row in enumerate(indices):
+        for x, c in enumerate(row):
+            img.setPixel(x, y, rgb[c])
+    return img

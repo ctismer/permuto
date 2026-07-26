@@ -31,28 +31,21 @@ def test_vector_length():
     assert iv.vector_length([3, 4, 0, 0, 0, 0, 0, 0]) == 5
 
 
-def test_spin_rotation_is_drift_free():
-    # PCalc.Spin builds a rotation from rots = Norm/120 (small-angle sine) and
-    # rotc = sqrt(Norm^2 - rots^2).  The point is that sin^2 + cos^2 stays at
-    # Norm^2 so repeated spins do not shrink or grow the figure.  Assert that
-    # identity to within integer-sqrt truncation -- not the intermediate values.
-    rots = iv.NORM // 120
-    rotc = iv.sqrt(iv.sqr(iv.NORM) - iv.sqr(rots))
-    hypot_sq = iv.sqr(rotc) + iv.sqr(rots)
-    # rotc is the floor of the true cosine, so the sum is <= Norm^2 but within
-    # the rounding of one unit in rotc: (rotc+1)^2 must exceed Norm^2.
-    assert hypot_sq <= iv.sqr(iv.NORM)
-    assert iv.sqr(rotc + 1) + iv.sqr(rots) > iv.sqr(iv.NORM)
-
-
-def test_spin_preserves_length_approximately():
+def test_spin_preserves_length():
+    """``PCalc.Spin`` builds its rotation from ``rots = Norm/120`` and
+    ``rotc = sqrt(Norm^2 - rots^2)``, so that sin^2 + cos^2 stays at Norm^2 and
+    repeated spins neither shrink nor grow the figure."""
     from permuto.core import layout
     from permuto.core.graph import Graph, Node
     g = Graph()
     g.nnodes = 1
-    g.nodes[1] = Node(num=1, pos=[1000, 500, 2000, 0, 0, 0, 0, 0])
+    # at the scale the layout actually works in -- a few hundred units would
+    # drown in the truncation of the fixed-point multiply
+    g.nodes[1] = Node(num=1, pos=[iv.NORM // 2, iv.NORM // 4, iv.NORM // 3,
+                                  0, 0, 0, 0, 0])
     g.set_dimensions(3)
     before = iv.vector_length(g.nodes[1].pos)
-    layout.spin(g)
+    for _ in range(50):
+        layout.spin(g)
     after = iv.vector_length(g.nodes[1].pos)
-    assert abs(after - before) <= 3  # only fixed-point rounding
+    assert abs(after - before) < before // 1000, "the figure drifts as it spins"

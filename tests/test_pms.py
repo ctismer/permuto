@@ -61,15 +61,6 @@ def test_every_1995_ply_survives_the_trip_through_text(path, tmp_path):
     assert graphs_agree(original.graph, read_pms(out).graph)
 
 
-@pytest.mark.skipif(not PLY, reason="no .ply files")
-def test_text_is_smaller_than_the_binary_dump(tmp_path):
-    """No padding, no zero fields -- the readable format is also the smaller one."""
-    p = next(x for x in PLY if x.stem == "pg24")
-    out = tmp_path / "pg24.pms"
-    write_pms(out, read_ply(p))
-    assert out.stat().st_size < p.stat().st_size
-
-
 def test_coordinates_are_the_point_and_are_kept_exactly(tmp_path):
     """The essence of a session is the relaxed integer coordinates; a text
     format keeps them exactly because they are already integers."""

@@ -90,6 +90,13 @@ class Graph:
             nd.nlink = len(nd.links)
             g.nodes[num] = nd
         g.set_dimensions(dimensions)
+        # "colors simply derived from nodenumbers" (SetupPolytope) -- a .nod
+        # file has no permutations to colour by, so the numbering has to do,
+        # in blocks of 6 or, past 24 nodes, of 24. The original's own comment
+        # on the second case: "awkward".
+        block = 6 if g.nnodes <= 24 else 24
+        for nd in g.nodes.values():
+            nd.color = 1 + (nd.num - 1) // block
         if init:
             g.random_init(seed)
         return g
@@ -109,6 +116,8 @@ class Graph:
         g.n_operators = len(operator_groups(operators))
         for i, p in enumerate(perms, start=1):
             nd = Node(num=i, perm=p)
+            # as PM does: the colour says which character the perm starts with
+            nd.color = base.index(p[0]) + 1 if p else 7
             seen: Dict[int, int] = {}
             for opk, nb in neighbors(p, operators):
                 j = num.get(nb)
@@ -165,7 +174,10 @@ class Graph:
         return dropped
 
     def random_init(self, seed: int = 0) -> None:
+        from . import layout
+
         iv.set_dimensions(self.dimensions)
         rng = random.Random(seed)
         for nd in self.ordered():
             iv.random_vector(nd.pos, rng, iv.NORM)
+        layout.frame(self)

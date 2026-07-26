@@ -151,6 +151,18 @@ def normalize(g) -> None:
         iv.scale_vector(nd.pos, iv.NORM, mx)
 
 
+def frame(g) -> None:
+    """Make freshly established coordinates visible at the current ``NORM``.
+
+    Seeding a graph and framing it belong together: random vectors, the
+    topology-derived seed of ``NewPermutograph`` and the coordinates read back
+    from a session file all live at their own scale, and anything much smaller
+    than ``NORM`` projects to a single dot.  Every producer of coordinates
+    calls this, so no call site can forget it.
+    """
+    normalize(g)
+
+
 def spin(g) -> None:
     """Rotate the (1,3) plane by a small fixed angle (integer fixed-point)."""
     iv.set_dimensions(g.dimensions)

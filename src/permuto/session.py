@@ -42,6 +42,18 @@ ALG_NAMES = {
 
 DIMENSION_CHECK_INTERVAL = 25   # "IF Iteration MOD 25 = 0 THEN Changed := TRUE"
 
+EXIT_QUESTION = "Do You want to exit? (Y/N)"   # UserIO, capital You and all
+
+
+def confirms_exit(text: str = "", *, enter: bool = False) -> bool:
+    """``UserIO.UserWantsToExit`` -- anything else keeps the program running.
+
+    The original accepted three languages' yes (and the author's own habit of
+    just hitting Enter), which is worth keeping: it is the only place the
+    program ever asked the user anything twice.
+    """
+    return enter or text[:1].lower() in ("y", "j", "o")   # English, Deutsch, France
+
 
 class Mode(Enum):
     """How the program was started -- one parameter, three worlds."""
@@ -94,6 +106,13 @@ class Session:
     load_warnings: List[str] = field(default_factory=list)
     """Non-fatal notes from loading this session (e.g. a truncated file), for
     the viewer to show in its status line instead of printing to the console."""
+
+    def __post_init__(self) -> None:
+        # A session always starts with a picture that fills the view: a graph
+        # read back from a file carries whatever fixed-point scale it was saved
+        # at (a .ply from 1995 used NORM = 4096), which would otherwise show up
+        # microscopic until the relaxation has renormalized it.
+        layout.frame(self.graph)
 
     # -- derived ---------------------------------------------------------
     @property
@@ -166,15 +185,20 @@ class Session:
         return self.algorithm
 
     def cycle_name_mode(self) -> int:
-        """Next label mode, skipping "perm" unless we have permutation strings.
+        """Next label mode, skipping the ones that have nothing to show.
 
         ``REPEAT NameMode := (NameMode+1) MOD 4 UNTIL Permuto OR (NameMode # 2)``
-        -- outside permutograph mode the nodes "have no perm strings".
+        -- outside permutograph mode the nodes "have no perm strings".  The
+        port applies the same idea to the display mode, which is `state.display`
+        and therefore all zeroes until SPA or ParSum has filled it in.
         """
         while True:
             self.name_mode = (self.name_mode + 1) % NameMode.COUNT
-            if self.permuto or self.name_mode != NameMode.PERM:
-                break
+            if self.name_mode == NameMode.PERM and not self.permuto:
+                continue
+            if self.name_mode == NameMode.DISPLAY and not self._spa_has_run:
+                continue
+            break
         self.changed = True
         return self.name_mode
 

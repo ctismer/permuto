@@ -10,7 +10,8 @@ Keys (as in the original):
     F file menu        P program menu  E edit operators (permutograph mode)
     space  single-step (while not running)   ESC confirm exit
 
-File menu (F):     Q quit   O PostScript out   L load .ply   S save .ply
+File menu (F):     Q quit (asks)   O PostScript out   L load .pms/.ply
+                   S save .pms
 Program menu (P):  N kill/repair node   L break/repair line   C collapse
                    U uncollapse   S run SPA   T SPTA   P ParSum
                    Node actions ask for a node number (ReadInt); line/collapse
@@ -27,7 +28,8 @@ from ..core import intvector as iv
 from ..core.graph import Graph
 from ..core.pm import PM
 from ..errors import PermutoError
-from ..session import Mode, NameMode, Session, new_permutograph_session
+from ..session import (DIMENSION_CHECK_INTERVAL, EXIT_QUESTION, Mode, NameMode,
+                       Session, confirms_exit, new_permutograph_session)
 from . import render
 from .prompt import FieldPrompt
 
@@ -108,11 +110,9 @@ def make_session(name_or_path, *, seed: int = 1, operators=None) -> Session:
     p = str(name_or_path)
     session_file = _session_path(p)
     if session_file is not None:
-        from ..core import layout
         from ..formats import load_session
 
         loaded = load_session(session_file)
-        layout.normalize(loaded.graph)         # frame it at the current scale
         mode = Mode.PERMUTO if loaded.pm is not None else Mode.POLYTOP
         session = Session(graph=loaded.graph, mode=mode, pm=loaded.pm)
         session.iteration = loaded.iteration
@@ -163,6 +163,18 @@ def feed_prompt(prompt, ev) -> str:
     return "typing"
 
 
+def exit_confirmed(ev) -> bool:
+    """``UserIO.UserWantsToExit`` as a keystroke -- used by every view.
+
+    The question is asked wherever the original asked it: ESC in the main menu,
+    ESC or ``Q`` in the file menu, ESC or ``Q`` in Iridium.
+    """
+    from PySide6.QtCore import Qt
+
+    return confirms_exit(ev.text(),
+                         enter=ev.key() in (Qt.Key_Return, Qt.Key_Enter))
+
+
 def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
     from PySide6.QtCore import Qt, QTimer
     from PySide6.QtGui import QColor, QFont, QPainter
@@ -180,13 +192,6 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
             self.seed = seed
             self.session = make_session(name_or_path, seed=seed,
                                         operators=self.operators)
-            # Frame the initial picture: a freshly built permutograph seeds its
-            # coordinates from the topology (tiny, ~tens of units), which at the
-            # large NORM projects to a single dot until relaxed.  One normalize
-            # scales it to fill the view straight away (the original ran one
-            # iteration, and hence a Normalize, before waiting for a key).
-            from ..core import layout
-            layout.normalize(self.session.graph)
 
             # UI chrome state
             self.ui_mode = "main"       # main | file | program | edit | prompt
@@ -224,10 +229,27 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
         def _on_timer(self):
             # only relax freely while running; single-step waits for a key
             if self.ui_mode == "main" and self.session.running:
-                self.session.tick()
+                self._run_a_frame()
             elif self.session.program_mode:
                 self.session.tick()      # a running program advances on its own
             self.update()
+
+        def _run_a_frame(self):
+            """One timer tick's worth of relaxation.
+
+            Normally one iteration per frame.  With HurryUp the original traded
+            looking for computing -- it drew only at the 25-iteration
+            checkpoints and skipped the spin while calculating -- so here it
+            keeps iterating until ``tick`` asks for a redraw.  Without this the
+            switch only cost the rotation and bought nothing.
+            """
+            s = self.session
+            if not s.hurry_up:
+                s.tick()
+                return
+            for _ in range(DIMENSION_CHECK_INTERVAL):   # at most one checkpoint
+                if s.tick():
+                    break
 
         # ================= painting ==================================
         def paintEvent(self, _ev):
@@ -305,6 +327,8 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
             if self.ui_mode == "edit":
                 return ("editing operators: digits, arrows move, "
                         "Ctrl-Home base, Ctrl-End last, Enter/Esc leave")
+            if self.ui_mode == "confirm":
+                return EXIT_QUESTION
             return self.session.menu_line()
 
         # ================= input =====================================
@@ -320,9 +344,18 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
                 self._file_key(ev)
             elif self.ui_mode == "program":
                 self._program_key(ev)
+            elif self.ui_mode == "confirm":
+                self._confirm_key(ev)
             else:
                 self._main_key(ev)
             self.update()
+
+        def _confirm_key(self, ev):
+            """Yes closes, anything else goes back to the main menu."""
+            if exit_confirmed(ev):
+                self.close()
+            else:
+                self.ui_mode = "main"
 
         # -- main menu -------------------------------------------------
         def _main_key(self, ev):
@@ -347,7 +380,7 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
             elif k == "e" and s.permuto:
                 self._enter_edit()
             elif ev.key() == Qt.Key_Escape:
-                self.close()
+                self.ui_mode = "confirm"
             elif not s.running:
                 s.tick()             # any other key single-steps
 
@@ -355,7 +388,9 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
         def _file_key(self, ev):
             k = ev.text().lower()
             if ev.key() == Qt.Key_Escape or k == "q":
-                self.ui_mode = "main"
+                # (Q)uit means quit the program, and so does ESC here -- both
+                # ask first, and a "no" drops back to the main menu.
+                self.ui_mode = "confirm"
             elif k == "o":
                 self._begin_prompt("PostScript out = ", "ps")
             elif k == "l":
@@ -535,14 +570,8 @@ def run(name_or_path, seed: int = 1, operators=None, _drive=None) -> int:
             return save_session(out, sess, binary=False)
 
         def _load_session(self, path):
-            from ..core import layout
-
             loaded = load_session(path)  # .pms or .ply, detected by content
-            # Rescale the loaded coordinates to the current NORM so the picture
-            # fills the view at once -- otherwise a session saved at a different
-            # fixed-point scale (e.g. the old 4096) shows up microscopic until
-            # the relaxation renormalizes it.
-            layout.normalize(loaded.graph)
+            # No rescaling here: Session frames whatever coordinates it is given.
             if loaded.pm is not None:
                 self.session = Session(graph=loaded.graph, mode=Mode.PERMUTO,
                                        pm=loaded.pm)
@@ -669,6 +698,7 @@ def run_iridium(seed: int = 1, _drive=None) -> int:
             self.phase = "build"        # build -> settle -> run
             self.settle = 0
             self.stepbuf = 0            # queued step keys (autorepeat)
+            self.confirming = False     # showing the exit question
             self._paint_error = None    # last exception in paintEvent, for tests
             self.prompt = None          # a FieldPrompt while typing
             self.prompt_action = None
@@ -730,6 +760,14 @@ def run_iridium(seed: int = 1, _drive=None) -> int:
 
         # -- input -----------------------------------------------------
         def keyPressEvent(self, ev):
+            if self.confirming:      # "Do You want to exit? (Y/N)"
+                if exit_confirmed(ev):
+                    self.close()
+                else:
+                    self.confirming = False
+                    self.message = ""
+                self.update()
+                return
             if self.prompt:
                 result = feed_prompt(self.prompt, ev)
                 if result == "cancel":
@@ -745,7 +783,8 @@ def run_iridium(seed: int = 1, _drive=None) -> int:
                 self.message = ""
             k = ev.text().lower()
             if ev.key() == Qt.Key_Escape or k == "q":
-                self.close()
+                self.confirming = True
+                self.message = EXIT_QUESTION
             elif k in ("s", " ") or ev.key() == Qt.Key_Space:
                 self.stepbuf += 1
             elif k == "r":
