@@ -236,3 +236,87 @@ def test_the_operator_digit_punches_its_patch_through_the_edge():
     assert clean_patches(without) == 0, "the bare edge must cover its midpoint"
     assert clean_patches(with_digits) > 0, \
         "the digit patch must cover the edge, not sit under it"
+
+
+def _with_spa(steps=6):
+    """A permutograph part-way through SPA: line states, and one node each
+    killed and marked active."""
+    from permuto.core import spa
+
+    g = _spread_permutograph()
+    spa.init_spa(g, 1)
+    for _ in range(steps):
+        spa.shortest_path(g)
+    return g
+
+
+def test_the_direction_discs_actually_reach_the_picture():
+    """The decisions are checked in test_scene; this is the other half -- that
+    the layer is drawn at all.  Nothing painted it in any test until now
+    (HANDOVER, item 1).
+
+    A disc is the same green as the edge it sits on -- it is a thickening of
+    the line, not a second colour -- so the only honest question is whether
+    that spot carries more of that green with the layer than without it.
+    """
+    from dataclasses import replace
+
+    from permuto import scene
+
+    g = _with_spa()
+    size = 700
+    sc = scene.build(g, size, size, op_colors=True, program=True)
+    assert sc.discs, "the wave has to have moved for this test to mean anything"
+
+    def _drawn(s):
+        from PySide6.QtGui import QImage, QPainter
+        img = QImage(size, size, QImage.Format.Format_ARGB32)
+        img.fill(0)
+        p = QPainter(img)
+        render.draw_scene(s, p)
+        p.end()
+        return img
+
+    def _around(img, disc, r):
+        x0, y0 = int(disc.at[0]), int(disc.at[1])
+        return sum(1
+                   for x in range(x0 - r, x0 + r + 1)
+                   for y in range(y0 - r, y0 + r + 1)
+                   if 0 <= x < size and 0 <= y < size
+                   and _rgb(img, x, y) == disc.rgb)
+
+    with_discs = _drawn(sc)
+    without = _drawn(replace(sc, discs=[]))
+    r = int(sc.disc_radius) + 1
+    thicker = sum(1 for d in sc.discs
+                  if _around(with_discs, d, r) > _around(without, d, r))
+    assert thicker, "no direction disc thickened the edge it belongs to"
+
+
+def test_a_dead_ball_is_hollow_and_an_active_one_wears_its_ring():
+    """`P`->`N` kills a node and the SPA front marks others active; both are
+    drawn, and both were unpainted in every test before this one."""
+    from permuto import scene
+
+    g = _with_spa()
+    size = 700
+    dead, active = list(g.nodes)[0], list(g.nodes)[1]
+    g.nodes[dead].state.dead = True
+    g.nodes[active].state.active = True
+    g.nodes[active].state.dead = False
+
+    sc = scene.build(g, size, size, op_colors=True, program=True)
+    img = _painted(g, size, size, op_colors=True, program=True)
+    pts = render.project(g, size, size)
+
+    x, y, _z = pts[dead]
+    assert _rgb(img, int(x), int(y)) == render.BACKGROUND, \
+        "a dead node must be hollow, not filled"
+
+    x, y, _z = pts[active]
+    ring = sc.radius + sc.ring_extra
+    white = any(_rgb(img, int(x + dx), int(y)) == (255, 255, 255)
+                for dx in (round(ring), round(ring) + 1, round(ring) - 1,
+                           -round(ring), -round(ring) - 1, -round(ring) + 1)
+                if 0 <= int(x + dx) < size)
+    assert white, "an active node must be ringed white"

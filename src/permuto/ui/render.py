@@ -1,23 +1,35 @@
-"""Drawing — the port of ``PmDisp.DrawEdges``: orthographic 2-D projection of
-the N-dimensional node positions, with a front/back depth cue.
+"""Drawing -- putting a :class:`permuto.scene.Scene` on a ``QPainter``.
 
-Used by both the interactive PySide6 viewer and a headless offscreen renderer
-(so we can produce a PNG without a display).
+What is *in* the picture is decided in :mod:`permuto.scene`, which is UI-free:
+the projection, the palette, which colour an edge is and why, where a direction
+disc sits, how big a ball is.  This module is the part that genuinely needs Qt,
+and it is deliberately dull -- five layers, each a loop over one list.
+
+Used by both the interactive viewer and a headless offscreen renderer (so we
+can produce a PNG without a display).
 """
 
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
-from typing import Dict, Tuple
 
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import (QBrush, QColor, QFont, QGuiApplication, QImage,
                            QPainter, QPen)
 
-from ..core import intvector as iv
-from ..core.graph import L_INPUT, L_LOCKED, L_OUTPUT
-from ..editor import BASE_FIELD, fields_of, value_of
+from .. import scene
+from ..scene import (BACKGROUND, INK, Scene, mark_size, operator_panel_rows,
+                     project, stroke_width)
+
+# Names the viewer and the tests reach for; the values live in permuto.scene.
+_scaled = mark_size
+_line = stroke_width
+_DOS_PALETTE = scene.DOS_PALETTE
+UI_SCALE = scene.UI_SCALE
+
+__all__ = ["project", "paint", "paint_iridium", "operator_panel_rows",
+           "paint_operator_panel", "render_image", "save_png",
+           "indexed_image", "BACKGROUND", "INK", "draw_scene"]
 
 
 def _ensure_gui_app():
@@ -28,363 +40,108 @@ def _ensure_gui_app():
     return app
 
 
-def project(g, width: int, height: int) -> Dict[int, Tuple[int, int, int]]:
-    """Map each node to (screen x, screen y, depth z), like ``PmDisp.DrawEdges``:
-    ``px = Scale(pos[1], Scale_X, Norm) + centre`` (component 3 = depth).
-
-    The original used different ``Scale_X`` and ``Scale_Y`` because its pixels
-    were not square (the ``AspectX=350 / AspectY=480`` correction made circles
-    look round).  On today's square pixels the honest equivalent is a single,
-    isotropic scale, so a sphere stays a sphere whatever the window shape and
-    however much of the width the operator panel takes.
-    """
-    NORM = iv.NORM
-    scale = (min(width, height) // 2) * 95 // 100
-    cx, cy = width // 2, height // 2
-    pts: Dict[int, Tuple[int, int, int]] = {}
-    for nd in g.nodes.values():
-        pos = nd.pos
-        px = iv.scale(pos[0], scale, NORM) + cx
-        py = iv.scale(-pos[1], scale, NORM) + cy
-        z = pos[2] if g.dimensions >= 3 else 0
-        pts[nd.num] = (px, py, z)
-    return pts
+def _pen(rgb, width: float) -> QPen:
+    pen = QPen(QColor(*rgb))
+    pen.setWidthF(width)
+    return pen
 
 
-# distinct, reasonably colour-blind-friendly hues for operators 1..n
-_PALETTE = [
-    (90, 200, 255), (255, 150, 90), (140, 230, 120), (230, 120, 220),
-    (240, 220, 90), (120, 190, 235), (250, 130, 150), (170, 220, 200),
-]
+def _menlo(pixels: float) -> QFont:
+    font = QFont("Menlo")
+    font.setPixelSize(int(pixels))
+    return font
 
 
-def _op_color(opk: int, front: bool):
-    r, g, b = _PALETTE[(opk - 1) % len(_PALETTE)]
-    if not front:  # dim the back edges for depth
-        r, g, b = r * 45 // 100, g * 45 // 100, b * 45 // 100
-    return QColor(r, g, b)
+# -- the five layers, in drawing order --------------------------------------
+
+def _draw_edges(sc: Scene, painter) -> None:
+    for e in sc.edges:
+        painter.setPen(_pen(e.rgb, e.width))
+        painter.drawLine(QPointF(*e.a), QPointF(*e.b))
 
 
-def _state_color(state: int, front: bool):
-    # LineStatus -> colour (PmDisp): input/output green, locked red, free grey
-    if state in (L_INPUT, L_OUTPUT):
-        r, g, b = 90, 220, 110
-    elif state == L_LOCKED:
-        r, g, b = 220, 80, 80
-    else:  # L_FREE
-        r, g, b = 80, 85, 100
-    if not front:
-        r, g, b = r * 50 // 100, g * 50 // 100, b * 50 // 100
-    return QColor(r, g, b)
+def _draw_discs(sc: Scene, painter) -> None:
+    """The direction discs, on top of the edges they belong to."""
+    if not sc.discs:
+        return
+    painter.setPen(Qt.NoPen)
+    for d in sc.discs:
+        painter.setBrush(QBrush(QColor(*d.rgb)))
+        painter.drawEllipse(QPointF(*d.at), sc.disc_radius, sc.disc_radius)
 
 
-BACKGROUND = (18, 18, 28)   # picture background; shared with the viewer chrome
+def _draw_digits(sc: Scene, painter) -> None:
+    """The operator number at each edge midpoint, on a punched-out patch of
+    background -- so it stays readable where the edge runs under it."""
+    if not sc.digits:
+        return
+    painter.setFont(_menlo(sc.digit_size))
+    pad = sc.digit_pad
+    for d in sc.digits:
+        box = QRectF(d.at[0] - pad, d.at[1] - pad * 1.25, pad * 2, pad * 2.5)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(QColor(*BACKGROUND)))
+        painter.drawRect(box)
+        painter.setPen(QColor(*d.rgb))
+        painter.drawText(box, Qt.AlignCenter, str(d.op))
 
 
-_PICTURE_PIXELS = 320   # the original picture area was 479 x 320 (pmdisp.def)
-
-# One knob for the whole UI's apparent size.  A faithful mapping (1.0) puts
-# every mark at the same fraction of the picture it had on the 479x320 original,
-# but that reads a touch large on a modern display, so the default trims it.
-# This is the single number to turn if things want to be bigger or smaller.
-UI_SCALE = 0.62
-
-
-def _scaled(height: int, picture_pixels: float) -> float:
-    """A mark size (font, node), in the original's picture pixels, for today.
-
-    Kept as an absolute count it would vanish in a large window, so it keeps the
-    same fraction of the picture height (PORT-GAPS section 6), times UI_SCALE.
-    Floored at 1 px so fonts never round to nothing.
-    """
-    return max(1.0, picture_pixels * height / _PICTURE_PIXELS * UI_SCALE)
-
-
-INK = (0, 0, 0)     # PlotCenteredStr(px, py, str, 0) -- labels are always black
+def _draw_balls(sc: Scene, painter) -> None:
+    """The nodes: a filled disc, hollow if dead, ringed white if active."""
+    for b in sc.balls:
+        at = QPointF(*b.at)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(QColor(*(b.fill or BACKGROUND))))
+        painter.drawEllipse(at, b.radius, b.radius)
+        if b.fill is None:                      # dead: background, black rim
+            painter.setPen(_pen((0, 0, 0), sc.rim_width))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawEllipse(at, b.radius, b.radius)
+        if b.ringed:
+            painter.setPen(_pen(scene.RING, sc.rim_width))
+            painter.setBrush(Qt.NoBrush)
+            ring = b.radius + sc.ring_extra
+            painter.drawEllipse(at, ring, ring)
 
 
-def _line(height: int, picture_pixels: float) -> float:
-    """Like :func:`_scaled` but for pen widths, which may go below 1 px so that
-    a busy sphere of edges does not turn into a solid blob."""
-    return max(0.5, picture_pixels * height / _PICTURE_PIXELS * UI_SCALE)
+def _draw_labels(sc: Scene, painter) -> None:
+    """Node number / perm / SPA display value, inside the ball.  "we plot text
+    inside the balls, therefore black is a good choice" -- PmDisp."""
+    if not any(b.label for b in sc.balls):
+        return
+    painter.setFont(_menlo(sc.label_size))
+    painter.setPen(QColor(*INK))
+    for b in sc.balls:
+        if not b.label:
+            continue
+        x, y = b.at
+        r = b.radius
+        painter.drawText(QRectF(x - r, y - r, 2 * r, 2 * r),
+                         Qt.AlignCenter, b.label)
 
 
-@dataclass
-class Picture:
-    """One frame of the graph: what to draw, how big, and with which of the
-    original's switches.
-
-    The layers are what they are because each covers the one below: the edges
-    run into the node centres and under the operator digits, so the digits sit
-    on a punched-out patch of background, the balls go over both, and the
-    labels go inside the balls.  ``tests/test_render.py`` pins that order down.
-    """
-
-    g: object
-    painter: object
-    width: int
-    height: int
-    labels: bool = False
-    op_colors: bool = False
-    program: bool = False
-    name_mode: int = 0
-    operator_digits: bool = True
-
-    def __post_init__(self):
-        self.pts = project(self.g, self.width, self.height)
-        self.have_ops = self.op_colors and self.g.n_operators > 0
-        # What goes inside the balls decides how big they are -- one `names`
-        # drives both in ``PmDisp.DrawNodes``.
-        self.text_mode = self.name_mode if self.name_mode \
-            else (2 if self.labels else 0)
-        if self.program:
-            self.text_mode = 3
-        # 5 / 9 / 12 / 9 are the values ``TrueDisc`` was called with, and they
-        # are radii, not diameters: ``TrueCircle(diam+1)`` rings the ball one
-        # pixel further out, and a four-character perm in the 6x8 cell is 24 px
-        # wide -- it only fits inside a ball of radius 12, which is where it
-        # was drawn.
-        self.radius = self.scaled({0: 5, 1: 9, 2: 12, 3: 9}[self.text_mode])
-        self.digit_spots = []   # (x, y, op, front), collected by _edges
-        self.disc_spots = []    # (x, y, colour) -- the direction disc of a wave
-
-    # -- sizes, in the original's picture pixels -------------------
-    def scaled(self, picture_pixels: float) -> float:
-        return _scaled(self.height, picture_pixels)
-
-    def pen_width(self, picture_pixels: float) -> float:
-        return _line(self.height, picture_pixels)
-
-    # -- the layers, in drawing order ------------------------------
-    def draw(self) -> None:
-        self.painter.setRenderHint(self.painter.RenderHint.Antialiasing, True)
-        self._edges()
-        self._direction_discs()
-        self._operator_digits()
-        self._balls()
-        if self.text_mode:
-            self._labels()
-
-    def _edges(self) -> None:
-        """Every undirected edge once, collecting what the layers above need."""
-        painter = self.painter
-        front_pen = QPen(QColor(90, 200, 255))
-        front_pen.setWidthF(self.pen_width(1.1))
-        back_pen = QPen(QColor(70, 80, 120))
-        back_pen.setWidthF(self.pen_width(0.6))
-
-        for nd in self.g.ordered():
-            xi, yi, zi = self.pts[nd.num]
-            for idx, j in enumerate(nd.links):
-                if j <= nd.num:
-                    continue
-                xj, yj, zj = self.pts[j]
-                front = (zi + zj) > 0
-                broken = (idx + 1) in nd.state.broken
-                if broken:
-                    pen = QPen(QColor(0, 0, 0))
-                    pen.setWidthF(self.pen_width(1.1))
-                elif self.program and idx < len(nd.state.lines):
-                    pen = QPen(_state_color(nd.state.lines[idx], front))
-                    pen.setWidthF(self.pen_width(1.1 if front else 0.6))
-                elif self.have_ops and idx < len(nd.opno):
-                    pen = QPen(_op_color(nd.opno[idx], front))
-                    pen.setWidthF(self.pen_width(1.1 if front else 0.6))
-                else:
-                    painter.setPen(front_pen if front else back_pen)
-                    pen = None
-                if pen is not None:
-                    painter.setPen(pen)
-                painter.drawLine(QPointF(xi, yi), QPointF(xj, yj))
-                # Which way does the wave run?  A disc at 1/6 of the edge
-                # answers that: near this node for an input, near the neighbour
-                # for an output.  Colour alone (green) only says "on the path".
-                if self.program and not broken and idx < len(nd.state.lines) \
-                        and nd.state.lines[idx] in (L_INPUT, L_OUTPUT):
-                    if nd.state.lines[idx] == L_INPUT:
-                        qx, qy = (5 * xi + xj) / 6, (5 * yi + yj) / 6
-                    else:
-                        qx, qy = (5 * xj + xi) / 6, (5 * yj + yi) / 6
-                    self.disc_spots.append(
-                        (qx, qy, _state_color(nd.state.lines[idx], front)))
-                # ``IF (names>0) & (progsel # P_SPTA)`` (pmdisp.mod:94): one
-                # switch for both, so "write nothing" leaves the links bare
-                # too.  The P_SPTA half is Iridium, which paint_iridium draws.
-                if self.operator_digits and self.have_ops and self.text_mode \
-                        and not broken and idx < len(nd.opno) and nd.opno[idx]:
-                    self.digit_spots.append(((xi + xj) / 2, (yi + yj) / 2,
-                                             nd.opno[idx], front))
-
-    def _direction_discs(self) -> None:
-        """The direction discs, on top of the edges they belong to."""
-        if not self.disc_spots:
-            return
-        disc_r = self.scaled(3)
-        self.painter.setPen(Qt.NoPen)
-        for x, y, colour in self.disc_spots:
-            self.painter.setBrush(QBrush(colour))
-            self.painter.drawEllipse(QPointF(x, y), disc_r, disc_r)
-
-    def _operator_digits(self) -> None:
-        """The operator number at each edge midpoint, on a punched-out patch of
-        background -- so it stays readable where the edge runs under it."""
-        if not self.digit_spots:
-            return
-        painter = self.painter
-        digit_font = QFont("Menlo")
-        digit_font.setPixelSize(int(self.scaled(8)))
-        painter.setFont(digit_font)
-        pad = self.scaled(4)
-        for x, y, op, front in self.digit_spots:
-            box = QRectF(x - pad, y - pad * 1.25, pad * 2, pad * 2.5)
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(QBrush(QColor(*BACKGROUND)))
-            painter.drawRect(box)
-            painter.setPen(_op_color(op, front))
-            painter.drawText(box, Qt.AlignCenter, str(op))
-
-    def _ball_color(self, nd) -> int:
-        """The palette entry a node's ball is filled with.
-
-        ``color`` says which character the permutation starts with, so the
-        classes are visible in the picture.  Front nodes take the bright half
-        -- ``farbe := (color+8) MOD 16`` -- which is the depth cue.
-
-        Only 1..7 and their bright twins 9..15 are usable: 0 is black and 8 is
-        dark grey, and a graph big enough to run past the palette would land on
-        them (``ikosa9`` has 812 nodes, hence colours up to 34).  Cycling
-        through seven keeps the pairs intact and never draws a black ball.
-        """
-        colour = 1 + (nd.color - 1) % 7
-        if self.g.dimensions >= 3 and self.pts[nd.num][2] >= 0:
-            colour += 8
-        return colour
-
-    def _balls(self) -> None:
-        """The nodes: a filled disc, hollow if dead, ringed white if active."""
-        painter = self.painter
-        for nd in self.g.ordered():
-            x, y, _z = self.pts[nd.num]
-            if nd.state.dead:
-                painter.setPen(Qt.NoPen)
-                painter.setBrush(QBrush(QColor(*BACKGROUND)))
-                painter.drawEllipse(QPointF(x, y), self.radius, self.radius)
-                pen = QPen(QColor(0, 0, 0))
-                pen.setWidthF(self.pen_width(0.8))
-                painter.setPen(pen)
-                painter.setBrush(Qt.NoBrush)
-                painter.drawEllipse(QPointF(x, y), self.radius, self.radius)
-            else:
-                painter.setPen(Qt.NoPen)
-                painter.setBrush(
-                    QBrush(QColor(*_DOS_PALETTE[self._ball_color(nd)])))
-                painter.drawEllipse(QPointF(x, y), self.radius, self.radius)
-            if nd.state.active:
-                pen = QPen(QColor(255, 255, 255))
-                pen.setWidthF(self.pen_width(0.8))
-                painter.setPen(pen)
-                painter.setBrush(Qt.NoBrush)
-                ring = self.radius + self.scaled(1)
-                painter.drawEllipse(QPointF(x, y), ring, ring)
-
-    def _label_text(self, nd) -> str:
-        if self.text_mode == 1:
-            return str(nd.num)
-        if self.text_mode == 2:
-            return nd.perm
-        return str(nd.state.display)
-
-    def _labels(self) -> None:
-        """Node number / perm / SPA display value, inside the ball.  "we plot
-        text inside the balls, therefore black is a good choice" -- PmDisp."""
-        painter = self.painter
-        label_font = QFont("Menlo")
-        label_font.setPixelSize(int(self.scaled(8)))   # the 6x8 font cell
-        painter.setFont(label_font)
-        painter.setPen(QColor(*INK))
-        r = self.radius
-        for nd in self.g.ordered():
-            text = self._label_text(nd)
-            if not text:
-                continue
-            x, y, _z = self.pts[nd.num]
-            painter.drawText(QRectF(x - r, y - r, 2 * r, 2 * r),
-                             Qt.AlignCenter, text)
+def draw_scene(sc: Scene, painter) -> None:
+    """Every layer of *sc*, in the order each covers the one below it."""
+    painter.setRenderHint(painter.RenderHint.Antialiasing, True)
+    _draw_edges(sc, painter)
+    _draw_discs(sc, painter)
+    _draw_digits(sc, painter)
+    _draw_balls(sc, painter)
+    _draw_labels(sc, painter)
 
 
 def paint(g, painter, width: int, height: int, **kw) -> None:
-    """Draw *g* onto *painter* -- see :class:`Picture` for the switches."""
-    Picture(g, painter, width, height, **kw).draw()
-
-
-# The standard DOS 16-colour palette, by index -- Iridium/SIMONE colours nodes
-# by these (Window.Yellow=14 idle, Blue=1 destination, Red=4 and NextColor for
-# packets).
-_DOS_PALETTE = [
-    (0, 0, 0), (60, 60, 220), (0, 170, 0), (0, 170, 170),
-    (210, 40, 40), (200, 0, 200), (170, 85, 0), (200, 200, 200),
-    (110, 110, 120), (110, 110, 255), (85, 255, 85), (85, 255, 255),
-    (255, 110, 110), (255, 120, 255), (245, 235, 90), (255, 255, 255),
-]
+    """Draw *g* onto *painter* -- see :func:`permuto.scene.build` for the
+    switches."""
+    draw_scene(scene.build(g, width, height, **kw), painter)
 
 
 def paint_iridium(g, painter, width: int, height: int) -> None:
-    """Draw the Iridium/SIMONE network (``PmDisp`` with ``progsel = P_SPTA``).
-
-    Node size encodes availability, the colour is the satellite's state
-    (yellow idle, blue destination, else the packet's colour), and the label is
-    the node's own name when idle, otherwise the message number it carries.
-    No operator digits -- Iridium never sets ``opno``.
-    """
-    pts = project(g, width, height)
-    painter.setRenderHint(painter.RenderHint.Antialiasing, True)
-
-    pen = QPen(QColor(150, 150, 160))
-    pen.setWidthF(_line(height, 0.9))
-    painter.setPen(pen)
-    for nd in g.ordered():
-        xi, yi, _zi = pts[nd.num]
-        for j in nd.links:
-            if j > nd.num:
-                xj, yj, _zj = pts[j]
-                painter.drawLine(QPointF(xi, yi), QPointF(xj, yj))
-
-    YELLOW = 14
-    font = QFont("Menlo")
-    font.setPixelSize(int(_scaled(height, 7)))
-    painter.setFont(font)
-    for nd in g.ordered():
-        x, y, _z = pts[nd.num]
-        # diameter = Scale(11, avail+1500, 10000), scaled to the picture
-        diam = _scaled(height, 11 * (nd.iri.avail + 1500) / 10000)
-        r = diam / 2
-        colour = QColor(*_DOS_PALETTE[nd.color % 16])
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QBrush(colour))
-        painter.drawEllipse(QPointF(x, y), r, r)
-        # label: own name when idle (yellow), else the message number it carries
-        text = nd.perm if nd.color == YELLOW else str(nd.iri.message_num)
-        if text and text != "0":
-            painter.setPen(QColor(0, 0, 0))
-            painter.drawText(QRectF(x - r, y - r, 2 * r, 2 * r),
-                             Qt.AlignCenter, text)
+    """Draw the Iridium/SIMONE network -- see :func:`permuto.scene.iridium_scene`."""
+    draw_scene(scene.iridium_scene(g, width, height), painter)
 
 
-def operator_panel_rows(pm):
-    """The lines of the operator editor, as ``(label, value, field)`` tuples.
-
-    ``field`` is an :class:`~permuto.editor.OpField`, or ``None`` for the blank
-    spacer line after the base -- matching the original's layout of a base
-    line, a gap, then 6 operators of 3 cycles each, only the first cycle of
-    each operator carrying an ``Op n`` label.  The cursor order comes from the
-    editor, so the panel and the cursor cannot disagree.
-    """
-    rows = [("Base", pm.base, BASE_FIELD), ("", "", None)]
-    for fld in fields_of(pm)[1:]:            # [0] is the base, already there
-        label = f"Op {fld.op}" if fld.cyc == 1 else ""
-        rows.append((label, value_of(pm, fld), fld))
-    return rows
-
+# -- the operator panel beside the picture ----------------------------------
 
 def paint_operator_panel(pm, painter, x, y, height, *,
                          active_field=None, buffer_text=None):
@@ -394,10 +151,8 @@ def paint_operator_panel(pm, painter, x, y, height, *,
     ``active_field`` set it shows the edit cursor, and ``buffer_text`` is the
     digits being typed into that field.
     """
-    font = QFont("Menlo")
-    line_px = _scaled(height, 11)
-    font.setPixelSize(int(line_px * 0.7))
-    painter.setFont(font)
+    line_px = mark_size(height, 11)
+    painter.setFont(_menlo(line_px * 0.7))
     for row, (label, value, field) in enumerate(operator_panel_rows(pm)):
         cy = y + row * line_px
         if label:
@@ -413,6 +168,8 @@ def paint_operator_panel(pm, painter, x, y, height, *,
             painter.drawText(QPointF(x + line_px * 3, cy),
                              (shown or "·") + ("_" if editing else ""))
 
+
+# -- offscreen --------------------------------------------------------------
 
 def render_image(g, width: int = 800, height: int = 800, **kw):
     _ensure_gui_app()
