@@ -108,20 +108,17 @@ def _line(height: int, picture_pixels: float) -> float:
     return max(0.5, picture_pixels * height / _PICTURE_PIXELS * UI_SCALE)
 
 
-def paint(g, painter, width: int, height: int, *,
-          labels: bool = False, op_colors: bool = False,
-          program: bool = False, name_mode: int = 0,
-          operator_digits: bool = True) -> None:
-    pts = project(g, width, height)
-    painter.setRenderHint(painter.RenderHint.Antialiasing, True)
+def _edges(g, painter, pts, height, *, have_ops, program, operator_digits):
+    """Draw every undirected edge once, and collect what the layers above need.
 
+    Returns ``(digit_spots, disc_spots)``: the operator number belonging to each
+    edge midpoint, and the direction disc of each wave edge.
+    """
     front_pen = QPen(QColor(90, 200, 255))
     front_pen.setWidthF(_line(height, 1.1))
     back_pen = QPen(QColor(70, 80, 120))
     back_pen.setWidthF(_line(height, 0.6))
-    have_ops = op_colors and g.n_operators > 0
 
-    # edges, each undirected pair once; remember midpoints for the op digit
     digit_spots = []   # (x, y, op, front)
     disc_spots = []    # (x, y, colour) -- the direction disc of a wave edge
     for nd in g.ordered():
@@ -161,57 +158,58 @@ def paint(g, painter, width: int, height: int, *,
                     and idx < len(nd.opno) and nd.opno[idx]:
                 digit_spots.append(((xi + xj) / 2, (yi + yj) / 2,
                                     nd.opno[idx], front))
+    return digit_spots, disc_spots
 
-    # the direction discs, on top of the edges they belong to
-    if disc_spots:
-        disc_r = _scaled(height, 3)
+
+def _direction_discs(painter, height, disc_spots):
+    """The direction discs, on top of the edges they belong to."""
+    if not disc_spots:
+        return
+    disc_r = _scaled(height, 3)
+    painter.setPen(Qt.NoPen)
+    for x, y, colour in disc_spots:
+        painter.setBrush(QBrush(colour))
+        painter.drawEllipse(QPointF(x, y), disc_r, disc_r)
+
+
+def _operator_digits(painter, height, digit_spots):
+    """The operator number at each edge midpoint, on a punched-out patch of
+    background -- so it stays readable where the edge runs under it."""
+    if not digit_spots:
+        return
+    digit_font = QFont("Menlo")
+    digit_font.setPixelSize(int(_scaled(height, 8)))
+    painter.setFont(digit_font)
+    pad = _scaled(height, 4)
+    for x, y, op, front in digit_spots:
         painter.setPen(Qt.NoPen)
-        for x, y, colour in disc_spots:
-            painter.setBrush(QBrush(colour))
-            painter.drawEllipse(QPointF(x, y), disc_r, disc_r)
+        painter.setBrush(QBrush(QColor(*BACKGROUND)))
+        painter.drawRect(QRectF(x - pad, y - pad * 1.25, pad * 2, pad * 2.5))
+        painter.setPen(_op_color(op, front))
+        painter.drawText(QRectF(x - pad, y - pad * 1.25, pad * 2, pad * 2.5),
+                         Qt.AlignCenter, str(op))
 
-    # operator number at each edge midpoint, on a punched-out background patch
-    if digit_spots:
-        digit_font = QFont("Menlo")
-        digit_font.setPixelSize(int(_scaled(height, 8)))
-        painter.setFont(digit_font)
-        pad = _scaled(height, 4)
-        for x, y, op, front in digit_spots:
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(QBrush(QColor(*BACKGROUND)))
-            painter.drawRect(QRectF(x - pad, y - pad * 1.25, pad * 2, pad * 2.5))
-            painter.setPen(_op_color(op, front))
-            painter.drawText(QRectF(x - pad, y - pad * 1.25, pad * 2, pad * 2.5),
-                             Qt.AlignCenter, str(op))
 
-    # What goes inside the balls decides how big they are -- one `names` drives
-    # both in ``PmDisp.DrawNodes``.
-    text_mode = name_mode if name_mode else (2 if labels else 0)
-    if program:
-        text_mode = 3
-    # 5 / 9 / 12 / 9 are the values ``TrueDisc`` was called with, and they are
-    # radii, not diameters: ``TrueCircle(diam+1)`` rings the ball one pixel
-    # further out, and a four-character perm in the 6x8 cell is 24 px wide --
-    # it only fits inside a ball of radius 12, which is where it was drawn.
-    radius = _scaled(height, {0: 5, 1: 9, 2: 12, 3: 9}[text_mode])
+def _ball_color(g, pts, nd) -> int:
+    """The palette entry a node's ball is filled with.
 
-    def ball_color(nd) -> int:
-        """The palette entry a node's ball is filled with.
+    ``color`` says which character the permutation starts with, so the classes
+    are visible in the picture.  Front nodes take the bright half --
+    ``farbe := (color+8) MOD 16`` -- which is the depth cue.
 
-        ``color`` says which character the permutation starts with, so the
-        classes are visible in the picture.  Front nodes take the bright half
-        -- ``farbe := (color+8) MOD 16`` -- which is the depth cue.
+    Only 1..7 and their bright twins 9..15 are usable: 0 is black and 8 is dark
+    grey, and a graph big enough to run past the palette would land on them
+    (``ikosa9`` has 812 nodes, hence colours up to 34).  Cycling through seven
+    keeps the pairs intact and never draws a black ball.
+    """
+    colour = 1 + (nd.color - 1) % 7
+    if g.dimensions >= 3 and pts[nd.num][2] >= 0:
+        colour += 8
+    return colour
 
-        Only 1..7 and their bright twins 9..15 are usable: 0 is black and 8 is
-        dark grey, and a graph big enough to run past the palette would land on
-        them (``ikosa9`` has 812 nodes, hence colours up to 34).  Cycling
-        through seven keeps the pairs intact and never draws a black ball.
-        """
-        colour = 1 + (nd.color - 1) % 7
-        if g.dimensions >= 3 and pts[nd.num][2] >= 0:
-            colour += 8
-        return colour
 
+def _balls(g, painter, pts, radius, height):
+    """The nodes: a filled disc, hollow if the node is dead, ringed if active."""
     for nd in g.ordered():
         x, y, _z = pts[nd.num]
         if nd.state.dead:
@@ -225,7 +223,7 @@ def paint(g, painter, width: int, height: int, *,
             painter.drawEllipse(QPointF(x, y), radius, radius)
         else:
             painter.setPen(Qt.NoPen)
-            painter.setBrush(QBrush(QColor(*_DOS_PALETTE[ball_color(nd)])))
+            painter.setBrush(QBrush(QColor(*_DOS_PALETTE[_ball_color(g, pts, nd)])))
             painter.drawEllipse(QPointF(x, y), radius, radius)
         if nd.state.active:
             pen = QPen(QColor(255, 255, 255))
@@ -235,26 +233,63 @@ def paint(g, painter, width: int, height: int, *,
             ring = radius + _scaled(height, 1)
             painter.drawEllipse(QPointF(x, y), ring, ring)
 
-    # labels inside the balls: node number / perm / SPA display value.  "we plot
-    # text inside the balls, therefore black is a good choice" -- PmDisp
+
+def _labels(g, painter, pts, radius, height, text_mode):
+    """Node number / perm / SPA display value, inside the ball.  "we plot text
+    inside the balls, therefore black is a good choice" -- PmDisp."""
+    label_font = QFont("Menlo")
+    label_font.setPixelSize(int(_scaled(height, 8)))   # the 6x8 font cell
+    painter.setFont(label_font)
+    painter.setPen(QColor(*INK))
+    for nd in g.ordered():
+        if text_mode == 1:
+            text = str(nd.num)
+        elif text_mode == 2:
+            text = nd.perm
+        else:
+            text = str(nd.state.display)
+        if not text:
+            continue
+        x, y, _z = pts[nd.num]
+        painter.drawText(
+            QRectF(x - radius, y - radius, 2 * radius, 2 * radius),
+            Qt.AlignCenter, str(text))
+
+
+def paint(g, painter, width: int, height: int, *,
+          labels: bool = False, op_colors: bool = False,
+          program: bool = False, name_mode: int = 0,
+          operator_digits: bool = True) -> None:
+    """The picture, in the order ``PmDisp`` built it up.
+
+    The layers are what they are because each covers the one below: the edges
+    run into the node centres and under the operator digits, so the digits sit
+    on a punched-out patch, the balls go over both, and the labels go inside
+    the balls.  ``tests/test_render.py`` pins that order down.
+    """
+    pts = project(g, width, height)
+    painter.setRenderHint(painter.RenderHint.Antialiasing, True)
+    have_ops = op_colors and g.n_operators > 0
+
+    # What goes inside the balls decides how big they are -- one `names` drives
+    # both in ``PmDisp.DrawNodes``.
+    text_mode = name_mode if name_mode else (2 if labels else 0)
+    if program:
+        text_mode = 3
+    # 5 / 9 / 12 / 9 are the values ``TrueDisc`` was called with, and they are
+    # radii, not diameters: ``TrueCircle(diam+1)`` rings the ball one pixel
+    # further out, and a four-character perm in the 6x8 cell is 24 px wide --
+    # it only fits inside a ball of radius 12, which is where it was drawn.
+    radius = _scaled(height, {0: 5, 1: 9, 2: 12, 3: 9}[text_mode])
+
+    digit_spots, disc_spots = _edges(
+        g, painter, pts, height, have_ops=have_ops, program=program,
+        operator_digits=operator_digits)
+    _direction_discs(painter, height, disc_spots)
+    _operator_digits(painter, height, digit_spots)
+    _balls(g, painter, pts, radius, height)
     if text_mode:
-        label_font = QFont("Menlo")
-        label_font.setPixelSize(int(_scaled(height, 8)))   # the 6x8 font cell
-        painter.setFont(label_font)
-        painter.setPen(QColor(*INK))
-        for nd in g.ordered():
-            if text_mode == 1:
-                text = str(nd.num)
-            elif text_mode == 2:
-                text = nd.perm
-            else:
-                text = str(nd.state.display)
-            if not text:
-                continue
-            x, y, _z = pts[nd.num]
-            painter.drawText(
-                QRectF(x - radius, y - radius, 2 * radius, 2 * radius),
-                Qt.AlignCenter, str(text))
+        _labels(g, painter, pts, radius, height, text_mode)
 
 
 # The standard DOS 16-colour palette, by index -- Iridium/SIMONE colours nodes
