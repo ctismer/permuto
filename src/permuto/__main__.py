@@ -76,10 +76,11 @@ def main(argv=None) -> int:
         return 0
 
     if cmd == "show":
-        from .ui.viewer import _resolve_file, run
+        from .loader import resolve_file
+        from .ui.viewer import run
 
         name, operators, seed = _as_spec(
-            rest, resolves=lambda n: _resolve_file(n) is not None)
+            rest, resolves=lambda n: resolve_file(n) is not None)
         return run(name, seed=seed, operators=operators)
 
     if cmd in ("iridium", "iri", "/i", "/I"):
@@ -97,8 +98,8 @@ def main(argv=None) -> int:
 
     if cmd == "render":
         from .core import layout
+        from .loader import load_graph
         from .ui import render as rndr
-        from .ui.viewer import load_graph
 
         pos = [a for a in rest if not a.startswith("--")]
         flags = {a for a in rest if a.startswith("--")}
@@ -116,7 +117,7 @@ def main(argv=None) -> int:
     if cmd == "export":
         from .core import layout
         from .formats import save_ps
-        from .ui.viewer import load_graph
+        from .loader import load_graph
 
         pos = [a for a in rest if not a.startswith("--")]
         name = pos[0]

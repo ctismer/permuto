@@ -84,7 +84,7 @@ def test_a_node_carries_the_colour_of_its_class():
 
 def test_operator_panel_lists_the_base_and_operators():
     from permuto.editor import BASE_FIELD
-    from permuto.ui.viewer import make_session
+    from permuto.loader import make_session
 
     s = make_session("1234", operators=["12", "+", "23", "+", "34"])
     rows = render.operator_panel_rows(s.pm)
@@ -129,7 +129,7 @@ def test_viewer_builds_without_a_display():
     """The whole viewer construction path (session + panel + first paint) must
     work headless, so this stays covered without a human at the screen."""
     from PySide6.QtGui import QImage, QPainter
-    from permuto.ui.viewer import make_session
+    from permuto.loader import make_session
 
     s = make_session("11111112",
                      operators=["1234", "+", "5678", "+", "18", "27", "+", "36", "45"])
