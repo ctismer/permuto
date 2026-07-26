@@ -80,6 +80,47 @@ class Program(Enum):
                              # the original only ever said "not yet available"
 
 
+class UiMode(Enum):
+    """Which menu the keyboard is talking to.
+
+    The original needed no such state: DOS read its keys inside whichever menu
+    loop was running, so the menu *was* the call stack.  An event-driven
+    frontend has to remember it instead, and both status lines and the forced
+    node numbers read it back -- which is why it lives here and not in the
+    widget.
+    """
+
+    MAIN = "main"
+    FILE = "file"
+    PROGRAM = "program"
+    EDIT = "edit"
+    PROMPT = "prompt"        # typing a file name or a node number
+    SELECT = "select"        # SelectCard: picking a neighbour
+    CONFIRM = "confirm"      # the exit question
+
+
+class PromptKind(Enum):
+    """What the text prompt is collecting, and which menu asked for it.
+
+    The menu matters because a prompt keeps its parent's line on screen: you
+    typed a file name under ``(Q)uit (O)utput (L)oad (S)ave``, and that is what
+    you go on seeing while you type.
+    """
+
+    PS = ("ps", UiMode.FILE)          # a PostScript output file
+    SAVE = ("save", UiMode.FILE)
+    LOAD = ("load", UiMode.FILE)
+    NODE = ("node", UiMode.PROGRAM)   # a node number (``UserIO.ReadInt``)
+
+    def __init__(self, value: str, menu: UiMode):
+        self._value_ = value
+        self.menu = menu
+
+
+EDIT_MENU_LINE = ("editing operators: digits, arrows move, "
+                  "Ctrl-Home base, Ctrl-End last, Enter/Esc leave")
+
+
 @dataclass
 class Session:
     """The running program: a graph, how it is being computed, and what is shown."""
@@ -168,6 +209,22 @@ class Session:
         self.iteration += 1
         self._advance_program()
         return redraw
+
+    def advance_frame(self) -> None:
+        """One frame's worth of relaxation, as the frontend's clock asks for it.
+
+        Normally one iteration per frame.  With HurryUp the original traded
+        looking for computing -- it drew only at the 25-iteration checkpoints
+        and skipped the spin while calculating (``polytop.mod:299``) -- so here
+        it keeps iterating until :meth:`tick` asks for a redraw.  Without this
+        the switch only costs the rotation and buys nothing.
+        """
+        if not self.hurry_up:
+            self.tick()
+            return
+        for _ in range(DIMENSION_CHECK_INTERVAL):   # at most one checkpoint
+            if self.tick():
+                break
 
     def _advance_program(self) -> None:
         if not self.program_mode:
@@ -261,6 +318,37 @@ class Session:
 
     def program_menu_line(self) -> str:
         return "Kill/Repair (N)ode / (L)ine   run (S)PA  SP(T)A  (P)ARSUM"
+
+    def top_line(self, ui_mode: "UiMode",
+                 prompt_kind: "PromptKind" = None) -> str:
+        """The line above the picture: the menu the keyboard is in.
+
+        A prompt shows the menu it was opened from, so typing a file name still
+        reads ``(Q)uit (O)utput (L)oad (S)ave``.
+        """
+        if ui_mode is UiMode.PROMPT and prompt_kind is not None:
+            ui_mode = prompt_kind.menu
+        if ui_mode is UiMode.FILE:
+            return self.file_menu_line()
+        if ui_mode in (UiMode.PROGRAM, UiMode.SELECT):
+            return self.program_menu_line()
+        if ui_mode is UiMode.EDIT:
+            return EDIT_MENU_LINE
+        if ui_mode is UiMode.CONFIRM:
+            return EXIT_QUESTION
+        return self.menu_line()
+
+    def label_mode(self, ui_mode: "UiMode",
+                   prompt_kind: "PromptKind" = None) -> int:
+        """What to write in the balls right now.
+
+        Node numbers are forced on while a node is being chosen, so there is
+        always something to read -- the original drew them before the program
+        menu regardless of the current name mode.
+        """
+        picking = ui_mode in (UiMode.PROGRAM, UiMode.SELECT) or \
+            (ui_mode is UiMode.PROMPT and prompt_kind is PromptKind.NODE)
+        return NameMode.NUMBER if picking else self.name_mode
 
     # -- editing entry point ---------------------------------------------
     def rebuild_permutograph(self, *, base_changed: bool) -> None:

@@ -38,8 +38,7 @@ from ..editor import OperatorEditor
 from ..errors import PermutoError
 from ..formats import save_ps
 from ..loader import make_session, session_from_file, write_session
-from ..session import (DIMENSION_CHECK_INTERVAL, EXIT_QUESTION, NameMode,
-                       confirms_exit)
+from ..session import (EXIT_QUESTION, PromptKind, UiMode, confirms_exit)
 from . import render
 from .prompt import FieldPrompt
 
@@ -151,39 +150,9 @@ class ViewBase(QWidget):
         p.setFont(font)
 
 
-class UiMode(Enum):
-    """Which menu the keyboard is talking to.
-
-    The original needed no such state: DOS read its keys inside whichever menu
-    loop was running, so the menu *was* the call stack.  An event-driven viewer
-    has to remember it instead, and every keystroke, both status lines and the
-    forced node numbers read it back.
-    """
-
-    MAIN = "main"
-    FILE = "file"
-    PROGRAM = "program"
-    EDIT = "edit"
-    PROMPT = "prompt"        # typing a file name or a node number
-    SELECT = "select"        # SelectCard: picking a neighbour
-    CONFIRM = "confirm"      # the exit question
-
-
-EDIT_MENU_LINE = ("editing operators: digits, arrows move, "
-                  "Ctrl-Home base, Ctrl-End last, Enter/Esc leave")
-
 #: the editor's cursor keys, as :meth:`OperatorEditor.move` names them
 _EDIT_MOVES = {Qt.Key_Up: "up", Qt.Key_Down: "down",
                Qt.Key_Home: "first", Qt.Key_End: "last"}
-
-
-class PromptKind(Enum):
-    """What the text prompt is collecting."""
-
-    PS = "ps"                # a PostScript output file
-    SAVE = "save"
-    LOAD = "load"
-    NODE = "node"            # a node number (``UserIO.ReadInt``)
 
 
 class NodeAction(Enum):
@@ -255,27 +224,10 @@ class PermutographView(ViewBase):
     def _on_timer(self):
         # only relax freely while running; single-step waits for a key
         if self.ui_mode is UiMode.MAIN and self.session.running:
-            self._run_a_frame()
+            self.session.advance_frame()
         elif self.session.program_mode:
             self.session.tick()      # a running program advances on its own
         self.update()
-
-    def _run_a_frame(self):
-        """One timer tick's worth of relaxation.
-
-        Normally one iteration per frame.  With HurryUp the original traded
-        looking for computing -- it drew only at the 25-iteration
-        checkpoints and skipped the spin while calculating -- so here it
-        keeps iterating until ``tick`` asks for a redraw.  Without this the
-        switch only cost the rotation and bought nothing.
-        """
-        s = self.session
-        if not s.hurry_up:
-            s.tick()
-            return
-        for _ in range(DIMENSION_CHECK_INTERVAL):   # at most one checkpoint
-            if s.tick():
-                break
 
     # ================= painting ==================================
     def _paint(self, p):
@@ -283,7 +235,8 @@ class PermutographView(ViewBase):
         render.paint(self.g, p, pic_w, self.height(),
                      op_colors=True,      # the viewer always colours by operator
                      program=self.session.program_mode,
-                     name_mode=self._draw_name_mode())
+                     name_mode=self.session.label_mode(self.ui_mode,
+                                                       self.prompt_kind))
         if self.session.permuto and self.session.pm is not None:
             render.paint_operator_panel(
                 self.session.pm, p, pic_w + 16, 60, self.height(),
@@ -291,21 +244,12 @@ class PermutographView(ViewBase):
                 buffer_text=self.editor.buffer if self.editor else None)
         self._paint_chrome(p)
 
-    def _draw_name_mode(self):
-        """Node numbers are forced on whenever a node is being chosen, so
-        there is always something to read -- the original drew them before
-        the program menu regardless of the current name mode."""
-        picking = self.ui_mode in (UiMode.PROGRAM, UiMode.SELECT) or \
-            (self.ui_mode is UiMode.PROMPT
-             and self.prompt_kind is PromptKind.NODE)
-        return NameMode.NUMBER if picking else self.session.name_mode
-
     def _paint_chrome(self, p):
         self._set_chrome_font(p)
 
         # top: the menu line for the current UI mode
         p.setPen(QColor(200, 205, 225))
-        p.drawText(12, 22, self._top_line())
+        p.drawText(12, 22, self.session.top_line(self.ui_mode, self.prompt_kind))
 
         # bottom: the status line, plus the live prompt / message
         p.setPen(QColor(150, 155, 175))
@@ -322,22 +266,6 @@ class PermutographView(ViewBase):
         elif self.message:
             p.setPen(QColor(255, 210, 140))
             p.drawText(12, self.height() - 14, self.message)
-
-    def _top_line(self):
-        if self.ui_mode is UiMode.FILE:
-            return self.session.file_menu_line()
-        if self.ui_mode is UiMode.PROMPT:
-            # a node number belongs to the program menu, a file name to F
-            return (self.session.program_menu_line()
-                    if self.prompt_kind is PromptKind.NODE
-                    else self.session.file_menu_line())
-        if self.ui_mode in (UiMode.PROGRAM, UiMode.SELECT):
-            return self.session.program_menu_line()
-        if self.ui_mode is UiMode.EDIT:
-            return EDIT_MENU_LINE
-        if self.ui_mode is UiMode.CONFIRM:
-            return EXIT_QUESTION
-        return self.session.menu_line()
 
     # ================= input =====================================
     def keyPressEvent(self, ev):

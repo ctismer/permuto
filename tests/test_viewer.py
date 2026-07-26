@@ -317,7 +317,7 @@ def test_escape_asks_before_leaving(qapp):
 
     def drive(view):
         view.keyPressEvent(esc)
-        captured["asked"] = (view.ui_mode, view._top_line())
+        captured["asked"] = (view.ui_mode, view.session.top_line(view.ui_mode))
         view.keyPressEvent(key("n"))                # not yet
         captured["after_no"] = view.ui_mode
         view.keyPressEvent(key("f"))               # file menu -> (Q)uit
@@ -724,10 +724,10 @@ def test_the_toggle_keys_move_their_own_flag_in_the_menu_line(qapp):
     captured = {}
 
     def drive(view):
-        captured["start"] = view._top_line()
+        captured["start"] = view.session.top_line(view.ui_mode)
         for key in "crhs":
             _press(view, key)
-        captured["toggled"] = view._top_line()
+        captured["toggled"] = view.session.top_line(view.ui_mode)
         captured["alg_before"] = view.session.status_line()
         _press(view, "a")
         captured["alg_after"] = view.session.status_line()
