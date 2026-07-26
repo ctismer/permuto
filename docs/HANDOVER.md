@@ -100,8 +100,9 @@ python -m permuto export pgl4 out.ps 600
 
 ## Phase 3 — the refactor, on `phase3-refactor`
 
-**19 commits, not pushed, and read by nobody but the author.** Tests green at
-every commit; `python -m pytest --cov=permuto` reports 92%.
+**On `origin`, and read by nobody but its author.** Tests green at every
+commit; `python -m pytest --cov=permuto` reports 92%. `git log --oneline
+main..phase3-refactor` is the whole story in twenty-odd lines.
 
 Three rules still bind, unchanged from when phase 3 started:
 
