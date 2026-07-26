@@ -227,10 +227,12 @@ def test_the_operator_digit_punches_its_patch_through_the_edge():
                         break
         return found
 
+    # name_mode=1: the digits follow `names`, so a picture with nothing
+    # written on the balls has nothing on the links either
     with_digits = render.render_image(g, size, size, op_colors=True,
-                                      operator_digits=True)
+                                      name_mode=1, operator_digits=True)
     without = render.render_image(g, size, size, op_colors=True,
-                                  operator_digits=False)
+                                  name_mode=1, operator_digits=False)
     assert clean_patches(without) == 0, "the bare edge must cover its midpoint"
     assert clean_patches(with_digits) > 0, \
         "the digit patch must cover the edge, not sit under it"

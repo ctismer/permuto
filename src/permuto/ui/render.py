@@ -207,7 +207,10 @@ class Picture:
                         qx, qy = (5 * xj + xi) / 6, (5 * yj + yi) / 6
                     self.disc_spots.append(
                         (qx, qy, _state_color(nd.state.lines[idx], front)))
-                if self.operator_digits and self.have_ops and not self.program \
+                # ``IF (names>0) & (progsel # P_SPTA)`` (pmdisp.mod:94): one
+                # switch for both, so "write nothing" leaves the links bare
+                # too.  The P_SPTA half is Iridium, which paint_iridium draws.
+                if self.operator_digits and self.have_ops and self.text_mode \
                         and not broken and idx < len(nd.opno) and nd.opno[idx]:
                     self.digit_spots.append(((xi + xj) / 2, (yi + yj) / 2,
                                              nd.opno[idx], front))

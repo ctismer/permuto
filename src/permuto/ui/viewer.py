@@ -232,8 +232,6 @@ class PermutographView(ViewBase):
 
         # UI chrome state
         self.ui_mode = UiMode.MAIN
-        self.labels = False
-        self.op_colors = True
         # a load note (e.g. a truncated session) shows in the status line
         self.message = load_note(session.load_warnings)
         self.pending = None         # a NodeAction awaiting its node number
@@ -283,7 +281,7 @@ class PermutographView(ViewBase):
     def _paint(self, p):
         pic_w = self.width() - (260 if self.session.permuto else 0)
         render.paint(self.g, p, pic_w, self.height(),
-                     labels=self.labels, op_colors=self.op_colors,
+                     op_colors=True,      # the viewer always colours by operator
                      program=self.session.program_mode,
                      name_mode=self._draw_name_mode())
         if self.session.permuto and self.session.pm is not None:

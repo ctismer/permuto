@@ -238,7 +238,10 @@ bisection), `PermBasisValid`, `FindBase`, `ValidCycle`, `CyclicOperate`,
 ## 6. Drawing (`PmDisp`) — done
 
 - Operator digit at each edge midpoint, on a `BackColor` rectangle punched out
-  of the edge (suppressed in Iridium mode).
+  of the edge. Guarded by `IF (names>0) & (progsel # P_SPTA)` (`pmdisp.mod:94`)
+  — the *same* `names` that decides the ball labels and their size, so
+  "write nothing" is one look, not two switches: small circles, no labels, bare
+  links. `P_SPTA` is Iridium, which `render.paint_iridium` draws separately.
 - Direction discs (`Graph.TrueDisc`, 3) at 1/6 of the edge for
   `L_input`/`L_output` — near own node for input, near neighbour for output.
   Colour says *that* an edge carries the wave, the disc says *which way*.

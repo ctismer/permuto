@@ -529,3 +529,57 @@ def test_a_salvaged_session_says_so_in_the_status_line(qapp, tmp_path):
     assert captured["on_start"].startswith("loaded (truncated):")
     assert captured["reloaded"].startswith("loaded (truncated):")
     assert "truncated" not in captured["good"], captured["good"]
+
+
+def _rgb(img, x, y):
+    c = img.pixelColor(x, y)
+    return (c.red(), c.green(), c.blue())
+
+
+def _edges_with_a_digit_patch(view):
+    """How many edges show the punched-out background patch that an operator
+    digit sits on.  The bare edge covers its own midpoint, so a clean block of
+    background there can only come from the patch."""
+    from permuto.ui import render
+
+    img = _repaint(view)
+    pic_w = view.width() - (260 if view.session.permuto else 0)
+    pts = render.project(view.g, pic_w, view.height())
+    found = 0
+    for nd in view.g.ordered():
+        xi, yi, _zi = pts[nd.num]
+        for idx, j in enumerate(nd.links):
+            if j <= nd.num or idx >= len(nd.opno) or not nd.opno[idx]:
+                continue
+            xj, yj, _zj = pts[j]
+            for t in (0.44, 0.47, 0.5, 0.53, 0.56):
+                x, y = round(xi + (xj - xi) * t), round(yi + (yj - yi) * t)
+                if not (1 <= x < img.width() - 1 and 1 <= y < img.height() - 1):
+                    continue
+                if all(_rgb(img, x + dx, y + dy) == render.BACKGROUND
+                       for dx in (-1, 0, 1) for dy in (-1, 0, 1)):
+                    found += 1
+                    break
+    return found
+
+
+def test_no_names_means_no_operator_numbers_on_the_edges(qapp):
+    """`N` cycling to "write nothing" is the plain look-at-it view: small
+    circles, no labels -- and no numbers on the links either.  The original
+    guarded the edge digits with the very same `names` that sizes and fills the
+    balls (pmdisp.mod:94), so the two cannot come apart."""
+    captured = {}
+
+    def drive(view):
+        view.resize(900, 800)
+        for _ in range(40):
+            view.session.tick()
+        captured["silent"] = _edges_with_a_digit_patch(view)   # NameMode.NONE
+        _press(view, "n")                                      # -> node numbers
+        captured["named"] = _edges_with_a_digit_patch(view)
+        view.close()
+
+    viewer.run("1234", operators=["12", "+", "23", "+", "34"], _drive=drive)
+    assert captured["silent"] == 0, \
+        "with nothing written, the links must be bare too"
+    assert captured["named"] > 0, "with names, the operator numbers are back"
