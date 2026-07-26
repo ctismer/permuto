@@ -12,7 +12,22 @@ tested without a display.
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import List, Sequence, Tuple
+
+
+class PromptResult(Enum):
+    """What a keystroke did to a prompt.
+
+    ``MORE`` is the one that bites: a prompt with several fields (Iridium's
+    (T)ransmit asks for three) is not finished by the first Enter, and reading
+    that as an ending closes it a third of the way through.
+    """
+
+    TYPING = "typing"
+    MORE = "more"          # field committed, the next one is now live
+    SUBMIT = "submit"      # the last field is in
+    CANCEL = "cancel"      # ESC
 
 
 class FieldPrompt:
@@ -47,12 +62,13 @@ class FieldPrompt:
     def backspace(self) -> None:
         self.buffer = self.buffer[:-1]
 
-    def enter(self) -> str:
-        """Commit the current field.  Returns ``"submit"`` when the last field
-        is done, else ``"more"``."""
+    def enter(self) -> PromptResult:
+        """Commit the current field: ``SUBMIT`` when the last one is done,
+        else ``MORE``."""
         self.values.append(self.buffer)
         self.buffer = ""
-        return "submit" if len(self.values) == len(self.fields) else "more"
+        return (PromptResult.SUBMIT if len(self.values) == len(self.fields)
+                else PromptResult.MORE)
 
     def display(self) -> str:
         """The prompt line, with a cursor on the field being typed.

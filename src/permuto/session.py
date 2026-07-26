@@ -30,6 +30,7 @@ from .core import layout, spa
 from .core.graph import Graph
 from .core.pm import PM
 from .errors import ProgramStateError
+from .menus import FILE_MENU, MAIN_MENU, PROGRAM_MENU, ProgramAction
 
 DIMENSION_CHECK_INTERVAL = 25   # "IF Iteration MOD 25 = 0 THEN Changed := TRUE"
 
@@ -91,40 +92,38 @@ class UiMode(Enum):
 
 
 class PromptKind(Enum):
-    """What the text prompt is collecting, and which menu asked for it.
+    """What the text prompt is collecting, which menu asked for it, and what it
+    says while it asks.
 
     The menu matters because a prompt keeps its parent's line on screen: you
     typed a file name under ``(Q)uit (O)utput (L)oad (S)ave``, and that is what
-    you go on seeing while you type.
+    you go on seeing while you type.  ``NODE`` has no wording of its own -- the
+    :class:`~permuto.menus.ProgramAction` that asked supplies it, because
+    "Node 1=" and "Uncollapse node=" are the same kind of prompt.
     """
 
-    PS = ("ps", UiMode.FILE)          # a PostScript output file
-    SAVE = ("save", UiMode.FILE)
-    LOAD = ("load", UiMode.FILE)
-    NODE = ("node", UiMode.PROGRAM)   # a node number (``UserIO.ReadInt``)
+    PS = ("ps", UiMode.FILE, "PostScript out = ")
+    SAVE = ("save", UiMode.FILE, "Save .pms = ")
+    LOAD = ("load", UiMode.FILE, "Load (.pms/.ply) = ")
+    NODE = ("node", UiMode.PROGRAM, "")     # a node number (``UserIO.ReadInt``)
 
-    def __init__(self, value: str, menu: UiMode):
+    def __new__(cls, value: str, menu: UiMode, label: str):
+        self = object.__new__(cls)
         self._value_ = value
         self.menu = menu
+        self.label = label
+        return self
 
 
 EDIT_MENU_LINE = ("editing operators: digits, arrows move, "
                   "Ctrl-Home base, Ctrl-End last, Enter/Esc leave")
 
 
-class NodeAction(Enum):
-    """What a node number typed into the program menu is for.
-
-    ``BREAK`` and ``COLLAPSE`` need a second node and carry on into
-    :class:`Selection`; which of the two steps is running is already in
-    :class:`UiMode`, so the action itself does not repeat it.
-    """
-
-    KILL = "kill"
-    BREAK = "break"                # then pick the other end
-    COLLAPSE = "collapse"          # then pick the node to collapse onto
-    UNCOLLAPSE = "uncollapse"
-    SPA = "spa"
+#: which menu each keyboard mode is talking to; anything else gets the main one
+MENU_FOR_MODE = {UiMode.MAIN: MAIN_MENU,
+                 UiMode.FILE: FILE_MENU,
+                 UiMode.PROGRAM: PROGRAM_MENU,
+                 UiMode.SELECT: PROGRAM_MENU}   # picking the second node
 
 
 @dataclass
@@ -136,7 +135,7 @@ class Selection:
     """
 
     node: int
-    action: NodeAction
+    action: ProgramAction
     items: List[int] = field(default_factory=list)
     pos: int = 0
 
@@ -356,18 +355,9 @@ class Session:
 
     # -- the two status lines --------------------------------------------
     def menu_line(self) -> str:
-        """The top line, rebuilt exactly as ``polytop.mod`` prints it."""
-        def flag(value: bool) -> str:
-            return "T" if value else "F"
-
-        line = (f"(A)lgo  (C)alc {flag(self.calculating)}"
-                f"  (R)un {flag(self.running)}"
-                f"  (H)urry {flag(self.hurry_up)}"
-                f"  (F)ile  (S)pin {flag(self.spinning)}"
-                f"  (N)ame  (P)rog")
-        if self.permuto:
-            line += "  (E)dit "
-        return line
+        """The top line, built from the menu table (``menus.MAIN_MENU``) so
+        that what is offered and what a key does cannot drift apart."""
+        return MAIN_MENU.line(self, permuto=self.permuto)
 
     def status_line(self) -> str:
         """The bottom line: ``iter=N dim=D nodes=N  A=Alg``."""
@@ -376,10 +366,10 @@ class Session:
                 f"  A={self.algorithm.label}    ")
 
     def file_menu_line(self) -> str:
-        return "(Q)uit  (O)utput  (L)oad  (S)ave"
+        return FILE_MENU.line(self)
 
     def program_menu_line(self) -> str:
-        return "Kill/Repair (N)ode / (L)ine   run (S)PA  SP(T)A  (P)ARSUM"
+        return PROGRAM_MENU.line(self)
 
     def top_line(self, ui_mode: "UiMode",
                  prompt_kind: "PromptKind" = None) -> str:
@@ -390,15 +380,12 @@ class Session:
         """
         if ui_mode is UiMode.PROMPT and prompt_kind is not None:
             ui_mode = prompt_kind.menu
-        if ui_mode is UiMode.FILE:
-            return self.file_menu_line()
-        if ui_mode in (UiMode.PROGRAM, UiMode.SELECT):
-            return self.program_menu_line()
         if ui_mode is UiMode.EDIT:
-            return EDIT_MENU_LINE
+            return EDIT_MENU_LINE          # cursor keys, not a key menu
         if ui_mode is UiMode.CONFIRM:
             return EXIT_QUESTION
-        return self.menu_line()
+        return MENU_FOR_MODE.get(ui_mode, MAIN_MENU).line(
+            self, permuto=self.permuto)
 
     def label_mode(self, ui_mode: "UiMode",
                    prompt_kind: "PromptKind" = None) -> int:

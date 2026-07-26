@@ -11,9 +11,23 @@ what :meth:`OperatorEditor.fields` describes.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import List, Optional
 
 from .errors import PermutoError
+
+
+class Move(Enum):
+    """Where the cursor goes -- one member per key the editor listens to.
+
+    ``LAST`` is the last cell anyone has filled in, not the last cell there is:
+    the original's Ctrl-End landed on the end of the table as it stood.
+    """
+
+    UP = "up"
+    DOWN = "down"
+    FIRST = "first"
+    LAST = "last"
 
 
 @dataclass(frozen=True)
@@ -34,10 +48,6 @@ class OpField:
 
 
 BASE_FIELD = OpField()
-
-#: what :meth:`OperatorEditor.move` accepts
-MOVES = ("up", "down", "first", "last")
-
 
 def fields_of(pm) -> List[OpField]:
     """Every editable cell of *pm*, in cursor order: the base, then the
@@ -100,22 +110,21 @@ class OperatorEditor:
         except PermutoError as exc:
             return str(exc)
 
-    def move(self, where: str) -> None:
-        """Move the cursor: ``up``/``down`` by one, ``first``/``last`` to the
-        ends -- ``last`` being the last cell anyone has filled in, not the last
-        cell there is."""
+    def move(self, where: Move) -> None:
+        """Move the cursor by one or to an end -- see :class:`Move`."""
         flds = self.fields()
         idx = flds.index(self.field)
-        if where == "up":
-            idx = max(0, idx - 1)
-        elif where == "down":
-            idx = min(len(flds) - 1, idx + 1)
-        elif where == "first":
-            idx = 0
-        elif where == "last":
-            idx = max((n for n, f in enumerate(flds)
-                       if f.is_base or self.value(f)), default=0)
-        else:
-            raise ValueError(f"unknown move {where!r}, expected one of {MOVES}")
+        match where:
+            case Move.UP:
+                idx = max(0, idx - 1)
+            case Move.DOWN:
+                idx = min(len(flds) - 1, idx + 1)
+            case Move.FIRST:
+                idx = 0
+            case Move.LAST:
+                idx = max((n for n, f in enumerate(flds)
+                           if f.is_base or self.value(f)), default=0)
+            case _:
+                raise ValueError(f"not a Move: {where!r}")
         self.field = flds[idx]
         self.buffer = self.value(self.field)

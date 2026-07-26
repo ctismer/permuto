@@ -1,38 +1,32 @@
 """The main viewer -- ``polytop.mod`` as a Qt widget.
 
-The interaction model lives in :mod:`permuto.session` (UI-free and tested);
-this widget draws it and feeds it keystrokes, keeping the original's keys and
-its two status lines.
+The interaction model lives in :mod:`permuto.session` (UI-free and tested) and
+the menus in :mod:`permuto.menus` (likewise); this widget draws them and feeds
+them keystrokes.  What is left here is genuinely Qt: pixels, and the mode the
+keyboard is in.
 
-Keys (as in the original):
-    A next algorithm   C calc on/off   R run (continuous) on/off
-    H hurry on/off     S spin on/off   N cycle name mode
-    F file menu        P program menu  E edit operators (permutograph mode)
-    space  single-step (while not running)   ESC confirm exit
-
-File menu (F):     Q quit (asks)   O PostScript out   L load .pms/.ply
-                   S save .pms
-Program menu (P):  N kill/repair node   L break/repair line   C collapse
-                   U uncollapse   S run SPA   T SPTA   P ParSum
-                   Node actions ask for a node number (ReadInt); line/collapse
-                   then pick the neighbour with space/Enter (SelectCard), as in
-                   the original -- it had no mouse.
+Which key does what is not written down here -- ask the menu tables.  The
+program menu's node prompts are on :class:`permuto.menus.ProgramAction`, the
+file menu's on :class:`permuto.session.PromptKind`, and everything the tables
+name is dispatched through the three ``_..._ACTIONS`` dicts at the foot of this
+module.
 """
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 
 from ..editor import OperatorEditor
 from ..errors import PermutoError
 from ..formats import save_ps
 from ..loader import make_session, session_from_file, write_session
-from ..session import NodeAction, PromptKind, Selection, UiMode
-from . import render
+from ..menus import (FILE_MENU, MAIN_MENU, PROGRAM_MENU, FileAction, Key,
+                     MainAction, ProgramAction)
+from ..session import PromptKind, Selection, UiMode
+from . import keys, render
 from .base_view import ViewBase
-from .keys import EDIT_MOVES, ENTER_KEYS, exit_confirmed, feed_prompt
-from .prompt import FieldPrompt
+from .keys import exit_confirmed, feed_prompt
+from .prompt import FieldPrompt, PromptResult
 
 
 def load_note(warnings) -> str:
@@ -65,7 +59,7 @@ class PermutographView(ViewBase):
         self.ui_mode = UiMode.MAIN
         # a load note (e.g. a truncated session) shows in the status line
         self.message = load_note(session.load_warnings)
-        self.pending = None         # a NodeAction awaiting its node number
+        self.pending = None         # a ProgramAction awaiting its node number
 
         # an OperatorEditor while UiMode.EDIT, otherwise None
         self.editor = None
@@ -143,83 +137,66 @@ class PermutographView(ViewBase):
          UiMode.CONFIRM: self._confirm_key}[self.ui_mode](ev)
         self.update()
 
+    def _enter(self, mode: UiMode) -> None:
+        """Hand the keyboard to another menu."""
+        self.ui_mode = mode
+
     def _confirm_key(self, ev):
         """Yes closes, anything else goes back to the main menu."""
         if exit_confirmed(ev):
             self.close()
         else:
-            self.ui_mode = UiMode.MAIN
+            self._enter(UiMode.MAIN)
 
     # -- main menu -------------------------------------------------
     def _main_key(self, ev):
-        k = ev.text().lower()
-        s = self.session
-        if k == "a":
-            s.next_algorithm()
-        elif k == "c":
-            s.calculating = not s.calculating
-        elif k == "r":
-            s.running = not s.running
-        elif k == "h":
-            s.hurry_up = not s.hurry_up
-        elif k == "s":
-            s.spinning = not s.spinning
-        elif k == "n":
-            s.cycle_name_mode()
-        elif k == "f":
-            self.ui_mode = UiMode.FILE
-        elif k == "p":
-            self.ui_mode = UiMode.PROGRAM    # numbers are forced on while here
-        elif k == "e" and s.permuto:
-            self._enter_edit()
-        elif ev.key() == Qt.Key_Escape:
-            self.ui_mode = UiMode.CONFIRM
-        elif not s.running:
-            s.tick()             # any other key single-steps
+        binding = MAIN_MENU.binding(keys.char(ev), keys.named(ev),
+                                    permuto=self.session.permuto)
+        if binding is not None and binding.flag:
+            # (C)alc (R)un (H)urry (S)pin: the table already names the attribute
+            # whose T/F the menu line shows, and the key flips exactly that one
+            setattr(self.session, binding.flag,
+                    not getattr(self.session, binding.flag))
+            return
+        action = binding.action if binding is not None else MainAction.STEP
+        _MAIN_ACTIONS[action](self)
+
+    def _step(self):
+        """What every key the menu does not claim does: one iteration -- but
+        only while not running, as the original had it."""
+        if not self.session.running:
+            self.session.tick()
 
     # -- file menu -------------------------------------------------
     def _file_key(self, ev):
-        k = ev.text().lower()
-        if ev.key() == Qt.Key_Escape or k == "q":
-            # (Q)uit means quit the program, and so does ESC here -- both
-            # ask first, and a "no" drops back to the main menu.
-            self.ui_mode = UiMode.CONFIRM
-        elif k == "o":
-            self._begin_prompt("PostScript out = ", PromptKind.PS)
-        elif k == "l":
-            self._begin_prompt("Load (.pms/.ply) = ", PromptKind.LOAD)
-        elif k == "s":
-            self._begin_prompt("Save .pms = ", PromptKind.SAVE)
+        action = FILE_MENU.action(keys.char(ev), keys.named(ev))
+        if action is not None:
+            _FILE_ACTIONS[action](self)
 
     # -- program menu ----------------------------------------------
     def _program_key(self, ev):
-        k = ev.text().lower()
-        s = self.session
-        if ev.key() == Qt.Key_Escape:
-            self.ui_mode = UiMode.MAIN
-        elif k == "n":
-            self._ask_node("Node=", NodeAction.KILL, "kill/repair")
-        elif k == "l":
-            self._ask_node("Node 1=", NodeAction.BREAK, "break/repair a line")
-        elif k == "c":
-            self._ask_node("Collapse node=", NodeAction.COLLAPSE, "collapse")
-        elif k == "u":
-            self._ask_node("Uncollapse node=", NodeAction.UNCOLLAPSE, "uncollapse")
-        elif k == "s":
-            self._ask_node("StartNode=", NodeAction.SPA, "run SPA from")
-        elif k == "t":
-            self._guard(s.start_spta)
-            self.ui_mode = UiMode.MAIN
-        elif k == "p":
-            if self._guard(s.start_par_sum):
-                self.ui_mode = UiMode.MAIN
+        action = PROGRAM_MENU.action(keys.char(ev), keys.named(ev))
+        if action is None:
+            return
+        if action.asks_for_a_node:
+            self._ask_node(action)
+        else:
+            _PROGRAM_ACTIONS[action](self)
 
-    def _ask_node(self, label, action, what):
+    def _ask_node(self, action: ProgramAction):
         """Ask for a node the original way -- type its number and Enter
         (``UserIO.ReadInt``).  The DOS program had no mouse."""
         self.pending = action
-        self._begin_prompt(f" {label}", PromptKind.NODE)
-        self.message = f"type a node number and Enter to {what}"
+        self._begin_prompt(PromptKind.NODE, action.prompt)
+        self.message = f"type a node number and Enter to {action.purpose}"
+
+    def _start_spta(self):
+        self._guard(self.session.start_spta)
+        self._enter(UiMode.MAIN)     # SPTA only ever says it does not exist
+
+    def _start_par_sum(self):
+        if self._guard(self.session.start_par_sum):
+            self._enter(UiMode.MAIN)     # a refusal keeps the menu open
 
     # -- operator editor -------------------------------------------
     def _enter_edit(self):
@@ -231,11 +208,12 @@ class PermutographView(ViewBase):
         if ev.text().isdigit():
             ed.type_digit(ev.text())
             return
-        if ev.key() == Qt.Key_Backspace:
+        key = keys.named(ev)
+        if key is Key.BACKSPACE:
             ed.backspace()
             return
-        where = EDIT_MOVES.get(ev.key())
-        leaving = ev.key() in ENTER_KEYS or ev.key() == Qt.Key_Escape
+        where = keys.EDIT_MOVES.get(key)
+        leaving = key in (Key.ENTER, Key.ESCAPE)
         if where is None and not leaving:
             return
         error = ed.commit()          # any move or exit commits the field first
@@ -253,23 +231,26 @@ class PermutographView(ViewBase):
                 base_changed=self.editor.base_changed)
         except PermutoError as exc:
             self.message = str(exc)
-        self.ui_mode = UiMode.MAIN
+        self._enter(UiMode.MAIN)
         self.editor = None
 
     # -- text prompt (filenames, node numbers) ---------------------
-    def _begin_prompt(self, label, kind):
+    def _begin_prompt(self, kind: PromptKind, label: str = ""):
+        """Open the prompt *kind* asks for; its own wording unless a caller
+        has a better one (a node prompt says what the number is for)."""
         self.ui_mode = UiMode.PROMPT
         self.prompt_kind = kind
-        self.prompt = FieldPrompt(label.strip(),
-                                  [(label.strip(), kind is PromptKind.NODE)])
+        text = (label or kind.label).strip()
+        self.prompt = FieldPrompt(text, [(text, kind is PromptKind.NODE)])
 
     def _prompt_key(self, ev):
-        result = feed_prompt(self.prompt, ev)
-        if result == "cancel":
-            self.pending = None
-            self.ui_mode = UiMode.MAIN
-        elif result == "submit":
-            self._run_prompt()
+        match feed_prompt(self.prompt, ev):
+            case PromptResult.CANCEL:
+                self.pending = None
+                self._enter(UiMode.MAIN)
+            case PromptResult.SUBMIT:
+                self._run_prompt()
+            # TYPING and MORE: keep the prompt open and go on collecting
 
     def _run_prompt(self):
         text = self.prompt.text()
@@ -278,26 +259,26 @@ class PermutographView(ViewBase):
         if self.prompt_kind is PromptKind.NODE:
             if not text.isdigit() or int(text) not in self.g.nodes:
                 self.message = f"no node {text} (1..{self.g.nnodes})"
-                self.ui_mode = UiMode.MAIN
+                self._enter(UiMode.MAIN)
                 self.pending = None
                 return
             self._apply_pending(int(text))
             return
         try:
-            if self.prompt_kind is PromptKind.PS:
-                save_ps(self.g, text)
-                self.message = f"wrote {text}"
-            elif self.prompt_kind is PromptKind.SAVE:
-                written = self._save_session(text)
-                self.message = f"saved {written}"
-            elif self.prompt_kind is PromptKind.LOAD:
-                self._load_session(text)        # sets its own message
+            _PROMPT_ACTIONS[self.prompt_kind](self, text)
         except (PermutoError, OSError) as exc:
             self.message = str(exc)
-        self.ui_mode = UiMode.MAIN
+        self._enter(UiMode.MAIN)
+
+    def _write_ps(self, path):
+        save_ps(self.g, path)
+        self.message = f"wrote {path}"
 
     def _save_session(self, path):
         return write_session(self.session, path)
+
+    def _report_save(self, path):
+        self.message = f"saved {self._save_session(path)}"
 
     def _load_session(self, path):
         self.session = session_from_file(path)
@@ -309,17 +290,12 @@ class PermutographView(ViewBase):
 
     def _apply_pending(self, node):
         """Act on a node number just entered (``ReadInt`` returned)."""
-        s = self.session
         action = self.pending
-        if action is NodeAction.BREAK:
-            self._begin_select(node, action, "select the other end")
-        elif action is NodeAction.COLLAPSE:
-            self._begin_select(node, action, "select the node to collapse onto")
-        else:
-            self._guard({NodeAction.KILL: lambda: s.kill_node(node),
-                         NodeAction.UNCOLLAPSE: lambda: s.uncollapse(node),
-                         NodeAction.SPA: lambda: s.start_spa(node)}[action])
-            self._done_pending()
+        if action.asks_for_a_second_node:
+            self._begin_select(node, action, action.second)
+            return
+        self._guard(lambda: _NODE_ACTIONS[action](self.session, node))
+        self._done_pending()
 
     def _begin_select(self, node, action, what):
         """Enter SelectCard: cycle *node*'s neighbours with space, Enter picks.
@@ -338,16 +314,15 @@ class PermutographView(ViewBase):
 
     def _select_key(self, ev):
         sel = self.select
-        if ev.key() == Qt.Key_Escape:
-            self._end_select()
-        elif ev.key() == Qt.Key_Space:
-            sel.advance()
-        elif ev.key() in ENTER_KEYS:
-            if sel.action is NodeAction.BREAK:
-                self.session.toggle_line(sel.node, sel.current)
-            elif sel.action is NodeAction.COLLAPSE:
-                self._guard(lambda: self.session.collapse(sel.node, sel.current))
-            self._end_select()
+        match keys.named(ev):
+            case Key.ESCAPE:
+                self._end_select()
+            case Key.SPACE:
+                sel.advance()
+            case Key.ENTER:
+                self._guard(lambda: _SECOND_NODE[sel.action](
+                    self.session, sel.node, sel.current))
+                self._end_select()
 
     def _end_select(self):
         self.select = None
@@ -355,7 +330,7 @@ class PermutographView(ViewBase):
 
     def _done_pending(self):
         self.pending = None
-        self.ui_mode = UiMode.MAIN
+        self._enter(UiMode.MAIN)
 
     # -- helpers ---------------------------------------------------
     def _guard(self, fn) -> bool:
@@ -366,3 +341,54 @@ class PermutographView(ViewBase):
         except PermutoError as exc:
             self.message = str(exc)
             return False
+
+
+# -- what each menu entry does ---------------------------------------------
+# One entry per action the tables in permuto.menus can produce; a missing one
+# is a KeyError the first time that key is pressed, not a key that does nothing.
+
+_MAIN_ACTIONS = {
+    MainAction.ALGORITHM: lambda v: v.session.next_algorithm(),
+    MainAction.NAME_MODE: lambda v: v.session.cycle_name_mode(),
+    MainAction.FILE_MENU: lambda v: v._enter(UiMode.FILE),
+    # node numbers are forced on while the program menu is up
+    MainAction.PROGRAM_MENU: lambda v: v._enter(UiMode.PROGRAM),
+    MainAction.EDIT: PermutographView._enter_edit,
+    MainAction.QUIT: lambda v: v._enter(UiMode.CONFIRM),
+    MainAction.STEP: PermutographView._step,
+}
+
+_FILE_ACTIONS = {
+    # (Q)uit means quit the program, and so does ESC here -- both ask first,
+    # and a "no" drops back to the main menu.
+    FileAction.QUIT: lambda v: v._enter(UiMode.CONFIRM),
+    FileAction.POSTSCRIPT: lambda v: v._begin_prompt(PromptKind.PS),
+    FileAction.LOAD: lambda v: v._begin_prompt(PromptKind.LOAD),
+    FileAction.SAVE: lambda v: v._begin_prompt(PromptKind.SAVE),
+}
+
+#: the program-menu entries that do not ask for a node first
+_PROGRAM_ACTIONS = {
+    ProgramAction.SPTA: PermutographView._start_spta,
+    ProgramAction.PARSUM: PermutographView._start_par_sum,
+    ProgramAction.LEAVE: lambda v: v._enter(UiMode.MAIN),
+}
+
+#: what a single node number is for, once ReadInt has returned
+_NODE_ACTIONS = {
+    ProgramAction.KILL: lambda s, n: s.kill_node(n),
+    ProgramAction.UNCOLLAPSE: lambda s, n: s.uncollapse(n),
+    ProgramAction.SPA: lambda s, n: s.start_spa(n),
+}
+
+#: and what the second node picked with SelectCard is for
+_SECOND_NODE = {
+    ProgramAction.BREAK: lambda s, a, b: s.toggle_line(a, b),
+    ProgramAction.COLLAPSE: lambda s, a, b: s.collapse(a, b),
+}
+
+_PROMPT_ACTIONS = {
+    PromptKind.PS: PermutographView._write_ps,
+    PromptKind.SAVE: PermutographView._report_save,
+    PromptKind.LOAD: PermutographView._load_session,   # sets its own message
+}

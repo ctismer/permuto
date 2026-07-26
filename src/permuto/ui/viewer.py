@@ -4,10 +4,10 @@ The widgets themselves live next door and are documented there:
 
 * :mod:`permuto.ui.base_view` -- the window, the frame timer, a paint that
   cannot crash Qt
-* :mod:`permuto.ui.permutograph_view` -- the main viewer and its menus
+* :mod:`permuto.ui.permutograph_view` -- the main viewer
 * :mod:`permuto.ui.iridium_view` -- the ``/I`` mode, SIMONE
 * :mod:`permuto.ui.keys` -- Qt key codes, translated once
-* :mod:`permuto.menus` -- what the menus are, UI-free
+* :mod:`permuto.menus` -- which key does what, and how the line reads: UI-free
 
 This module keeps the names the rest of the program imports, so ``from
 permuto.ui import viewer`` still reaches the views, their modes and the two
@@ -18,17 +18,19 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QApplication
 
-from ..session import NodeAction, PromptKind, Selection, UiMode
+from ..menus import (FileAction, IridiumAction, Key, MainAction, ProgramAction)
+from ..session import PromptKind, Selection, UiMode
 from .base_view import ViewBase
-from .iridium_view import IriAction, IridiumView, IriPhase
+from .iridium_view import IridiumView, IriPhase
 from .keys import exit_confirmed, feed_prompt
 from .permutograph_view import PermutographView, load_note
+from .prompt import PromptResult
 
 __all__ = ["run", "run_iridium",
            "ViewBase", "PermutographView", "IridiumView",
-           "UiMode", "PromptKind", "NodeAction", "Selection",
-           "IriPhase", "IriAction",
-           "feed_prompt", "exit_confirmed", "load_note"]
+           "UiMode", "PromptKind", "Selection", "IriPhase",
+           "Key", "MainAction", "FileAction", "ProgramAction", "IridiumAction",
+           "PromptResult", "feed_prompt", "exit_confirmed", "load_note"]
 
 
 def _exec(app, view, _drive) -> int:

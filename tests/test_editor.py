@@ -4,7 +4,7 @@ cell anyone filled in.  No Qt here -- that is the point of the class.
 """
 
 from permuto.core.pm import PM
-from permuto.editor import OperatorEditor, OpField
+from permuto.editor import Move, OperatorEditor, OpField
 
 
 def _pm():
@@ -17,7 +17,7 @@ def _pm():
 def test_an_invalid_cycle_keeps_the_cursor():
     pm = _pm()
     ed = OperatorEditor(pm)
-    ed.move("down")                      # Op 1, cycle 1
+    ed.move(Move.DOWN)                      # Op 1, cycle 1
     ed.buffer = "15"                     # a 4-place base has no position 5
     assert ed.commit(), "an invalid cycle must report, not pass silently"
     assert ed.field == OpField(1, 1), "the cursor may not leave a bad cell"
@@ -26,6 +26,6 @@ def test_an_invalid_cycle_keeps_the_cursor():
 
 def test_last_goes_to_the_last_filled_cell_not_the_last_cell():
     ed = OperatorEditor(_pm())
-    ed.move("last")
+    ed.move(Move.LAST)
     assert ed.field == OpField(2, 1)
     assert ed.buffer == "23"

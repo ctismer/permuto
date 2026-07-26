@@ -4,24 +4,27 @@ A thin bypass reusing :mod:`permuto.core.iri`, :mod:`permuto.core.layout` and
 ``render.paint_iridium``, mirroring how ``polytop.mod`` "hacked it in at this
 point": the network is grown one satellite at a time, left to settle, and only
 then does the keyboard mean anything.
+
+Its keys are :data:`permuto.menus.IRIDIUM_MENU`, and what they do is the table
+at the foot of this module.
 """
 
 from __future__ import annotations
 
 from enum import Enum
 
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 
 from ..core import layout
 from ..core.graph import Graph
 from ..core.iri import Iridium
 from ..errors import PermutoError
+from ..menus import IRIDIUM_MENU, IridiumAction
 from ..session import EXIT_QUESTION, UiMode
-from . import render
+from . import keys, render
 from .base_view import ViewBase
 from .keys import exit_confirmed, feed_prompt
-from .prompt import FieldPrompt
+from .prompt import FieldPrompt, PromptResult
 
 SETTLE_STEPS = 180
 
@@ -36,13 +39,6 @@ class IriPhase(Enum):
     BUILD = "build"
     SETTLE = "settle"
     RUN = "run"
-
-
-class IriAction(Enum):
-    """What the Iridium prompt is collecting -- ``PromptKind`` for the /I mode."""
-
-    KILL = "kill"
-    TRANSMIT = "transmit"
 
 
 class IridiumView(ViewBase):
@@ -94,7 +90,7 @@ class IridiumView(ViewBase):
         render.paint_iridium(self.graph, p, self.width(), self.height())
         self._set_chrome_font(p)
         p.setPen(QColor(200, 205, 225))
-        p.drawText(12, 22, "Kill  Transmit  Step  Repeat  Clear      Quit")
+        p.drawText(12, 22, IRIDIUM_MENU.line())
         p.setPen(QColor(255, 230, 140))
         if self.prompt:
             p.drawText(12, self.height() - 14, self.prompt.display())
@@ -117,11 +113,11 @@ class IridiumView(ViewBase):
             self.message = ""
 
     def _prompt_key(self, ev):
-        result = feed_prompt(self.prompt, ev)
-        if result in ("typing", "more"):
-            return            # still filling in -- "transmit" asks for three
-        if result == "submit":
-            self._run_prompt()
+        match feed_prompt(self.prompt, ev):
+            case PromptResult.TYPING | PromptResult.MORE:
+                return       # still filling in -- (T)ransmit asks for three
+            case PromptResult.SUBMIT:
+                self._run_prompt()
         self.prompt = None
         self.ui_mode = UiMode.MAIN
 
@@ -131,41 +127,63 @@ class IridiumView(ViewBase):
             self.phase = IriPhase.RUN
             self.settle = SETTLE_STEPS
             self.message = ""
-        k = ev.text().lower()
-        if ev.key() == Qt.Key_Escape or k == "q":
-            self.ui_mode = UiMode.CONFIRM
-            self.message = EXIT_QUESTION
-        elif k in ("s", " ") or ev.key() == Qt.Key_Space:
-            self.stepbuf += 1
-        elif k == "r":
-            self.iri.step()
-            self.update()
-            self.iri.step()
-            self.iri.repeat_all()
-        elif k == "c":
-            self.iri.reset()
-        elif k == "k":
-            self._begin_prompt(IriAction.KILL, ["Node"])
-        elif k == "t":
-            self._begin_prompt(IriAction.TRANSMIT, ["Node1", "Node2", "Repeat"])
+        action = IRIDIUM_MENU.action(keys.char(ev), keys.named(ev))
+        if action is None:
+            return
+        if action.asks_for_numbers:
+            self._begin_prompt(action)
+        else:
+            _IRIDIUM_ACTIONS[action](self)
 
-    def _begin_prompt(self, action, fields):
+    def _ask_exit(self):
+        self.ui_mode = UiMode.CONFIRM
+        self.message = EXIT_QUESTION
+
+    def _queue_step(self):
+        self.stepbuf += 1        # held down, the key repeats and they queue up
+
+    def _repeat(self):
+        self.iri.step()
+        self.update()
+        self.iri.step()
+        self.iri.repeat_all()
+
+    def _begin_prompt(self, action: IridiumAction):
         self.prompt_action = action
         self.ui_mode = UiMode.PROMPT
+        fields = action.fields
         if len(fields) == 1:
             self.prompt = FieldPrompt(action.value, [(f"{fields[0]}=", True)])
         else:
             self.prompt = FieldPrompt(action.value, [(f, True) for f in fields])
 
     def _run_prompt(self):
-        nums = self.prompt.ints()
         try:
-            if self.prompt_action is IriAction.KILL:
-                self.iri.kill_node(Iridium.num_to_label(nums[0]))
-            elif self.prompt_action is IriAction.TRANSMIT:
-                self.iri.step()
-                self.iri.transmit(Iridium.num_to_label(nums[0]),
-                                  Iridium.num_to_label(nums[1]), nums[2])
+            _IRIDIUM_PROMPTS[self.prompt_action](self, self.prompt.ints())
             self.message = ""
         except PermutoError as exc:
             self.message = str(exc)
+
+    def _kill(self, nums):
+        self.iri.kill_node(Iridium.num_to_label(nums[0]))
+
+    def _transmit(self, nums):
+        self.iri.step()
+        self.iri.transmit(Iridium.num_to_label(nums[0]),
+                          Iridium.num_to_label(nums[1]), nums[2])
+
+
+# -- what each key of IRIDIUM_MENU does ------------------------------------
+
+_IRIDIUM_ACTIONS = {
+    IridiumAction.QUIT: IridiumView._ask_exit,
+    IridiumAction.STEP: IridiumView._queue_step,
+    IridiumAction.REPEAT: IridiumView._repeat,
+    IridiumAction.CLEAR: lambda v: v.iri.reset(),
+}
+
+#: and what the two that collect numbers do once they have them
+_IRIDIUM_PROMPTS = {
+    IridiumAction.KILL: IridiumView._kill,
+    IridiumAction.TRANSMIT: IridiumView._transmit,
+}

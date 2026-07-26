@@ -91,7 +91,7 @@ def test_permutograph_view_paints_in_every_mode(qapp):
         # SelectCard over a node's neighbours
         view.ui_mode = viewer.UiMode.SELECT
         n = 1
-        view.select = viewer.Selection(node=n, action=viewer.NodeAction.BREAK,
+        view.select = viewer.Selection(node=n, action=viewer.ProgramAction.BREAK,
                                        items=list(view.g.nodes[n].links))
         _repaint(view)
         captured["error"] = view._paint_error
@@ -483,13 +483,12 @@ def test_iridium_view_paints_through_build_and_run(qapp):
         # force the network fully built and run a step
         while not view.iri.built:
             view._on_timer()
-        view.phase = "run"
+        view.phase = viewer.IriPhase.RUN
         view.iri.transmit("900", "009")
         view.iri.step()
         _repaint(view)
         # a transmit prompt open
-        view._begin_prompt(viewer.IriAction.TRANSMIT,
-                           ["Node1", "Node2", "Repeat"])
+        view._begin_prompt(viewer.IridiumAction.TRANSMIT)
         view.prompt.type_char("9")
         _repaint(view)
         captured["error"] = view._paint_error

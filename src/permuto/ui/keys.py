@@ -1,40 +1,64 @@
-"""Qt key events, translated once.
+"""Qt key events, translated once -- the only module that knows Qt key codes.
 
-Both views ask the same questions of a key event -- does it confirm the exit
-question, what does it do to a prompt, where does it move the operator cursor
--- and each answer belongs in one place rather than once per view.  This is
-also the only module that has to know Qt's key codes.
+Everything downstream works in :class:`permuto.menus.Key` and characters, so
+the menus, the editor and the prompts stay frontend-neutral: a second frontend
+replaces this file and nothing else.
 """
 
 from __future__ import annotations
 
+from typing import Optional
+
 from PySide6.QtCore import Qt
 
+from ..editor import Move
+from ..menus import Key
 from ..session import confirms_exit
+from .prompt import PromptResult
 
 #: Enter on the main keyboard and Enter on the numeric pad are two key codes
 ENTER_KEYS = (Qt.Key_Return, Qt.Key_Enter)
 
-#: the editor's cursor keys, as :meth:`OperatorEditor.move` names them
-EDIT_MOVES = {Qt.Key_Up: "up", Qt.Key_Down: "down",
-              Qt.Key_Home: "first", Qt.Key_End: "last"}
+_NAMED = {Qt.Key_Escape: Key.ESCAPE,
+          Qt.Key_Return: Key.ENTER,
+          Qt.Key_Enter: Key.ENTER,
+          Qt.Key_Space: Key.SPACE,
+          Qt.Key_Backspace: Key.BACKSPACE,
+          Qt.Key_Up: Key.UP,
+          Qt.Key_Down: Key.DOWN,
+          Qt.Key_Home: Key.HOME,
+          Qt.Key_End: Key.END}
+
+#: where the editor's cursor keys go, as :class:`permuto.editor.Move` names it
+EDIT_MOVES = {Key.UP: Move.UP, Key.DOWN: Move.DOWN,
+              Key.HOME: Move.FIRST, Key.END: Move.LAST}
 
 
-def feed_prompt(prompt, ev) -> str:
+def named(ev) -> Optional[Key]:
+    """The :class:`Key` this event is, or None if it types a character."""
+    return _NAMED.get(ev.key())
+
+
+def char(ev) -> str:
+    """The character this event types, lower-cased -- "" if it types none."""
+    return ev.text().lower()
+
+
+def feed_prompt(prompt, ev) -> PromptResult:
     """Map a Qt key event onto a :class:`FieldPrompt`.
 
-    The one place key events touch a prompt, used by every view -- returns
-    ``"cancel"``, ``"submit"``, ``"more"`` or ``"typing"``.
+    The one place key events touch a prompt, used by every view.
     """
-    if ev.key() == Qt.Key_Escape:
-        return "cancel"
-    if ev.key() in ENTER_KEYS:
+    key = named(ev)
+    if key is Key.ESCAPE:
+        return PromptResult.CANCEL
+    if key is Key.ENTER:
         return prompt.enter()
-    if ev.key() == Qt.Key_Backspace:
+    if key is Key.BACKSPACE:
         prompt.backspace()
-        return "typing"
+        return PromptResult.TYPING
     prompt.type_char(ev.text())
-    return "typing"
+    return PromptResult.TYPING
 
 
 def exit_confirmed(ev) -> bool:
@@ -43,4 +67,4 @@ def exit_confirmed(ev) -> bool:
     The question is asked wherever the original asked it: ESC in the main menu,
     ESC or ``Q`` in the file menu, ESC or ``Q`` in Iridium.
     """
-    return confirms_exit(ev.text(), enter=ev.key() in ENTER_KEYS)
+    return confirms_exit(ev.text(), enter=named(ev) is Key.ENTER)
