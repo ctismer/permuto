@@ -117,8 +117,17 @@ pgl4, pgl5, pgl6, reflekt4, reflekt5, test, triprism, zykel`.
 `polytop.mod` deliberately uses no `REAL` (comment 17.12.91: *"absolutely no
 more REAL necessary. 11k code saved"*).
 
-**Fixed point** (`IntVector`): `Norm = 4096` is treated as `1.0`. `Scale(x,mul,div)
-= x*mul DIV div` is the fixed-point multiply; `Sqr`/`Sqrt` are integer.
+**Fixed point** (`IntVector`): one value is treated as `1.0` — `Norm = 4096` in
+the original (the most a 16-bit `INTEGER` can square without overflowing), the
+port uses `NORM = 2**24` because it computes in 32 bit and 12 bits of fraction
+visibly quantised the relaxation. `Scale(x,mul,div) = x*mul DIV div` is the
+fixed-point multiply; `Sqr`/`Sqrt` are integer.
+
+Coordinates therefore always live at *some* scale, and anything much smaller
+than `NORM` projects to a single dot. `layout.frame()` establishes the scale and
+is called by every producer of coordinates — `Graph.random_init`,
+`PM.new_permutograph` for a fresh graph, and `Session` for whatever a session
+file brought along (a 1995 `.ply` carries `Norm = 4096` coordinates).
 
 **Rotation** (`PCalc.Spin`): small fixed angle per step in the (1,3) plane:
 ```
@@ -167,10 +176,14 @@ legacy/                  # the recovered Modula-2 original (delete when done)
   mail-fragments/        # the individually e-mailed SPA fragments (duplicates)
 src/permuto/
   perms.py               # NextPerm                              [done]
-  gen/                   # genperm, operate, num2, pipeline       [done, verified]
-  formats/               # .pg/.nod/.pgd readers                  [done]
-  core/                  # IntVector, NodeMgr(graph), PCalc(layout), PmProgs(spa) [done, tested]
-  ui/                    # PySide6 2D-projection viewer + PNG renderer [done]
+  gen/                   # genperm, operate, num2, pipeline, geodesic,
+                         # factorize, vierdrei                    [done, verified]
+  formats/               # .pg/.nod/.pgd readers, .ply (read), .pms, PostScript [done]
+  session.py             # polytop.mod's modes, toggles, main loop -- UI-free  [done]
+  core/                  # IntVector, NodeMgr(graph), PCalc(layout), PmProgs(spa),
+                         # PM (operator table + editing), Iri (SIMONE) [done, tested]
+  ui/                    # PySide6 viewer (menus, editor, /I mode) + PNG renderer [done]
+  studies/               # standalone experiments: kugel (colour/dither)  [done]
 tests/                   # golden tests vs legacy/modula/nod/*
 docs/ARCHITECTURE.md
 ```
@@ -195,22 +208,18 @@ coordinates `int`. *Done:*
 Verified emergent behaviour: relaxing the icosahedron from 8-D lets the
 dimensions "fall" to 3-D (`tools/relax_demo.py`).
 
-The permutograph **viewer core** is done. The program as a whole is **not**
-feature-complete — see `docs/PORT-GAPS.md` for the verified gap list.
+**Phase 2 — parity — is essentially reached.** Ported since: `PM`'s interactive
+editing and the **operator editor**, the whole menu/keyboard system
+(single-step, file and program submenus, `UserIO`'s input primitives), the
+`.ply` session format plus the text `.pms` that replaced it for saving, the
+PostScript preamble, `Iri`/SIMONE with its `/I` mode, and the AWK generators
+(`makeikos`, `trunc`, `vierdrei`). What is left are drawing details —
+see `docs/PORT-GAPS.md`, which tracks them individually.
 
-Still to port (phase 2, "reach parity"):
-* `PM`'s interactive editing — the **operator editor** (base + 6 operators × 3
-  cycles), Connect/Disconnect/Collapse/Uncollapse, `PermName`/`PermCache`;
-* the menu/keyboard system from `polytop.mod`, including single-step mode, the
-  file submenu and the full program submenu, plus `UserIO`'s input primitives;
-* the `.ply` binary session format and the PostScript preamble `plots/poly.pre`;
-* the missing `PmDisp` details (operator digit on edges, direction discs,
-  dead/active node styling, EGA-pixel sizes scaled to today's picture area);
-* `Iri` — the Iridium/SIMONE satellite routing simulation (`/I` mode);
-* `makeikos.awk` — the geodesic icosahedron generator (frequency 1..12).
-
-Genuinely out of scope (verified standalone experiments): `kugel`, `ham1`,
-`h`, `pmtest`, `pm5`. `TextPlot`/`ScreenHandler`/`MiniFont` are DOS
+Not viewer features (verified standalone experiments): `ham1`, `h`, `pmtest`,
+`pm5`; `kugel` was too, and is ported anyway as `studies/kugel.py` — the 1991
+colour study, the one piece that keeps its floating point.
+`TextPlot`/`ScreenHandler`/`MiniFont` are DOS
 text-on-graphics infra replaced by Qt (`MiniFont` was a fixed-width 6×8 cell —
 the replacement must be monospace and scaled to look the same size);
 `Utilities` (`SetZero`, `nl`) inlined.

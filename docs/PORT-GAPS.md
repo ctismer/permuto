@@ -1,9 +1,10 @@
 # Port gaps — what the Python port still owes the Modula-2 original
 
-Status: **the port is not feature-complete.** Phase 1 delivered the viewer
-core (generation, relaxation, projection, SPA/ParSum, PostScript). This
-document lists, verified against `legacy/modula/`, everything the original
-can do that the port cannot yet.
+Status: **parity is reached, nothing is open.** Every mode, menu, program,
+drawing detail and generator of the original exists in the port. This document
+is no longer a work plan; it stays as the record of what the original did, with
+the byte-level formats and decoded behaviour that made the port possible, all
+verified against `legacy/modula/`.
 
 Rule for this phase: **reach parity first.** Improvements beyond the original
 are welcome afterwards — with the single exception of error handling, where
@@ -14,19 +15,24 @@ the original's behaviour is not portable (see §0).
 | § | Item | State |
 |---|---|---|
 | 0 | Error handling (`permuto/errors.py`) | **done** |
-| 1 | Operating modes (Polytop / `/PG` / `/I`) | open — §5 |
-| 2 | Menu, keys, status lines, single-step | open |
+| 1 | Operating modes (Polytop / `/PG` / `/I`) | **done** |
+| 2 | Menu, keys, status lines, single-step (`session.py`, `ui/viewer.py`) | **done** |
+| 2 | `ESC` = `UserWantsToExit()` confirmation prompt | **done** |
 | 3 | `.ply` binary session format (`formats/plyfile.py`) | **done** |
-| 3 | PostScript preamble shipped with the export | open |
-| 4 | Program submenu (kill/break/collapse/uncollapse) — model in `core/pm.py` | model **done**, UI open |
+| 3 | File submenu (quit / PostScript out / load / save) | **done** |
+| 3 | PostScript preamble shipped with the export (`formats/poly.pre`) | **done** |
+| 4 | Program submenu (kill/break/collapse/uncollapse) — model + UI | **done** |
 | 5 | `PM` model: naming, build, runtime editing (`core/pm.py`) | **done** |
-| 5 | Operator editor UI | open |
-| 6 | Drawing details, EGA sizes scaled | open |
+| 5 | Operator editor UI | **done** |
+| 6 | Drawing: operator digit, dead/active nodes, screen sizes scaled | **done** |
+| 6 | Direction discs (`TrueDisc`) for `L_input`/`L_output` | **done** |
+| 6 | Labels black and centred in the ball | **done** |
 | 7 | Iridium / SIMONE — simulation (`core/iri.py`) | **done** |
 | 7 | Iridium / SIMONE — `/I` mode UI (`run_iridium`) | **done** |
 | 8 | `makeikos` geodesic generator (`gen/geodesic.py`) | **done** |
 | 8 | `trunc` factorisation (`gen/factorize.py`), `vierdrei` (`gen/vierdrei.py`) | **done** |
 | 9 | `UserIO` input primitives | **done** (one `FieldPrompt`) |
+| 9 | `InputStr`'s overwrite typing (port appends; Ins/Del/←/→ absent) | n/a — not wanted |
 | + | Text session format `.pms` (better than `.ply`) | **done** |
 
 What is done is verified against the original data, not just against
@@ -34,6 +40,12 @@ invariants: `PM` reproduces the permutations, edges *and* operator numbers of
 all eight `.ply` files; the geodesic generator is isomorphic to all twelve
 `ikosa*.nod`; `vierdrei` and the factorisation match their `.nod` edge sets
 exactly; `.ply` round-trips byte-for-byte apart from uninitialised padding.
+
+Deliberate deviations, beyond §0's error handling: the depth cue dims the back
+*edges* instead of the original's `colour + 8` palette trick (the balls do use
+it), `N` skips the display mode until a program has filled it (the original's
+own reason for skipping the perm mode, applied once more), and the viewer saves
+`.pms` text rather than a memory dump.
 
 Earlier versions of `HANDOVER.md` / `ARCHITECTURE.md` declared the interactive
 layer, the operator editor and `Iri` "intentionally not ported / out of
@@ -64,16 +76,16 @@ PySide6 layer catches and displays. Never terminate the process.
 
 ## 1. Operating modes
 
-The original is one program with three modes; the port only has the first.
+The original is one program with three modes; the port has all three.
 
 | Mode | Start | Port |
 |---|---|---|
-| Polytop | `polytop <file.nod>` — load a finished graph | **done** |
-| Permutograph | `polytop /PG` — build permutographs interactively, default base `1234`, ops `12 23 34` | **missing** |
-| Iridium | `polytop /I` | **missing** |
+| Polytop | `polytop <file.nod>` — load a finished graph | `permuto show <name>` |
+| Permutograph | `polytop /PG` — build permutographs interactively, default base `1234`, ops `12 23 34` | `permuto` (no argument) |
+| Iridium | `polytop /I` | `permuto iridium` |
 
-Also missing: `Running = FALSE` is the **start state** — every iteration
-blocks on a keypress, so any unbound key single-steps the relaxation.
+`Running = FALSE` is the **start state**: every iteration blocks on a keypress,
+so any unbound key single-steps the relaxation. Reproduced.
 
 ## 2. Main menu, keys and status lines (`polytop.mod`)
 
@@ -84,19 +96,35 @@ Bottom line: `iter=<n> dim=<d> nodes=<n>  A=<algorithm>`
 |---|---|---|
 | `A` | cycle algorithm (Rubber, Rubber2, Ribbon, Mean, New) | done |
 | `C` | calculating on/off | done |
-| `R` | running (continuous) on/off | **missing** (no single-step mode) |
+| `R` | running (continuous) on/off | done |
 | `S` | spinning on/off | done |
-| `H` | HurryUp — draw seldom, suppress spin while calculating | **missing** |
-| `N` | NameMode 0..3 cycle (none / node# / perm / display); mode 2 skipped unless Permuto | partly |
-| `F` | file submenu | **missing** |
-| `P` | program submenu | partly |
-| `E` | operator editor (Permuto only) | **missing** |
+| `H` | HurryUp — draw seldom, suppress spin while calculating | done |
+| `N` | NameMode 0..3 cycle (none / node# / perm / display); mode 2 skipped unless Permuto | done; mode 3 skipped too until SPA has run |
+| `F` | file submenu | done |
+| `P` | program submenu | done |
+| `E` | operator editor (Permuto only) | done |
 | `M` | collapse mask (`EdCollapseMask` is commented out in the original — resets `Iteration` only) | n/a |
-| `ESC` | `UserWantsToExit()` — accepts `y/Y`, `j/J`, `o/O`, Enter | **missing** |
+| `ESC` | `UserWantsToExit()` — accepts `y/Y`, `j/J`, `o/O`, Enter | done |
 
-## 3. File submenu `(Q)uit (O)utput (L)oad (S)ave` — all missing
+`UserWantsToExit` (`userio.mod:17`) asks `Do You want to exit? (Y/N)` and takes
+yes in three languages plus a bare Enter; anything else carries on. It guards
+every way out: `ESC` in the main menu (`polytop.mod:431`), `ESC`/`Q` in the file
+menu (`:443`) — note that the file menu's **(Q)uit ends the program**, it is not
+a way back — and `ESC`/`Q` in Iridium (`:773`). One `exit_confirmed()` in
+`ui/viewer.py` serves all three.
 
-> **Open question on the format itself.** `SavePoly` is a raw memory dump
+`HurryUp` is "compute fast, look seldom", and both halves matter:
+`polytop.mod:299` skips the spin while calculating, and `:315` draws only at the
+25-iteration checkpoints. In a Qt timer the second half is not free — one
+`tick()` per timer event would make the switch pure loss — so the viewer runs
+iterations until `tick()` asks for a redraw (`_run_a_frame`).
+
+## 3. File submenu `(Q)uit (O)utput (L)oad (S)ave` — done
+
+The open question below has been decided: the viewer **reads** `.ply` and
+**writes** `.pms`, a line-oriented text format (`formats/pmsfile.py`).
+
+> **The question, as it stood.** `SavePoly` is a raw memory dump
 > (`FIO.WrBin` of `SIZE(NodeType)`), and its purpose was to preserve the
 > *relaxed* state — `.nod` holds only topology, while settling into the final
 > 3-D shape takes hundreds of iterations. In 1995 a dump was the cheapest way
@@ -132,17 +160,17 @@ Bottom line: `iter=<n> dim=<d> nodes=<n>  A=<algorithm>`
   Faces' *Itchycoo Park* (1967), adopted without understanding it, then
   forgotten — recovered here in 2026.
 
-## 4. Program submenu — partly missing
+## 4. Program submenu — done
 
 Menu line: `Kill/Repair (N)ode / (L)ine   run (S)PA  SP(T)A  (P)ARSUM`
 (`(C)ollapse` and `(U)ncollapse` exist but are not advertised.)
 
 | Key | Action | Port |
 |---|---|---|
-| `N` | toggle `state.dead` on a node | **missing** |
-| `L` | toggle `state.broken` on an edge — node 1 typed, neighbour picked with `SelectCard` | **missing** |
-| `C` | `PM.Collapse(n1, n2)` — merge n1 onto n2 | **missing** |
-| `U` | `PM.Uncollapse(n1)` — restore canonical edges via `ExecOperator` | **missing** |
+| `N` | toggle `state.dead` on a node | done |
+| `L` | toggle `state.broken` on an edge — node 1 typed, neighbour picked with `SelectCard` | done |
+| `C` | `PM.Collapse(n1, n2)` — merge n1 onto n2 | done |
+| `U` | `PM.Uncollapse(n1)` — restore canonical edges via `ExecOperator` | done |
 | `S` | SPA from a start node | done |
 | `T` | SPTA — the original itself says "sorry, SPTA not yet available" | n/a |
 | `P` | ParSum (requires a prior SPA run) | done |
@@ -150,11 +178,14 @@ Menu line: `Kill/Repair (N)ode / (L)ine   run (S)PA  SP(T)A  (P)ARSUM`
 Before the menu appears the original draws node numbers on **both** video
 pages so the user can read the number to type.
 
-## 5. Operator editor (`pm.mod`) — missing entirely
+## 5. Operator editor (`pm.mod`) — done
 
 Permanently visible right of the picture (row 4, column 64); `E` enters edit
 mode. One base line + 6 operators × 3 cycles = 19 fields (`MaxOps=6`,
-`MaxCyc=3`).
+`MaxCyc=3`). In the port: `render.paint_operator_panel` draws it,
+`viewer._edit_key` / `_leave_edit` run it, `session.rebuild_permutograph`
+finishes it. The section below stays because it documents *why* the editor
+behaves as it does.
 
 **How the solids actually arise** (decoded from the surviving `.ply` headers,
 all of which are `Permuto = TRUE`): through **multiset bases**. Repeated
@@ -203,42 +234,83 @@ bisection), `PermBasisValid`, `FindBase`, `ValidCycle`, `CyclicOperate`,
 `Connect`, `Disconnect`, `Collapse`, `Uncollapse`, `NewPermutograph`,
 `PolytopFilter` (currently a stub returning `TRUE`).
 
-## 6. Drawing (`PmDisp`) — missing details
+## 6. Drawing (`PmDisp`) — done
 
 - Operator digit at each edge midpoint, on a `BackColor` rectangle punched out
   of the edge (suppressed in Iridium mode).
-- Direction discs (`Graph.TrueDisc`, r=3) at 1/6 of the edge for
+- Direction discs (`Graph.TrueDisc`, 3) at 1/6 of the edge for
   `L_input`/`L_output` — near own node for input, near neighbour for output.
+  Colour says *that* an edge carries the wave, the disc says *which way*.
 - Broken edges drawn black; `L_input`/`L_output` green, `L_locked` red.
-- Depth cue `colour + 8` when `Dimensions >= 3` and `z + zz > 0`.
-- Node diameter by NameMode: `0→5`, `1→9`, `2→12`, `3→9`.
+- Depth cue `colour + 8` when `Dimensions >= 3` and `z + zz > 0` — the port
+  dims the back edges instead; there is no 16-entry DOS palette to index into.
+- Node size by NameMode: `0→5`, `1→9`, `2→12`, `3→9`.
+- Ball colour is the node's own `color`, with `(color+8) MOD 16` for the front
+  half. `color` comes from `Str.Pos(BasePerm, perm[0]) + 1` in permutograph mode
+  (`pm.mod:352`), so it groups the permutations by first character, and from
+  `1 + (num-1) DIV 6`, resp. `DIV 24` past 24 nodes, for a `.nod` graph
+  (`polytop.mod:218`, the author's own comment: *"awkward"*).
 - Dead nodes hollow (background disc + black circle); active nodes get an
-  extra white circle at `diam+1`; labels always black, centred in the ball.
+  extra white circle one pixel out; labels **always black**, centred in the
+  ball (`PlotCenteredStr(px, py, str, 0)`), on the node's palette colour.
 
-### Everything above is in EGA pixels — scale it
+  Do not "improve" this. Choosing the ink per ball by brightness or by WCAG
+  contrast, and levelling the balls into one light band, were all tried on
+  screen in July 2026 and rejected: the picture is meant to look like this.
 
-All the numbers in this section (font cell, node diameters, disc radius 3, the
-8×10 punch-out rectangle, line widths) are absolute pixels on a 640×350 EGA
-screen, where the drawing area `_pic` was **479×320** (`pmdisp.def`). They must
-be scaled to today's drawing area, or they shrink to illegibility in a large
-window. Take the *apparent* size of the original as the target:
+### `TrueDisc`'s third argument is a **radius**
+
+`Graph` is a library module and its source did not survive, so the sizes above
+had to be read off the calls. Two things settle it: `TrueCircle(px, py, diam+1)`
+rings a ball drawn at `diam`, which is only visible if the number is a radius;
+and a four-character perm string in the 6×8 font cell is 24 px wide, so it fits
+inside `diam = 12` exactly when that 12 is a radius. `PlotCenteredStr` puts it
+there — the ball is sized around its label. Reading the number as a diameter
+gives balls at half size with labels spilling out.
+
+### Everything above is in the original's screen pixels — scale it
+
+All the numbers in this section (font cell, node radii, disc radius 3, the
+8×10 punch-out rectangle, line widths) are absolute pixels on the original's
+screen: a **VGA** card in a 640×350 16-colour mode, where the drawing area
+`_pic` was **479×320** (`pmdisp.def`). `ScreenHandler`'s source is lost, but the
+geometry pins the mode down: `_scanlines = 350`, and `AspectX/AspectY = 350/480`
+is exactly that mode's non-square pixel ratio — which is why a picture 479 wide
+and 320 high came out square on screen. (`ham1.mod` and `kugel.mod` say it
+outright: *"VGA-Karte nötig"*.)
+
+The resolution is compiled in, but the **video pages are not**: the group ran
+VGA and Super-VGA cards, and `polytop.mod:671` asks
+`Graph.GetVideoConfig` for `numvideopages`. With more than one page the program
+double-buffers — *"screen is built hidden and then shown"* — and `PagesToPrint`
+makes sure a change is redrawn onto both pages before it stops. That is the one
+place the program adapts to the card, and it needs no port: Qt composites
+off-screen anyway.
+
+The sizes must be scaled to today's drawing area, or they shrink to
+illegibility in a large window. Take the *apparent* size of the original as the
+target:
+
+`render._scaled()` does that mapping, and `render.UI_SCALE` is the single knob
+for the whole UI's apparent size (a faithful 1.0 reads a touch large today).
 
 | Original | Fraction of `_pic` | At a 900 px drawing area |
 |---|---|---|
 | font cell 6×8 | 1.25 % w × 2.5 % h | ≈ 11 × 22 px |
-| node diameter 12 (perm labels) | 3.75 % h | ≈ 34 px |
-| node diameter 9 / 5 | 2.8 % / 1.6 % h | ≈ 25 / 14 px |
+| node radius 12 (perm labels) | 3.75 % h | ≈ 34 px |
+| node radius 9 / 5 | 2.8 % / 1.6 % h | ≈ 25 / 14 px |
 | direction disc r = 3 | 0.94 % h | ≈ 8 px |
 
 `minifont.mod` is **lost** (only `minifont.obj` survives), so the glyphs cannot
 be reproduced byte-exact. What mattered about it was that it was a
 **fixed-width 6×8 cell** — so the replacement must be a monospace Qt font,
 sized so that a character occupies the same fraction of the picture as it did
-on EGA. Not "a small font": a proportionally large one.
+on the 479×320 original. Not "a small font": a proportionally large one.
 
-## 7. Iridium / `Iri` — missing entirely
+## 7. Iridium / `Iri` — done
 
-Own module (`core/iri.py`), independent of the permutograph generator.
+Own module (`core/iri.py`), independent of the permutograph generator; the
+`/I` mode is `viewer.run_iridium`.
 
 The intro calls it **SIMONE V1.4**. Per the author (2026-07-24): "damals war ich
 in Simone etwas verknallt. ich habe mein programm deshalb SIMulation ONE
@@ -285,9 +357,9 @@ reproduce the bugs silently; document each:
 6. The neighbour sum before division can reach 60000 — fits a 16-bit CARDINAL
    only because the triangular grid has ≤ 6 links. Document, don't reproduce.
 
-## 8. Generators and graph tools
+## 8. Generators and graph tools — done
 
-None of these are ported. All are AWK, none depend on the Modula code.
+All AWK, none depend on the Modula code; all three are now in `gen/`.
 
 * **`makeikos.awk`** — geodesic icosahedra, frequency 1..12 (`10f²+2` nodes).
   `nod/ikosa1..12.nod` are frozen outputs; `ikosa2` is used by
@@ -319,22 +391,51 @@ order. Without TAWK's hash function the numbering cannot be reconstructed. The
 *graph* is well defined, so the port checks isomorphism against the originals
 instead, which is the stronger statement anyway.
 
-## 9. Input layer (`UserIO`) — no equivalent yet
+## 9. Input layer (`UserIO`) — one `FieldPrompt`
 
 `InputStr(S, allowed, exit)` (character filter, Home/End/←/→/Del/Backspace,
 Ins toggle, overwrite by default), `ReadInt/ReadLong/ReadReal(min, max, prec)`
 (range handling — see §0), `SelectCard(a, len)` (cycle a list with space,
 1-based result), `UserWantsToExit()`. Functionality matters, not the DOS
-look — Qt validators and an input line in the viewer are the equivalent.
+look — `ui/prompt.py`'s `FieldPrompt` and the viewer's input line are the
+equivalent, and node picking uses `SelectCard`'s space/Enter cycle.
+
+One thing is deliberately **not** reproduced: `InputStr`'s cursor and its
+overwrite-by-default typing. Editing a field is append + Backspace, so retyping
+a base means clearing it first. That was a DOS-terminal habit, not a feature of
+the program (decided 2026-07-26) — and with it the last open item is closed.
 
 ---
 
-## Out of scope (verified: standalone experiments, not viewer features)
+## Not viewer features (verified: standalone experiments)
 
-`ham1.mod` (Hamiltonian circle search, 4 algorithms, imports no project
-module), `h.mod` (one-off count — "85477800 Wege der Länge 17 gibt es ab
-Knoten 1", result is in the comment), `kugel.mod` (Floyd-Steinberg dithered
-sphere, unrelated), `pm5.mod`/`pm5_221.mod` (brute-force variant; differs only
-in the start permutation), `pmtest.mod` (ranking experiment with a documented
-failure), `inzidenz.m` (Mathematica helper), `lj`/`ljtest.pas` (PCL printer
-test), `num.awk` (superseded by `num2.awk`).
+None of these import a project module, so none of them is needed for parity.
+That does not make them worthless — see `kugel` below.
+
+`ham1.mod` (Hamiltonian circle search, 4 algorithms), `h.mod` (one-off count —
+"85477800 Wege der Länge 17 gibt es ab Knoten 1", result is in the comment),
+`pm5.mod`/`pm5_221.mod` (brute-force variant; differs only in the start
+permutation), `pmtest.mod` (ranking experiment with a documented failure),
+`inzidenz.m` (Mathematica helper), `lj`/`ljtest.pas` (PCL printer test),
+`num.awk` (superseded by `num2.awk`).
+
+### `kugel.mod` — ported anyway, as `studies/kugel.py`
+
+The author's 1991 study in getting a natural-looking lit sphere out of 14
+colours: a hand-mixed deep-red-to-pink-white ramp, plus two ways of hiding the
+quantisation — an ordered 4×4 dither (the pattern copied off the Windows 3.0
+setup screen and drawn into the source as ASCII) and Floyd-Steinberg error
+diffusion with a noise "Shake". One octant is computed and mirrored eight ways,
+with the loops starting two pixels early so the error buffer is charged before
+the visible part begins — that is what keeps the octant boundaries seamless.
+
+It is the only place in the 1995 source that uses floating point, and the port
+keeps it that way. Two things are documented rather than reproduced: the
+ordered-dither branch kept the error arrays up to date but overwrote the
+accumulated value first, so those stores never reached a pixel; and `Lib.RANDOM`
+is source-less, so the shake takes a `seed` — same idea, different numbers,
+and reproducible.
+
+`permuto kugel [out.png] [size] [--floyd]`. The study is Qt-free and returns
+palette indices; `render.indexed_image()` turns those into pixels and knows
+nothing about spheres.

@@ -9,3 +9,8 @@ __pycache__/
 /*.pms
 /*.ply
 /xanti
+
+# pictures written by the CLI into the working directory (render, export,
+# kugel). The ones in docs/demo/ are project data and stay tracked.
+/*.png
+/*.ps
