@@ -40,7 +40,9 @@ def _press(view, ch):
     from PySide6.QtGui import QKeyEvent
 
     special = {"esc": Qt.Key_Escape, "enter": Qt.Key_Return,
-               "back": Qt.Key_Backspace}
+               "back": Qt.Key_Backspace, "space": Qt.Key_Space,
+               "up": Qt.Key_Up, "down": Qt.Key_Down,
+               "home": Qt.Key_Home, "end": Qt.Key_End}
     if ch in special:
         view.keyPressEvent(QKeyEvent(QKeyEvent.KeyPress, special[ch],
                                      Qt.NoModifier, ""))
@@ -583,3 +585,159 @@ def test_no_names_means_no_operator_numbers_on_the_edges(qapp):
     assert captured["silent"] == 0, \
         "with nothing written, the links must be bare too"
     assert captured["named"] > 0, "with names, the operator numbers are back"
+
+
+def _type(view, text):
+    """Type a whole string into the open prompt, one key at a time."""
+    for ch in text:
+        _press(view, ch)
+
+
+def _black_pixels_on_edge(view, n1, n2):
+    """Near-black pixels along the middle of an edge -- what PmDisp draws a
+    broken line in.  Measured with nothing written (NameMode.NONE), where the
+    only black in the picture is a broken edge; the background sums to 64, an
+    operator colour to far more, so a low sum can only be ink.
+    """
+    from permuto.ui import render
+
+    img = _repaint(view)
+    pic_w = view.width() - (260 if view.session.permuto else 0)
+    pts = render.project(view.g, pic_w, view.height())
+    x1, y1, _z1 = pts[n1]
+    x2, y2, _z2 = pts[n2]
+    hits = 0
+    for k in range(7, 14):
+        t = k / 20
+        x, y = round(x1 + (x2 - x1) * t), round(y1 + (y2 - y1) * t)
+        if 0 <= x < img.width() and 0 <= y < img.height() \
+                and sum(_rgb(img, x, y)) < 30:
+            hits += 1
+    return hits
+
+
+def test_breaking_a_line_needs_two_steps_and_blackens_that_edge(qapp):
+    """P -> L asks for one end by number, then SelectCard walks the neighbours
+    with space and Enter breaks the edge -- which PmDisp draws black.  The same
+    keys again repair it, so the picture must come back."""
+    captured = {}
+
+    def break_the_line(view):
+        _press(view, "p")                 # program menu
+        _press(view, "l")                 # break/repair a line
+        _press(view, "1")                 # node 1, as ReadInt wants it
+        _press(view, "enter")
+        _press(view, "space")             # walk on to the next neighbour
+        chosen = view.select.current       # the one the status line offers
+        _press(view, "enter")
+        return chosen
+
+    def drive(view):
+        view.resize(900, 800)
+        for _ in range(60):
+            view.session.tick()
+        other = break_the_line(view)
+        captured["broken"] = _black_pixels_on_edge(view, 1, other)
+        captured["mode"] = view.ui_mode
+        captured["marks"] = set(view.g.nodes[1].state.broken)
+        assert break_the_line(view) == other, "the same neighbour, second time"
+        captured["repaired"] = _black_pixels_on_edge(view, 1, other)
+        view.close()
+
+    viewer.run("1234", operators=["12", "+", "23", "+", "34"], _drive=drive)
+    assert captured["broken"] > 0, "a broken edge must be drawn black"
+    assert captured["repaired"] == 0, "the same keys must repair it again"
+    assert captured["marks"], "the mark belongs on the node, not just on screen"
+    assert captured["mode"] is viewer.UiMode.MAIN, "the menu must close"
+
+
+def test_the_file_menu_works_with_the_name_actually_typed_in(qapp, tmp_path):
+    """F->S, F->O and F->L with the file name typed key by key, which is the
+    only way a user reaches them."""
+    saved = tmp_path / "typed"
+    ps = tmp_path / "picture.ps"
+    captured = {}
+
+    def drive(view):
+        for _ in range(40):
+            view.session.tick()
+        _press(view, "f")
+        _press(view, "s")
+        _type(view, str(saved))
+        _press(view, "enter")
+        captured["save"] = view.message
+
+        _press(view, "f")
+        _press(view, "o")
+        _type(view, str(ps))
+        _press(view, "enter")
+        captured["ps"] = view.message
+
+        _press(view, "f")
+        _press(view, "l")
+        _type(view, str(saved) + ".pms")
+        _press(view, "enter")
+        captured["load"] = view.message
+        captured["nodes"] = view.g.nnodes
+        captured["mode"] = view.ui_mode
+        view.close()
+
+    viewer.run("1234", operators=["12", "+", "23", "+", "34"], _drive=drive)
+    assert (tmp_path / "typed.pms").is_file(), captured["save"]
+    assert captured["save"].startswith("saved")
+    assert ps.is_file() and ps.read_bytes().rstrip().endswith(b"Finish")
+    assert captured["ps"].startswith("wrote")
+    assert captured["load"].startswith("loaded")
+    assert captured["nodes"] == 24, "the saved graph came back"
+    assert captured["mode"] is viewer.UiMode.MAIN
+
+
+def test_the_editor_cursor_keys_reach_the_right_cells(qapp):
+    """E opens on the base, Down steps into the table, End goes to the last
+    cell anyone filled in (not the last cell there is), Home back to the base."""
+    from permuto.editor import BASE_FIELD, OpField
+
+    captured = {}
+
+    def drive(view):
+        _press(view, "e")
+        captured["opened"] = (view.editor.field, view.editor.buffer)
+        _press(view, "down")
+        captured["down"] = (view.editor.field, view.editor.buffer)
+        _press(view, "end")
+        captured["end"] = (view.editor.field, view.editor.buffer)
+        _press(view, "home")
+        captured["home"] = view.editor.field
+        _press(view, "esc")
+        captured["left"] = (view.ui_mode, view.editor)
+        view.close()
+
+    viewer.run("1234", operators=["12", "+", "23", "+", "34"], _drive=drive)
+    assert captured["opened"] == (BASE_FIELD, "1234")
+    assert captured["down"] == (OpField(1, 1), "12")
+    assert captured["end"] == (OpField(3, 1), "34")
+    assert captured["home"] == BASE_FIELD
+    assert captured["left"] == (viewer.UiMode.MAIN, None)
+
+
+def test_the_toggle_keys_move_their_own_flag_in_the_menu_line(qapp):
+    """C, R, H and S each own one T/F in the top line -- a dispatch table that
+    sent a key to the wrong handler would show up here."""
+    captured = {}
+
+    def drive(view):
+        captured["start"] = view._top_line()
+        for key in "crhs":
+            _press(view, key)
+        captured["toggled"] = view._top_line()
+        captured["alg_before"] = view.session.status_line()
+        _press(view, "a")
+        captured["alg_after"] = view.session.status_line()
+        view.close()
+
+    viewer.run("1234", operators=["12", "+", "23", "+", "34"], _drive=drive)
+    for flag in ("(C)alc T", "(R)un F", "(H)urry F", "(S)pin T"):
+        assert flag in captured["start"], captured["start"]
+    for flag in ("(C)alc F", "(R)un T", "(H)urry T", "(S)pin F"):
+        assert flag in captured["toggled"], captured["toggled"]
+    assert captured["alg_before"] != captured["alg_after"], "A steps the algorithm"
