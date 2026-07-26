@@ -16,10 +16,12 @@ alongside for reference until the port is complete.
   - `perms.py`, `gen/` (genperm, operate, num2, pipeline), `formats/`
   - `core/` — NodeMgr, PM, PmProgs, IntVector, PCalc, Iri — UI-free
   - `session.py` — modes, menu state and main loop, also UI-free
-  - `menus.py`, `editor.py`, `loader.py` — which key does what, the operator
-    cursor, and what a name on the command line resolves to; all UI-free
+  - `menus.py`, `scene.py`, `editor.py`, `loader.py` — which key does what,
+    what is in the picture, the operator cursor, and what a name on the command
+    line resolves to; all UI-free
   - `ui/` — PySide6: `permutograph_view`, `iridium_view`, `base_view`,
-    `keys` (the only module that knows Qt key codes), `render`, `prompt`
+    `keys` (the only module that knows Qt key codes), `render` (five drawing
+    loops over a `Scene`), `prompt`
   - `studies/` — standalone experiments: `kugel` (the 1991 colour study).
     Keep these free of viewer imports, in both directions.
 - `tests/` — golden tests: regenerate `legacy/modula/nod/*` and compare

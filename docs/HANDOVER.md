@@ -180,40 +180,53 @@ three as expected behaviour.
 ### Measured
 
 ```
-src     main 5071 -> 5928
-tests   main 2519 -> 3532   (+1013)
-coverage  92% -> 93%,  menus.py 100%, loader.py 84% -> 100%
-Qt-bound (every file that imports PySide6)  1229 -> 1239  = 24% -> 21% of src
-ui/viewer.py  829 -> 53   (+ base_view 85, permutograph_view 394,
-                             iridium_view 189, keys 70, menus 283 UI-free)
+src     main 5071 -> 6038
+tests   main 2519 -> 3835   (+1316)
+coverage  92% -> 93%,  menus.py and scene.py 100%, loader.py 84% -> 100%
+Qt-bound (files under ui/ that import PySide6)  main 1229 -> 992  = 24% -> 16%
+ui/viewer.py  829 -> 53    (+ permutograph_view 394, iridium_view 189,
+                              base_view 85, keys 70)
+ui/render.py  444 -> 201   (+ scene.py 346, UI-free)
 ```
 
 The refactor did **not** make the code shorter. What moved is where the logic
-lives and whether a mistake is caught: the Qt-bound surface barely changed in
-size but is now five named files instead of two, and the part a second frontend
-would have to rewrite is `ui/keys.py` plus the painting.
+lives and whether a mistake is caught. The Qt-bound part is down by a fifth and
+is now six named files instead of two; what a second frontend would have to
+rewrite is `ui/keys.py` and five drawing loops, because `menus.py`, `scene.py`,
+`session.py`, `editor.py` and `loader.py` are all frontend-neutral.
 
 ### What to do next, in this order
 
-1. **`ui/render.py` (82%) — the direction discs are never drawn** in any test.
-   They are a deliberate addition of the port (PORT-GAPS §6: colour says *that*
-   an edge carries the wave, the disc says *which way*). Dead nodes (hollow
-   ball, black rim) and the white ring on active ones are unpainted too — that
-   is the visible result of `P`→`N`, itself an untested key path.
-2. **`formats/pmsfile.py` (88%) — the refusals.** The open lines are the
+1. **`formats/pmsfile.py` (88%) — the refusals.** The open lines are the
    `FileFormatError` branches. "Reject with a reason instead of swallowing it"
    is the port's stated advantage over the original; nobody checks the reasons
    arrive.
-3. **Have someone else read the branch diff** before it lands on `main`.
+2. **Have someone else read the branch diff** before it lands on `main`.
+
+Done since: the loader rules (three defects, see the table above) and
+`ui/render.py`, which turned into `scene.py` + five drawing loops — the
+direction discs, the hollow dead ball and the white ring now have tests on both
+sides, what the scene says and what reaches the pixels.
 
 ### How to read a "coverage hole" on this list
 
-Twice now the honest answer to "these lines never run" has been "and two of
+Twice now the honest answer to "these lines never run" has been "and some of
 them are wrong". Before writing a test for an uncovered branch, work out what
 the branch is *supposed* to do and check that it does — a test written to the
 current behaviour turns a defect into a golden expectation, which is worse than
 no test. The loader entry above is the worked example: three of its rules were
 wrong, and all three would have been frozen.
+
+The same goes for a test that passes on the first run: prove it can fail.
+`test_the_direction_discs_actually_reach_the_picture` passed and was worthless
+— a disc is the same green as the edge it sits on, so comparing the pixel under
+it to the disc's colour could not tell the two apart. Switching the layer off
+and watching the test still pass is what found that.
+
+When a change has to leave the picture alone, say so in bytes: render a set of
+frames before and after and compare hashes. The `scene.py` split was checked
+over eleven (both window shapes, every name mode, a graph mid-SPA with a broken
+edge, a dead node, an active one, a `.nod` graph, the 812-node geodesic).
 
 ### Nothing is off limits
 
