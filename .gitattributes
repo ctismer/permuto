@@ -1,3 +1,14 @@
 # Preserve the recovered 1990s DOS files byte-for-byte: no line-ending or
 # text conversion. This repo is a faithful archive of the decrypted project.
 * -text
+
+# The recovered sources are CP437, which makes a UTF-8 locale call them binary.
+# `diff=cp437` only changes how git *shows* them (see the textconv in
+# CONTRIBUTING/HANDOVER); the stored bytes stay exactly as they were in 1995.
+legacy/**/*.mod diff=cp437
+legacy/**/*.def diff=cp437
+legacy/**/*.awk diff=cp437
+legacy/**/*.txt diff=cp437
+legacy/**/*.bat diff=cp437
+legacy/**/*.pas diff=cp437
+legacy/**/*.pre diff=cp437

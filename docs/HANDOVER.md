@@ -94,6 +94,10 @@ Afterwards: optionally TypeScript/browser on the cleaned core.
 - The sizes `TrueDisc`/`TrueCircle` were called with are **radii**, not
   diameters — the ball is sized around the label that goes inside it. See
   PORT-GAPS §6; `Graph`'s source is lost, so this was read off the call sites.
+- **`grep` lies about `legacy/`.** Those files are CP437, which a UTF-8 locale
+  calls binary; macOS grep then prints nothing and exits 1, which reads as "not
+  found". `git grep`, `rg` and `grep -a` are fine. For readable diffs:
+  `git config diff.cp437.textconv "iconv -f cp437 -t utf-8"` (once per clone).
 - `/rewind` restores files but does **not** touch git. If disk and HEAD
   disagree, trust the disk and re-commit.
 - `Lib.RANDOM` is source-less → absolute node positions are not

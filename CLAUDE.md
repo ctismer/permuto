@@ -40,6 +40,15 @@ alongside for reference until the port is complete.
   it was float in 1991 too). Keep `core/` UI-free (PySide6 now, a possible
   TypeScript/web viewer later, are just frontends).
 - Origin is DOS / CP437; `legacy/**` is kept byte-exact via `.gitattributes`.
+  Two consequences worth knowing before you lose an hour:
+  - **Never search `legacy/` with plain `grep`.** In a UTF-8 locale macOS grep
+    calls those files binary and then reports *no match*, silently, exit 1 —
+    it looks exactly like "the word isn't there". Use `git grep`, `rg`, or
+    `grep -a`. Reading them in Python needs `encoding="cp437"`.
+  - For readable `git diff`/`git show` on them, set the textconv once per
+    clone: `git config diff.cp437.textconv "iconv -f cp437 -t utf-8"`
+    (`.gitattributes` already routes the sources to it; the stored bytes are
+    untouched).
 - Run `python -m pytest` to check the port against the originals.
 - Tests exist so features don't break, so **test from the UI where possible**:
   drive the widget with real keystrokes (`viewer.run(..., _drive=...)`), grab
