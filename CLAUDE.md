@@ -28,9 +28,10 @@ alongside for reference until the port is complete.
 
 ## Working notes
 - **Start here:** `docs/HANDOVER.md` — current state and what's next.
-  Phase 2 (parity with the original) is complete; next is the pythonic
-  refactor. `docs/PORT-GAPS.md` is no longer a work plan but the record of
-  what the original did.
+  Phase 2 (parity with the original) is complete; phase 3, the pythonic
+  refactor, is under way on the branch `phase3-refactor` — check it out before
+  reading the code. `docs/PORT-GAPS.md` is no longer a work plan but the record
+  of what the original did, and of where the port deliberately differs (§0).
 - Read `docs/ARCHITECTURE.md` — it has the verified formats and the
   fixed-point rotation/projection/relaxation maths.
 - Port style: the strict-1:1 rule has done its job and no longer binds — the
