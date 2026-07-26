@@ -337,21 +337,24 @@ Part b), *"Katzenminze"*, is `Iri` before it was written:
 That is, line for line, `avail = 0.65·avail + 0.30·mean(neighbours) + 500`, the
 discharge to 80 % on use, and the detour around dead satellites.
 
-**What `SPTA` stood for is not known.** `SPA` is the shortest path algorithm;
-`SPTA` was Gerhard G. Thomas's, and per the author (2026-07-26) he never
-delivered the specification, so it could not be built — hence the menu entry
-that only ever answers "sorry, SPTA not yet available". Do not reconstruct a
-meaning for it from the surrounding code; the two hints there are weak and
-say nothing about the algorithm:
+**`SPTA` was never specified and never built.** `SPA` is the shortest path
+algorithm; `SPTA` was Gerhard G. Thomas's, and per the author (2026-07-26) the
+specification never arrived, which is why the menu entry only ever answers
+"sorry, SPTA not yet available".
 
-* `polytop.mod:409` has the call commented out as `LocalShortestPath()`.
-* `salzdemo.txt` assumes it as given — *"Angenommen, wir haben den SPTA. Dieser
-  kann aufgrund der Netzwerkstruktur lokal kürzeste Wege finden"* — and then
-  adds the availability code **on top of** it. So the availability routing that
-  `Iri` implements is not SPTA; it is what was to be layered over it.
+What it was heading towards is legible, if not settled: **locally** shortest
+paths, found from the network structure alone. `polytop.mod:409` has the call
+commented out as `LocalShortestPath()`, and `salzdemo.txt` assumes it as given —
+*"Angenommen, wir haben den SPTA. Dieser kann aufgrund der Netzwerkstruktur
+lokal kürzeste Wege finden"* — and only then adds the availability code **on
+top**. The author's own verdict (same day): it was not thought through to the
+end. So the routing `Iri` implements is not SPTA; it is the layer that was to
+sit above it.
 
-The enum value survives as a display selector: `progsel = P_SPTA` is what
-`PmDisp` checks to draw in Iridium mode.
+That layer exists because it had to: there was a demo at **Motorola in
+Chicago**, and something had to be on the screen. The Iridium simulation is what
+was shown. The enum value survives as the display selector — `progsel = P_SPTA`
+is what `PmDisp` checks to draw in Iridium mode.
 
 One idea from it never got built, and it is credited in the file to "Jeff" —
 **Jeff Myers**, senior at Motorola, whom the group visited in the USA when they
