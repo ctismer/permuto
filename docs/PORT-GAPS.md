@@ -298,8 +298,35 @@ The sizes must be scaled to today's drawing area, or they shrink to
 illegibility in a large window. Take the *apparent* size of the original as the
 target:
 
-`render._scaled()` does that mapping, and `render.UI_SCALE` is the single knob
+`scene.mark_size()` does that mapping, and `scene.UI_SCALE` is the single knob
 for the whole UI's apparent size (a faithful 1.0 reads a touch large today).
+
+**But only up to a point** (changed 2026-07-27, at the author's request). The
+original could not be resized at all — a compiled-in 479×320 — so there is no
+behaviour here to be faithful to, and keeping every mark at a constant fraction
+of the picture turned out to be wrong for a window that *can* be pulled open: it
+made enlarging a pure zoom, the same picture bigger, saying nothing new. The
+reason to pull the window open is to see the structure in the room that appears.
+So marks scale up to `scene.MARK_REFERENCE` (740, the picture the viewer opens
+with) and then stand still; past it the extra room goes into the distances
+between nodes. At 1500×1500 a 120-node permutograph is a mass of overlapping
+balls under the old rule and a readable polytope under this one.
+
+Two details worth keeping:
+
+* Marks are measured by the picture's **short side**, the same quantity
+  `project()` spreads the nodes over. Measuring them by the height alone let
+  the two disagree — a 300×900 window drew balls 2.6× too fat for the
+  distances they sat in.
+* Ball, label, digit, disc, rim and pen widths are **one family** and stop
+  together. The ball radius is chosen to fit the text inside it, so a ball that
+  stops growing while its label does not would overflow.
+
+`UI_SCALE` is written as `0.62 * 860 / 740`: the old factor measured against a
+window *height* of 860, restated against the new *extent* reference, so the
+window the viewer opens with is bit-identical to before. Rounding it to 0.72 is
+a 0.075 % change and still visible — it moves a centred ball label across a
+rounding boundary and 5840 pixels shift by one.
 
 | Original | Fraction of `_pic` | At a 900 px drawing area |
 |---|---|---|

@@ -217,3 +217,57 @@ def test_a_satellite_grows_with_what_it_has_left():
     full, empty = scene.iridium_scene(g, SIZE, SIZE).balls
     assert full.radius > empty.radius
     assert empty.radius == scene.mark_size(SIZE, 11 * 1500 / 10000) / 2
+
+
+# -- how the picture answers a bigger window --------------------------------
+
+def test_pulling_the_window_open_buys_distance_not_bigger_balls():
+    """The point of enlarging is to see the structure in the room that appears.
+    Marks that keep a constant fraction of the picture make it a pure zoom --
+    the same picture, larger, saying nothing new.  Past MARK_REFERENCE they
+    stand still and the graph spreads out underneath them."""
+    g = _two_nodes()
+    sizes = [740, 1110, 1480, 2220]
+    radii = {scene.build(g, s, s).radius for s in sizes}
+    assert len(radii) == 1, f"the balls grew with the window: {sorted(radii)}"
+
+    spread = [abs(scene.build(g, s, s).edges[0].a[0]
+                  - scene.build(g, s, s).edges[0].b[0]) for s in sizes]
+    assert spread == sorted(spread) and spread[-1] > 2 * spread[0], \
+        "the nodes have to move apart, or there is nothing to see"
+
+
+def test_a_small_window_still_scales_so_it_stays_legible():
+    """Below the reference the old rule holds: a mark keeps its share of the
+    picture, so a small window is a small picture and not a few vast balls."""
+    g = _two_nodes()
+    small, reference = scene.build(g, 370, 370), scene.build(g, 740, 740)
+    assert small.radius < reference.radius
+    assert small.radius == pytest.approx(reference.radius / 2, rel=0.01)
+
+
+def test_marks_are_measured_by_the_side_the_nodes_are_spread_over():
+    """They used to be measured by the height while the nodes were spread over
+    the short side, so a tall narrow window drew balls 2.6x too fat for the
+    distances they sat in."""
+    assert scene.picture_extent(300, 900) == 300
+    narrow = scene.build(_two_nodes(), 300, 900)
+    square = scene.build(_two_nodes(), 300, 300)
+    assert narrow.radius == square.radius, \
+        "the extra height is empty margin; it may not inflate the marks"
+
+
+def test_every_mark_in_the_picture_follows_the_same_rule():
+    """One family: ball, label, digit, disc, rim and pen widths all stop
+    growing together, or the ball outgrows the text meant to sit inside it."""
+    g = _two_nodes()
+    # concrete sizes, not multiples of MARK_REFERENCE: derived from the constant
+    # they would agree with any value of it, including "never stop growing"
+    assert scene.MARK_REFERENCE <= 740, "both sizes below are meant to clamp"
+    kw = dict(op_colors=True, name_mode=2, program=True)
+    at_reference = scene.build(g, 740, 740, **kw)
+    far_bigger = scene.build(g, 2220, 2220, **kw)
+    for attr in ("radius", "digit_size", "digit_pad", "label_size",
+                 "disc_radius", "rim_width", "ring_extra"):
+        assert getattr(at_reference, attr) == getattr(far_bigger, attr), attr
+    assert at_reference.edges[0].width == far_bigger.edges[0].width

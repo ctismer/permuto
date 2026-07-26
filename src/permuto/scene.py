@@ -56,31 +56,65 @@ RING: RGB = (255, 255, 255)          # the white ring on an active node
 
 PICTURE_PIXELS = 320   # the original picture area was 479 x 320 (pmdisp.def)
 
+#: The picture extent at which marks stop growing -- the size the viewer opens
+#: with (a 1000x860 window, 260 of which is the operator panel).
+#:
+#: Past it, pulling the window open buys *distance between the nodes*, not
+#: bigger balls.  Marks that keep a constant fraction of the picture make
+#: enlarging a pure zoom: the same picture, bigger, telling you nothing new --
+#: whereas the reason to pull a window open is to see the structure in the room
+#: that appears.  The 1995 original could not be resized at all, so there is no
+#: behaviour here to be faithful to.
+MARK_REFERENCE = 740
+
 # One knob for the whole UI's apparent size.  A faithful mapping (1.0) puts
 # every mark at the same fraction of the picture it had on the 479x320 original,
 # but that reads a touch large on a modern display, so the default trims it.
-# This is the single number to turn if things want to be bigger or smaller.
-UI_SCALE = 0.62
+# This is the single number to turn if things want to be bigger or smaller, and
+# the one a size control would drive.
+#
+# Written as the arithmetic it is: marks used to be 0.62 of a window *height* of
+# 860, and are now measured against a picture *extent* of 740, so this restates
+# the same size against the new reference.  Rounding it to 0.72 is a 0.075%
+# change and still visibly wrong: it moves a centred ball label across a
+# rounding boundary, and 5840 pixels of the opening window shift by one.
+UI_SCALE = 0.62 * 860 / 740
 
 YELLOW = 14            # Iridium: the colour of an idle satellite
 
 
 # -- sizes, in the original's picture pixels --------------------------------
 
-def mark_size(height: int, picture_pixels: float) -> float:
+def picture_extent(width: int, height: int) -> int:
+    """What "the picture" measures, for the purpose of sizing marks: its short
+    side -- the same quantity :func:`project` spreads the nodes over.
+
+    Sizing marks by the height alone let the two disagree: a tall narrow window
+    drew balls for a height the picture never got, 2.6x too fat for the
+    distances they sat in.
+    """
+    return min(width, height)
+
+
+def _scale(extent: int, picture_pixels: float) -> float:
+    return picture_pixels * min(extent, MARK_REFERENCE) / PICTURE_PIXELS * UI_SCALE
+
+
+def mark_size(extent: int, picture_pixels: float) -> float:
     """A mark size (font, node), in the original's picture pixels, for today.
 
-    Kept as an absolute count it would vanish in a large window, so it keeps the
-    same fraction of the picture height (PORT-GAPS section 6), times UI_SCALE.
-    Floored at 1 px so fonts never round to nothing.
+    Below :data:`MARK_REFERENCE` it keeps the same fraction of the picture
+    (PORT-GAPS section 6), so a small window stays legible; above it the mark
+    stands still and the extra room goes into the graph.  Floored at 1 px so
+    fonts never round to nothing.
     """
-    return max(1.0, picture_pixels * height / PICTURE_PIXELS * UI_SCALE)
+    return max(1.0, _scale(extent, picture_pixels))
 
 
-def stroke_width(height: int, picture_pixels: float) -> float:
+def stroke_width(extent: int, picture_pixels: float) -> float:
     """Like :func:`mark_size` but for pen widths, which may go below 1 px so
     that a busy sphere of edges does not turn into a solid blob."""
-    return max(0.5, picture_pixels * height / PICTURE_PIXELS * UI_SCALE)
+    return max(0.5, _scale(extent, picture_pixels))
 
 
 def dim(rgb: RGB, percent: int) -> RGB:
@@ -248,16 +282,17 @@ def build(g, width: int, height: int, *, labels: bool = False,
           name_mode: int = 0, operator_digits: bool = True) -> Scene:
     """Everything in one frame of *g*, in the order it has to be drawn."""
     pts = project(g, width, height)
+    extent = picture_extent(width, height)
     have_ops = op_colors and g.n_operators > 0
     text_mode = text_mode_for(name_mode, labels, program)
-    radius = mark_size(height, BALL_RADIUS[text_mode])
+    radius = mark_size(extent, BALL_RADIUS[text_mode])
     scene = Scene(radius=radius,
-                  digit_size=mark_size(height, 8),
-                  digit_pad=mark_size(height, 4),
-                  label_size=mark_size(height, 8),   # the 6x8 font cell
-                  disc_radius=mark_size(height, 3),
-                  rim_width=stroke_width(height, 0.8),
-                  ring_extra=mark_size(height, 1))
+                  digit_size=mark_size(extent, 8),
+                  digit_pad=mark_size(extent, 4),
+                  label_size=mark_size(extent, 8),   # the 6x8 font cell
+                  disc_radius=mark_size(extent, 3),
+                  rim_width=stroke_width(extent, 0.8),
+                  ring_extra=mark_size(extent, 1))
 
     for nd in g.ordered():
         xi, yi, zi = pts[nd.num]
@@ -285,7 +320,7 @@ def build(g, width: int, height: int, *, labels: bool = False,
                 reason, wide = "plain", front
             scene.edges.append(Edge(
                 (xi, yi), (xj, yj), rgb,
-                stroke_width(height, 1.1 if wide else 0.6), front, reason))
+                stroke_width(extent, 1.1 if wide else 0.6), front, reason))
 
             if not broken and state in (L_INPUT, L_OUTPUT):
                 incoming = state == L_INPUT
@@ -318,8 +353,9 @@ def iridium_scene(g, width: int, height: int) -> Scene:
     carries.  No operator digits -- Iridium never sets ``opno``.
     """
     pts = project(g, width, height)
-    scene = Scene(label_size=mark_size(height, 7))
-    width_ = stroke_width(height, 0.9)
+    extent = picture_extent(width, height)
+    scene = Scene(label_size=mark_size(extent, 7))
+    width_ = stroke_width(extent, 0.9)
     for nd in g.ordered():
         xi, yi, _zi = pts[nd.num]
         for j in nd.links:
@@ -330,7 +366,7 @@ def iridium_scene(g, width: int, height: int) -> Scene:
     for nd in g.ordered():
         x, y, _z = pts[nd.num]
         # diameter = Scale(11, avail+1500, 10000), scaled to the picture
-        radius = mark_size(height, 11 * (nd.iri.avail + 1500) / 10000) / 2
+        radius = mark_size(extent, 11 * (nd.iri.avail + 1500) / 10000) / 2
         text = nd.perm if nd.color == YELLOW else str(nd.iri.message_num)
         scene.balls.append(Ball((x, y), radius, DOS_PALETTE[nd.color % 16],
                                 label=text if text and text != "0" else ""))
