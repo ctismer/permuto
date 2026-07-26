@@ -16,6 +16,7 @@ from PySide6.QtGui import (QBrush, QColor, QFont, QGuiApplication, QImage,
 
 from ..core import intvector as iv
 from ..core.graph import L_INPUT, L_LOCKED, L_OUTPUT
+from ..editor import BASE_FIELD, fields_of, value_of
 
 
 def _ensure_gui_app():
@@ -312,16 +313,16 @@ def paint_iridium(g, painter, width: int, height: int) -> None:
 def operator_panel_rows(pm):
     """The lines of the operator editor, as ``(label, value, field)`` tuples.
 
-    ``field`` is ``('base',)`` or ``('op', i, j)`` (1-based), or ``None`` for
-    the blank spacer line after the base -- matching the original's layout of a
-    base line, a gap, then 6 operators of 3 cycles each, only the first cycle
-    of each operator carrying an ``Op n`` label.
+    ``field`` is an :class:`~permuto.editor.OpField`, or ``None`` for the blank
+    spacer line after the base -- matching the original's layout of a base
+    line, a gap, then 6 operators of 3 cycles each, only the first cycle of
+    each operator carrying an ``Op n`` label.  The cursor order comes from the
+    editor, so the panel and the cursor cannot disagree.
     """
-    rows = [("Base", pm.base, ("base",)), ("", "", None)]
-    for i in range(len(pm.optable)):
-        for j in range(len(pm.optable[i])):
-            label = f"Op {i + 1}" if j == 0 else ""
-            rows.append((label, pm.optable[i][j], ("op", i + 1, j + 1)))
+    rows = [("Base", pm.base, BASE_FIELD), ("", "", None)]
+    for fld in fields_of(pm)[1:]:            # [0] is the base, already there
+        label = f"Op {fld.op}" if fld.cyc == 1 else ""
+        rows.append((label, value_of(pm, fld), fld))
     return rows
 
 

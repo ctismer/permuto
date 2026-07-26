@@ -76,9 +76,8 @@ def test_permutograph_view_paints_in_every_mode(qapp):
             view.session.tick()
         _repaint(view)
         # operator editor open
-        view.ui_mode = viewer.UiMode.EDIT
-        view.edit_field = ("base",)
-        view.edit_buffer = view.session.pm.base
+        view.ui_mode = viewer.UiMode.MAIN
+        _press(view, "e")                     # into the operator editor
         _repaint(view)
         # a numeric prompt
         view.ui_mode = viewer.UiMode.PROMPT

@@ -38,6 +38,7 @@ from ..core import layout
 from ..core.graph import Graph
 from ..core.iri import Iridium
 from ..core.pm import find_link
+from ..editor import OperatorEditor
 from ..errors import PermutoError
 from ..formats import load_session, read_pgd, save_ps, save_session
 from ..formats.plyfile import PlySession
@@ -251,6 +252,10 @@ class UiMode(Enum):
 EDIT_MENU_LINE = ("editing operators: digits, arrows move, "
                   "Ctrl-Home base, Ctrl-End last, Enter/Esc leave")
 
+#: the editor's cursor keys, as :meth:`OperatorEditor.move` names them
+_EDIT_MOVES = {Qt.Key_Up: "up", Qt.Key_Down: "down",
+               Qt.Key_Home: "first", Qt.Key_End: "last"}
+
 
 class PromptKind(Enum):
     """What the text prompt is collecting."""
@@ -313,10 +318,8 @@ class PermutographView(ViewBase):
         self.message = "; ".join(session.load_warnings)
         self.pending = None         # a NodeAction awaiting its node number
 
-        # operator editor state
-        self.edit_field = None      # ('base',) or ('op', i, j)
-        self.edit_buffer = ""
-        self.edit_base_before = ""
+        # an OperatorEditor while UiMode.EDIT, otherwise None
+        self.editor = None
 
         # a FieldPrompt while typing a file name or node number
         self.prompt_kind = None
@@ -366,8 +369,8 @@ class PermutographView(ViewBase):
         if self.session.permuto and self.session.pm is not None:
             render.paint_operator_panel(
                 self.session.pm, p, pic_w + 16, 60, self.height(),
-                active_field=self.edit_field if self.ui_mode is UiMode.EDIT else None,
-                buffer_text=self.edit_buffer if self.ui_mode is UiMode.EDIT else None)
+                active_field=self.editor.field if self.editor else None,
+                buffer_text=self.editor.buffer if self.editor else None)
         self._paint_chrome(p)
 
     def _draw_name_mode(self):
@@ -513,87 +516,37 @@ class PermutographView(ViewBase):
     # -- operator editor -------------------------------------------
     def _enter_edit(self):
         self.ui_mode = UiMode.EDIT
-        self.edit_base_before = self.session.pm.base
-        self.edit_field = ("base",)
-        self.edit_buffer = self.session.pm.base
-
-    def _commit_field(self) -> bool:
-        """Validate and store the field being edited; True if it took."""
-        pm = self.session.pm
-        try:
-            if self.edit_field[0] == "base":
-                pm.set_base(self.edit_buffer)
-            else:
-                _, i, j = self.edit_field
-                pm.set_cycle(i, j, self.edit_buffer)
-            return True
-        except PermutoError as exc:
-            self.message = str(exc)
-            return False
-
-    def _load_field(self):
-        pm = self.session.pm
-        if self.edit_field[0] == "base":
-            self.edit_buffer = pm.base
-        else:
-            _, i, j = self.edit_field
-            self.edit_buffer = pm.optable[i - 1][j - 1]
+        self.editor = OperatorEditor(self.session.pm)
 
     def _edit_key(self, ev):
-        key = ev.key()
+        ed = self.editor
         if ev.text().isdigit():
-            self.edit_buffer += ev.text()
+            ed.type_digit(ev.text())
             return
-        if key == Qt.Key_Backspace:
-            self.edit_buffer = self.edit_buffer[:-1]
+        if ev.key() == Qt.Key_Backspace:
+            ed.backspace()
             return
-        # any move or exit first tries to commit the current field
-        moving = key in (Qt.Key_Up, Qt.Key_Down, Qt.Key_Return,
-                         Qt.Key_Enter, Qt.Key_Escape, Qt.Key_Home, Qt.Key_End)
-        if moving and not self._commit_field():
-            return                       # blocking validation: cannot leave
-        if key in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Escape):
+        where = _EDIT_MOVES.get(ev.key())
+        leaving = ev.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Escape)
+        if where is None and not leaving:
+            return
+        error = ed.commit()          # any move or exit commits the field first
+        if error:
+            self.message = error     # blocking validation: cannot leave
+            return
+        if leaving:
             self._leave_edit()
-        elif key in (Qt.Key_Up, Qt.Key_Down, Qt.Key_Home, Qt.Key_End):
-            self._move_edit(key)
-
-    def _edit_fields(self):
-        fields = [("base",)]
-        pm = self.session.pm
-        for i in range(len(pm.optable)):
-            for j in range(len(pm.optable[i])):
-                fields.append(("op", i + 1, j + 1))
-        return fields
-
-    def _move_edit(self, key):
-        fields = self._edit_fields()
-        idx = fields.index(self.edit_field)
-        if key == Qt.Key_Up:
-            idx = max(0, idx - 1)
-        elif key == Qt.Key_Down:
-            idx = min(len(fields) - 1, idx + 1)
-        elif key == Qt.Key_Home:
-            idx = 0
-        elif key == Qt.Key_End:
-            idx = max((n for n, f in enumerate(fields)
-                       if f == ("base",) or self._field_value(f)), default=0)
-        self.edit_field = fields[idx]
-        self._load_field()
-
-    def _field_value(self, field):
-        if field[0] == "base":
-            return self.session.pm.base
-        _, i, j = field
-        return self.session.pm.optable[i - 1][j - 1]
+        else:
+            ed.move(where)
 
     def _leave_edit(self):
-        base_changed = self.session.pm.base != self.edit_base_before
         try:
-            self.session.rebuild_permutograph(base_changed=base_changed)
+            self.session.rebuild_permutograph(
+                base_changed=self.editor.base_changed)
         except PermutoError as exc:
             self.message = str(exc)
         self.ui_mode = UiMode.MAIN
-        self.edit_field = None
+        self.editor = None
 
     # -- text prompt (filenames, node numbers) ---------------------
     def _begin_prompt(self, label, kind):

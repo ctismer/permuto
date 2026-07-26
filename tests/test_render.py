@@ -83,12 +83,13 @@ def test_a_node_carries_the_colour_of_its_class():
 
 
 def test_operator_panel_lists_the_base_and_operators():
+    from permuto.editor import BASE_FIELD
     from permuto.ui.viewer import make_session
 
     s = make_session("1234", operators=["12", "+", "23", "+", "34"])
     rows = render.operator_panel_rows(s.pm)
-    assert rows[0] == ("Base", "1234", ("base",))
-    values = {v for _, v, f in rows if f and f[0] == "op"}
+    assert rows[0] == ("Base", "1234", BASE_FIELD)
+    values = {v for _, v, f in rows if f and not f.is_base}
     assert {"12", "23", "34"} <= values
 
 
