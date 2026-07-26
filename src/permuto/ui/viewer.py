@@ -24,6 +24,7 @@ from __future__ import annotations
 import os
 import pathlib
 import sys
+import traceback
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QPainter
@@ -141,8 +142,6 @@ def _report_paint_error(exc: Exception) -> None:
     already-torn-down window segfaults.  We print it here and swallow it so the
     window keeps running and the process exits cleanly.
     """
-    import traceback
-
     traceback.print_exc()
     # drop any saved traceback so it cannot hold a QPainter past shutdown
     if hasattr(sys, "last_traceback"):

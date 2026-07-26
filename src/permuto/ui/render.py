@@ -10,12 +10,15 @@ from __future__ import annotations
 import os
 from typing import Dict, Tuple
 
+from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtGui import (QBrush, QColor, QFont, QGuiApplication, QImage,
+                           QPainter, QPen)
+
 from ..core import intvector as iv
+from ..core.graph import L_INPUT, L_LOCKED, L_OUTPUT
 
 
 def _ensure_gui_app():
-    from PySide6.QtGui import QGuiApplication
-
     app = QGuiApplication.instance()
     if app is None:
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -54,8 +57,6 @@ _PALETTE = [
 
 
 def _op_color(opk: int, front: bool):
-    from PySide6.QtGui import QColor
-
     r, g, b = _PALETTE[(opk - 1) % len(_PALETTE)]
     if not front:  # dim the back edges for depth
         r, g, b = r * 45 // 100, g * 45 // 100, b * 45 // 100
@@ -64,9 +65,6 @@ def _op_color(opk: int, front: bool):
 
 def _state_color(state: int, front: bool):
     # LineStatus -> colour (PmDisp): input/output green, locked red, free grey
-    from ..core.graph import L_INPUT, L_LOCKED, L_OUTPUT
-    from PySide6.QtGui import QColor
-
     if state in (L_INPUT, L_OUTPUT):
         r, g, b = 90, 220, 110
     elif state == L_LOCKED:
@@ -113,11 +111,6 @@ def paint(g, painter, width: int, height: int, *,
           labels: bool = False, op_colors: bool = False,
           program: bool = False, name_mode: int = 0,
           operator_digits: bool = True) -> None:
-    from PySide6.QtCore import QPointF, QRectF, Qt
-    from PySide6.QtGui import QBrush, QColor, QFont, QPen
-
-    from ..core.graph import L_INPUT, L_OUTPUT
-
     pts = project(g, width, height)
     painter.setRenderHint(painter.RenderHint.Antialiasing, True)
 
@@ -282,9 +275,6 @@ def paint_iridium(g, painter, width: int, height: int) -> None:
     the node's own name when idle, otherwise the message number it carries.
     No operator digits -- Iridium never sets ``opno``.
     """
-    from PySide6.QtCore import QPointF, QRectF, Qt
-    from PySide6.QtGui import QBrush, QColor, QFont, QPen
-
     pts = project(g, width, height)
     painter.setRenderHint(painter.RenderHint.Antialiasing, True)
 
@@ -343,9 +333,6 @@ def paint_operator_panel(pm, painter, x, y, height, *,
     ``active_field`` set it shows the edit cursor, and ``buffer_text`` is the
     digits being typed into that field.
     """
-    from PySide6.QtCore import QPointF
-    from PySide6.QtGui import QColor, QFont
-
     font = QFont("Menlo")
     line_px = _scaled(height, 11)
     font.setPixelSize(int(line_px * 0.7))
@@ -368,8 +355,6 @@ def paint_operator_panel(pm, painter, x, y, height, *,
 
 def render_image(g, width: int = 800, height: int = 800, **kw):
     _ensure_gui_app()
-    from PySide6.QtGui import QColor, QImage, QPainter
-
     img = QImage(width, height, QImage.Format.Format_ARGB32)
     img.fill(QColor(*BACKGROUND))
     p = QPainter(img)
@@ -389,8 +374,6 @@ def indexed_image(indices, palette):
     A plain pixel writer: it knows nothing about what produced the indices.
     """
     _ensure_gui_app()
-    from PySide6.QtGui import QColor, QImage
-
     height, width = len(indices), len(indices[0])
     img = QImage(width, height, QImage.Format.Format_ARGB32)
     rgb = [QColor(*c).rgb() for c in palette]
