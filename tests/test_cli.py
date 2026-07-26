@@ -38,17 +38,17 @@ def test_show_tells_a_file_name_from_a_base_permutation(opened):
     assert (a3[0], k3["seed"], k3["operators"]) == ("ikosa2", 1, None)
 
 
-@pytest.mark.parametrize("argv", [[], ["/PG"], ["/pg"], ["--pg"]])
-def test_the_permutograph_mode_starts_from_every_spelling(opened, argv):
-    """`polytop /PG`: base 1234 with 12/23/34, and no arguments means the
-    same thing."""
+@pytest.mark.parametrize("argv", [[], ["--pg"]])
+def test_the_permutograph_mode_starts_with_the_1995_defaults(opened, argv):
+    """What `polytop /PG` came up with: base 1234 with 12/23/34.  No arguments
+    means the same thing."""
     assert main(argv) == 0
     (_, args, kw), = opened
     assert args[0] == "1234"
     assert kw["operators"] == ["12", "+", "23", "+", "34"]
 
 
-@pytest.mark.parametrize("word", ["iridium", "iri", "/i", "/I", "--iridium"])
+@pytest.mark.parametrize("word", ["iridium", "iri", "--iridium"])
 def test_every_spelling_of_the_iridium_mode(opened, word):
     assert main([word]) == 0
     assert opened[0][0] == "iridium"

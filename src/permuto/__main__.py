@@ -7,15 +7,16 @@
     python -m permuto show  <name-or-file.nod>      # interactive PySide6 viewer
     python -m permuto show  <session.pms|.ply>      # resume a saved session
     python -m permuto show  <base> <op...>          # build + view on the fly
-    python -m permuto iridium                       # the /I satellite simulation
+    python -m permuto iridium                       # the SIMONE satellite simulation
     python -m permuto convert <in.ply> [out.pms]    # migrate a binary session
     python -m permuto render <name.nod> [out.png] [steps]   # offscreen PNG
     python -m permuto export <name> [out.ps] [steps]        # PostScript (SavePicture)
     python -m permuto kugel [out.png] [size] [--floyd]      # the 1991 colour study
 
-The original's switches still work, in both spellings: ``/PG`` and ``--pg``
-start the permutograph mode (which is what no arguments does too), ``/I`` and
-``--iridium`` start SIMONE.
+The original's two modes are flags here: ``--pg`` starts the permutograph mode
+(which is what no arguments does too) and ``--iridium`` starts SIMONE.  Their
+1995 spellings ``/PG`` and ``/I`` are gone -- DOS switch syntax, and nothing
+else on this command line looks like that.
 
 Example:
     python -m permuto gen 123 12 + 23
@@ -87,7 +88,8 @@ def _cmd_show(args) -> int:
 
 
 def _cmd_start(args=None) -> int:
-    """``/PG`` -- permutograph mode with the default base and operators."""
+    """``--pg``, and what no arguments does: the permutograph mode with the
+    default base and operators, as ``polytop /PG`` came up in 1995."""
     from .ui.viewer import run
 
     return run(DEFAULT_BASE, operators=list(DEFAULT_OPERATORS))
@@ -179,7 +181,7 @@ def _parser() -> argparse.ArgumentParser:
     c.set_defaults(run=_cmd_show)
 
     c = sub.add_parser("iridium", aliases=["iri"],
-                       help="the /I satellite simulation")
+                       help="the SIMONE satellite simulation")
     c.set_defaults(run=_cmd_iridium)
 
     c = sub.add_parser("convert", help="migrate a binary .ply session to .pms")
@@ -211,15 +213,14 @@ def _parser() -> argparse.ArgumentParser:
     return p
 
 
-#: ``polytop``'s own switches, in the 1995 spelling and in today's
-_DOS_SWITCHES = {"/i": ["iridium"], "--iridium": ["iridium"],
-                 "/pg": [], "--pg": []}
+#: ``polytop``'s two modes as flags -- what ``/PG`` and ``/I`` used to be
+_MODE_SWITCHES = {"--iridium": ["iridium"], "--pg": []}
 
 
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    if argv and argv[0].lower() in _DOS_SWITCHES:
-        argv = _DOS_SWITCHES[argv[0].lower()] + argv[1:]
+    if argv and argv[0] in _MODE_SWITCHES:
+        argv = _MODE_SWITCHES[argv[0]] + argv[1:]
     if not argv:
         return _cmd_start()
     try:
