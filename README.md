@@ -44,6 +44,14 @@ the shortest-path edges:
 
 ![SPA on S₄](docs/demo/pgl4_spa.png)
 
+Also recovered: **`kugel`**, a 1991 study in making 14 colours look like a lit
+sphere — a hand-mixed ramp plus dithering, one octant computed and mirrored
+eight ways so no seams show (`permuto kugel`, `--floyd` for Floyd-Steinberg
+instead of the ordered pattern):
+
+<img src="docs/demo/kugel.png" alt="the kugel colour study" width="420">
+
+
 ## Install & run
 
 Requires Python 3.10+ (PySide6 is pulled in automatically). One command:
@@ -71,6 +79,7 @@ python -m permuto gen 123 12 + 23           # edge list on stdout
 python -m permuto render pgl5 out.png 700   # offscreen PNG
 python -m permuto export pgl4 out.ps 600    # runnable PostScript
 python -m permuto convert old.ply new.pms   # migrate a binary session
+permuto kugel out.png 800 [--floyd]         # the 1991 colour study
 ```
 
 Viewer keys follow the original: `A` algorithm · `C` calc · `R` run ·
@@ -85,6 +94,7 @@ ParSum) · `E` edit operators. It single-steps until you press `R`.
 | `src/permuto/gen/` | generators: the `genperm`/`operate`/`num2` pipeline, geodesic icosahedra, factorisation, the `vierdrei` graph |
 | `src/permuto/formats/` | `.pg`/`.nod`/`.pgd` readers, binary `.ply` (read) and the text `.pms` session format, PostScript export |
 | `src/permuto/ui/` | the PySide6 viewer and offscreen renderer |
+| `src/permuto/studies/` | standalone experiments from the original: `kugel`, the colour/dither study |
 | `legacy/` | the recovered 1990s Modula-2 original |
 | `docs/` | `ARCHITECTURE.md` (formats, the fixed-point maths), `PORT-GAPS.md` |
 

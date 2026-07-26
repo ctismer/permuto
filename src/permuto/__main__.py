@@ -11,6 +11,7 @@
     python -m permuto convert <in.ply> [out.pms]    # migrate a binary session
     python -m permuto render <name.nod> [out.png] [steps]   # offscreen PNG
     python -m permuto export <name> [out.ps] [steps]        # PostScript (SavePicture)
+    python -m permuto kugel [out.png] [size] [--floyd]      # the 1991 colour study
 
 Example:
     python -m permuto gen 123 12 + 23
@@ -126,6 +127,22 @@ def main(argv=None) -> int:
             layout.relax_step(g, alg="rubber")
         save_ps(g, out)
         print(f"exported {name} ({g.nnodes} nodes, {g.dimensions}-D) -> {out}")
+        return 0
+
+    if cmd == "kugel":
+        from .studies.kugel import PALETTE, render_sphere
+        from .ui.render import indexed_image
+
+        pos = [a for a in rest if not a.startswith("--")]
+        flags = {a for a in rest if a.startswith("--")}
+        out = pos[0] if pos else "kugel.png"
+        size = int(pos[1]) if len(pos) > 1 else 640
+        floyd = "--floyd" in flags
+        indices = render_sphere(size * 200 // 640,     # the original's proportions
+                                size, size * 3 // 4, floyd=floyd)
+        indexed_image(indices, PALETTE).save(out, "PNG")
+        print(f"kugel ({'Floyd-Steinberg' if floyd else 'ordered dither'}, "
+              f"{len(PALETTE) - 2} colours) -> {out}")
         return 0
 
     print(f"unknown command: {cmd!r}\n{__doc__}")
