@@ -79,11 +79,10 @@ def _cmd_build(args) -> int:
 
 
 def _cmd_show(args) -> int:
-    from .loader import resolve_file
+    from .loader import can_open
     from .ui.viewer import run
 
-    name, operators, seed = _as_spec(
-        args.spec, resolves=lambda n: resolve_file(n) is not None)
+    name, operators, seed = _as_spec(args.spec, resolves=can_open)
     return run(name, seed=seed, operators=operators)
 
 

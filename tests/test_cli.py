@@ -38,6 +38,25 @@ def test_show_tells_a_file_name_from_a_base_permutation(opened):
     assert (a3[0], k3["seed"], k3["operators"]) == ("ikosa2", 1, None)
 
 
+def test_a_seed_behind_a_session_file_still_resumes_the_session(
+        opened, tmp_path, monkeypatch):
+    """Saving `mine` writes mine.pms, and `show mine` reopens it -- but `show
+    mine 3` used to build a nonsense permutograph out of the name: the question
+    "is this a file?" was asked of the graph loader alone, which knows .pgd and
+    .nod and nothing about sessions, so the seed became an operator list."""
+    from permuto.core.graph import Graph
+    from permuto.formats import PlySession, write_pms
+
+    g = Graph.build("123", ["12", "+", "23"], seed=1)
+    write_pms(tmp_path / "mine.pms", PlySession(graph=g, mode="permuto",
+                                                base="123"))
+    monkeypatch.chdir(tmp_path)
+
+    main(["show", "mine", "3"])
+    (_, args, kw), = opened
+    assert (args[0], kw["seed"], kw["operators"]) == ("mine", 3, None)
+
+
 @pytest.mark.parametrize("argv", [[], ["--pg"]])
 def test_the_permutograph_mode_starts_with_the_1995_defaults(opened, argv):
     """What `polytop /PG` came up with: base 1234 with 12/23/34.  No arguments

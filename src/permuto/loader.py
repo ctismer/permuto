@@ -34,20 +34,29 @@ def _nod_dir():
 
 
 def resolve_file(p: str):
-    """Return the .pgd/.nod path for a name or file, or None if none exists."""
-    candidates = []
-    if os.path.exists(p):
-        candidates.append(p)
-        if p.endswith(".nod") and os.path.exists(p[:-4] + ".pgd"):
-            candidates.insert(0, p[:-4] + ".pgd")
-    else:
-        base = os.path.join(_nod_dir(), p)
+    """Return the .pgd/.nod path for a name or file, or None if none exists.
+
+    A typed extension is honoured, wherever the file lives: ask for a ``.nod``
+    and you get that ``.nod``, with its stored coordinates and polytop mode.
+    Only a bare name is ambiguous, and there the build recipe beats its own
+    result -- a ``.pgd`` rebuilds the permutograph with the operator table that
+    the ``.nod`` has thrown away.  Bare names are looked for here first and
+    among the bundled samples second, so ``permuto build knot ...`` is followed
+    by ``permuto show knot``.
+    """
+    if p.endswith((".pgd", ".nod")):
+        for cand in (p, os.path.join(_nod_dir(), p)):
+            if os.path.isfile(cand):
+                return cand
+        return None
+    if os.path.isfile(p):
+        return p
+    for directory in ("", _nod_dir()):
         for ext in (".pgd", ".nod"):
-            if os.path.exists(base + ext):
-                candidates.append(base + ext)
-        if p.endswith((".pgd", ".nod")) and os.path.exists(os.path.join(_nod_dir(), p)):
-            candidates.insert(0, os.path.join(_nod_dir(), p))
-    return candidates[0] if candidates else None
+            cand = os.path.join(directory, p + ext)
+            if os.path.isfile(cand):
+                return cand
+    return None
 
 
 def load_graph(name_or_path, *, dimensions: int = iv.MAXDIMEN,
@@ -81,6 +90,19 @@ def _session_path(p: str):
             if f.read(15) == b"permuto session":
                 return cand
     return None
+
+
+def can_open(name: str) -> bool:
+    """Whether *name* is something :func:`make_session` can open.
+
+    The CLI has to tell ``show <file> 3`` -- a graph and a seed -- from ``show
+    <base> <op...>`` -- a permutation and its operators -- before it opens
+    anything, and it hangs on exactly this question.  Saved sessions count:
+    asking ``resolve_file`` alone, which only knows graphs, read the seed
+    behind a ``.pms`` as an operator list and built a permutograph out of the
+    file name.
+    """
+    return resolve_file(name) is not None or _session_path(name) is not None
 
 
 def make_session(name_or_path, *, seed: int = 1, operators=None) -> Session:
