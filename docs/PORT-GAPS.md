@@ -66,6 +66,7 @@ The original deals with bad input in three non-portable ways:
 | Fails silently when no link slot is free | `PM.Connect` | raise / report |
 | Overwrites files without asking; `SavePicture` never calls `FIO.Close` | `NodeMgr.SavePicture` / `SavePoly` | confirm overwrite; use context managers |
 | Accepts an invalid base | `PM.PermBasisValid` uses global `PM.Order`, which is 0 on the first edit → `NextPerm` aborts → returns `TRUE` unseen | **real bug**: validate independently of `Order` |
+| Removing a link leaves the per-link marks pointing at the wrong edges | `PM.Disconnect` (`pm.mod:479`) shifts `links` and `opno` down and decrements `nlink`, but `lines` and `broken` (`nodemgr.def:39`) are addressed by the same index and stay where they were — `pmdisp.mod:72` and `pmprogs.mod:33` then read them against the shifted list | **real bug**: `Node.remove_link` moves everything indexed by link together. Reachable through Collapse/Uncollapse, the only callers of `Disconnect`; the `L` command toggles `broken` without disconnecting, which is why it survives normal use |
 | Label whose digits don't sum to `Freq` → `SeekNode` returns 0 → silent no-op | Iridium `k`/`t` commands | reject with a message |
 
 Design: a `PermutoError` hierarchy (`InvalidBase`, `InvalidCycle`,

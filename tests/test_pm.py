@@ -5,7 +5,8 @@ import pytest
 
 from permuto import InvalidBase, InvalidCycle
 from permuto.core import Graph
-from permuto.core.pm import MAX_CYC, MAX_LINKS, MAX_OPS, PM, disconnect, is_linked
+from permuto.core.graph import MAX_LINKS
+from permuto.core.pm import MAX_CYC, MAX_OPS, PM
 
 
 def make_pm(base, ops):
@@ -155,7 +156,7 @@ def test_connect_recovers_the_operator_number_after_a_disconnect():
     pm = PM(base="1234")
     g = pm.new_permutograph()
     op = dict(zip(g.nodes[1].links, g.nodes[1].opno))[2]
-    disconnect(g, 1, 2)
+    g.disconnect(1, 2)
     assert pm.connect(g, 1, 2)
     assert dict(zip(g.nodes[1].links, g.nodes[1].opno))[2] == op
 
@@ -165,7 +166,7 @@ def test_connect_refuses_a_full_node_instead_of_swallowing_the_edge():
     the edge and Collapse could lose edges without a word."""
     pm = PM(base="1234")
     g = pm.new_permutograph()
-    free = [n for n in sorted(g.nodes) if n != 1 and not is_linked(g, 1, n)]
+    free = [n for n in sorted(g.nodes) if n != 1 and not g.is_linked(1, n)]
     while g.nodes[1].nlink < MAX_LINKS:
         assert pm.connect(g, 1, free.pop(0))
     assert g.nodes[1].nlink == MAX_LINKS
@@ -180,7 +181,7 @@ def test_collapse_moves_the_neighbours_and_reports_what_was_lost():
     others = [j for j in g.nodes[n1].links if j != n2]
     assert pm.collapse(g, n1, n2) == 0
     assert g.nodes[n1].nlink == 0                 # left isolated, not deleted
-    assert all(is_linked(g, j, n2) for j in others)
+    assert all(g.is_linked(j, n2) for j in others)
 
 
 def test_uncollapse_restores_exactly_the_canonical_edges():
@@ -201,5 +202,5 @@ def test_broken_marks_follow_their_edge_through_a_disconnect():
     nd = g.nodes[1]
     marked = nd.links[2]
     nd.state.broken = {3}
-    disconnect(g, 1, nd.links[0])
+    g.disconnect(1, nd.links[0])
     assert nd.links[nd.state.broken.pop() - 1] == marked

@@ -35,7 +35,6 @@ from PySide6.QtWidgets import QApplication, QWidget
 from ..core import layout
 from ..core.graph import Graph
 from ..core.iri import Iridium
-from ..core.pm import find_link
 from ..editor import OperatorEditor
 from ..errors import PermutoError
 from ..formats import load_session, save_ps, save_session
@@ -588,7 +587,7 @@ class PermutographView(ViewBase):
 
     def _toggle_broken(self, n1, n2):
         for a, b in ((n1, n2), (n2, n1)):
-            k = find_link(self.g, a, b)
+            k = self.g.find_link(a, b)
             if k:
                 st = self.g.nodes[a].state
                 st.broken ^= {k}

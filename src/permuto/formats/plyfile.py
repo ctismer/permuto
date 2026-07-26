@@ -54,7 +54,8 @@ from typing import List, Optional
 from ..errors import FileFormatError, InvalidBase, InvalidCycle
 from ..core import intvector as iv
 from ..core.graph import Graph, IriState, Node, NodeState
-from ..core.pm import MAX_CYC, MAX_LINKS, MAX_OPS, PM
+from ..core.graph import MAX_LINKS
+from ..core.pm import MAX_CYC, MAX_OPS, PM
 
 HEADER_SIZE = 178
 RECORD_SIZE = 123

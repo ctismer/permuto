@@ -43,11 +43,10 @@ from ..errors import InvalidBase, InvalidCycle, LimitExceeded, limit_check
 from ..gen.operate import apply_cycle
 from ..perms import next_perm
 from . import intvector as iv
-from .graph import Graph, Node, NodeState
+from .graph import MAX_LINKS, Graph, Node, NodeState
 
 MAX_OPS = 6      # PM.MaxOps -- "should be MaxLinks / 2, each op has max 2 arms"
 MAX_CYC = 3      # PM.MaxCyc
-MAX_LINKS = 12   # NodeMgr.MaxLinks
 MAX_NODES_TOT = 2000  # NodeMgr.MaxNodesTot ("aber weniger koennte allokiert werden")
 
 DEFAULT_BASE = "1234"
@@ -98,59 +97,6 @@ def all_perms_from(base: str) -> List[str]:
         if next_perm(cur):
             break
     return out
-
-
-# --- graph surgery (no PM state needed) --------------------------------
-
-def find_link(g: Graph, n1: int, n2: int) -> int:
-    """``PM.FindLink`` -- 1-based index of the link n1->n2, or 0."""
-    nd = g.nodes.get(n1)
-    if nd is None:
-        return 0
-    for i, j in enumerate(nd.links, start=1):
-        if j == n2:
-            return i
-    return 0
-
-
-def is_linked(g: Graph, n1: int, n2: int) -> bool:
-    """``PM.IsLinked`` -- note a node counts as linked to itself."""
-    if n1 == n2:
-        return True
-    return find_link(g, n1, n2) > 0
-
-
-def links_avail(g: Graph, n1: int, n2: int) -> bool:
-    """``PM.LinksAvail`` -- "check if both have an empty slot"."""
-    return (g.nodes[n1].nlink < MAX_LINKS) and (g.nodes[n2].nlink < MAX_LINKS)
-
-
-def disconnect(g: Graph, n1: int, n2: int) -> bool:
-    """``PM.Disconnect`` -- remove the edge from both sides. True if removed."""
-    if n1 == n2 or not is_linked(g, n1, n2):
-        return False
-    for a, b in ((n1, n2), (n2, n1)):
-        nd = g.nodes[a]
-        k = find_link(g, a, b)
-        if k:
-            del nd.links[k - 1]
-            if k - 1 < len(nd.opno):
-                del nd.opno[k - 1]
-            nd.nlink = len(nd.links)
-            _fix_state_after_link_removal(nd, k)
-    return True
-
-
-def _fix_state_after_link_removal(nd: Node, k: int) -> None:
-    """Keep the per-link state arrays aligned when link *k* (1-based) goes.
-
-    The original shifted ``links`` and ``opno`` but left ``state.lines`` and
-    ``state.broken`` pointing at the old indices -- so after a Disconnect the
-    "broken" marks silently referred to different edges.  We shift them along.
-    """
-    if k - 1 < len(nd.state.lines):
-        del nd.state.lines[k - 1]
-    nd.state.broken = {i if i < k else i - 1 for i in nd.state.broken if i != k}
 
 
 # --- the PM state ------------------------------------------------------
@@ -359,9 +305,9 @@ class PM:
         The original returned nothing, so a full node silently swallowed the
         edge; callers here can tell and report it.
         """
-        if n1 <= 0 or n2 <= 0 or is_linked(g, n1, n2):
+        if n1 <= 0 or n2 <= 0 or g.is_linked(n1, n2):
             return False
-        if not links_avail(g, n1, n2):
+        if not g.links_avail(n1, n2):
             return False
         op = self.which_operator(g, n1, n2)
         for a, b in ((n1, n2), (n2, n1)):
@@ -380,14 +326,14 @@ class PM:
         silent loss.  *n1* is left isolated, not removed -- "for future: kill
         all the unlinked nodes".
         """
-        if not is_linked(g, n1, n2) or n1 == n2:
+        if not g.is_linked(n1, n2) or n1 == n2:
             return 0
-        disconnect(g, n1, n2)
+        g.disconnect(n1, n2)
         lost = 0
         nd = g.nodes[n1]
         for _ in range(nd.nlink):
-            node = nd.links[0]        # Disconnect shifts, so index 0 is fine
-            disconnect(g, n1, node)
+            node = nd.links[0]        # disconnect shifts, so index 0 is fine
+            g.disconnect(n1, node)
             if not self.connect(g, node, n2):
                 lost += 1
         return lost
@@ -395,7 +341,7 @@ class PM:
     def uncollapse(self, g: Graph, n1: int) -> None:
         """``PM.Uncollapse`` -- drop all edges of *n1* and restore canonical ones."""
         for other in list(g.nodes[n1].links):
-            disconnect(g, n1, other)
+            g.disconnect(n1, other)
         for op in range(1, MAX_OPS + 1):
             node = self.exec_operator(g, n1, op)
             if node != n1:

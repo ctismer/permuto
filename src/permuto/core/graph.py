@@ -21,6 +21,8 @@ from . import intvector as iv
 # LineStatus (NodeMgr): edge state used by the PmProgs programs / display
 L_FREE, L_INPUT, L_OUTPUT, L_LOCKED = 0, 1, 2, 3
 
+MAX_LINKS = 12   # NodeMgr.MaxLinks -- how many edges a node has room for
+
 
 @dataclass
 class NodeState:
@@ -66,6 +68,24 @@ class Node:
     perm: str = ""
     state: NodeState = field(default_factory=NodeState)
     iri: IriState = field(default_factory=IriState)
+
+    def remove_link(self, k: int) -> None:
+        """Drop link *k* (1-based), keeping every per-link array aligned.
+
+        ``PM.Disconnect`` shifted ``links`` and ``opno`` but left ``state.lines``
+        and ``state.broken`` at their old indices, although they address the
+        same link numbers -- so after a Disconnect the marks referred to
+        different edges (``docs/PORT-GAPS.md`` section 0).  Everything indexed
+        by link lives here now, and shifts together.
+        """
+        del self.links[k - 1]
+        if k - 1 < len(self.opno):
+            del self.opno[k - 1]
+        self.nlink = len(self.links)
+        if k - 1 < len(self.state.lines):
+            del self.state.lines[k - 1]
+        self.state.broken = {i if i < k else i - 1
+                             for i in self.state.broken if i != k}
 
 
 class Graph:
@@ -147,6 +167,41 @@ class Graph:
 
     def ordered(self) -> List[Node]:
         return [self.nodes[i] for i in sorted(self.nodes)]
+
+    # -- edges ---------------------------------------------------------
+    # These were PM.FindLink / IsLinked / LinksAvail / Disconnect in the
+    # original, but they ask nothing about permutations -- they are the link
+    # lists, which is NodeMgr's business and therefore the graph's.
+    def find_link(self, n1: int, n2: int) -> int:
+        """``PM.FindLink`` -- 1-based index of the link n1->n2, or 0."""
+        nd = self.nodes.get(n1)
+        if nd is None:
+            return 0
+        for i, j in enumerate(nd.links, start=1):
+            if j == n2:
+                return i
+        return 0
+
+    def is_linked(self, n1: int, n2: int) -> bool:
+        """``PM.IsLinked`` -- note a node counts as linked to itself."""
+        if n1 == n2:
+            return True
+        return self.find_link(n1, n2) > 0
+
+    def links_avail(self, n1: int, n2: int) -> bool:
+        """``PM.LinksAvail`` -- "check if both have an empty slot"."""
+        return (self.nodes[n1].nlink < MAX_LINKS
+                and self.nodes[n2].nlink < MAX_LINKS)
+
+    def disconnect(self, n1: int, n2: int) -> bool:
+        """``PM.Disconnect`` -- remove the edge from both sides. True if gone."""
+        if n1 == n2 or not self.is_linked(n1, n2):
+            return False
+        for a, b in ((n1, n2), (n2, n1)):
+            k = self.find_link(a, b)
+            if k:
+                self.nodes[a].remove_link(k)
+        return True
 
     def pack_nodes(self) -> int:
         """``NodeMgr.PackNodes`` + ``MoveNode`` -- squeeze out deleted nodes.
