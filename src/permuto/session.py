@@ -76,7 +76,8 @@ class Program(Enum):
     IDLE = "idle"
     SPA = "spa"
     PARSUM = "parsum"
-    SPTA = "spta"            # the original: "sorry, SPTA not yet available"
+    SPTA = "spta"            # Gerhard's algorithm; the spec never arrived, so
+                             # the original only ever said "not yet available"
 
 
 @dataclass

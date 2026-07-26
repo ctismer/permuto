@@ -337,10 +337,21 @@ Part b), *"Katzenminze"*, is `Iri` before it was written:
 That is, line for line, `avail = 0.65·avail + 0.30·mean(neighbours) + 500`, the
 discharge to 80 % on use, and the detour around dead satellites.
 
-It also explains **SPTA**, the menu entry that answers "sorry, SPTA not yet
-available": it was meant to be the locally shortest path *plus* the availability
-code. `Iri` got that instead, as its own module — which is why the Iridium
-display runs under `progsel = P_SPTA` in `PmDisp`.
+**What `SPTA` stood for is not known.** `SPA` is the shortest path algorithm;
+`SPTA` was Gerhard G. Thomas's, and per the author (2026-07-26) he never
+delivered the specification, so it could not be built — hence the menu entry
+that only ever answers "sorry, SPTA not yet available". Do not reconstruct a
+meaning for it from the surrounding code; the two hints there are weak and
+say nothing about the algorithm:
+
+* `polytop.mod:409` has the call commented out as `LocalShortestPath()`.
+* `salzdemo.txt` assumes it as given — *"Angenommen, wir haben den SPTA. Dieser
+  kann aufgrund der Netzwerkstruktur lokal kürzeste Wege finden"* — and then
+  adds the availability code **on top of** it. So the availability routing that
+  `Iri` implements is not SPTA; it is what was to be layered over it.
+
+The enum value survives as a display selector: `progsel = P_SPTA` is what
+`PmDisp` checks to draw in Iridium mode.
 
 One idea from it never got built, and it is credited in the file to "Jeff" —
 **Jeff Myers**, senior at Motorola, whom the group visited in the USA when they
