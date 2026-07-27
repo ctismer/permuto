@@ -10,7 +10,7 @@ from __future__ import annotations
 
 
 
-def next_perm(s: List) -> bool:
+def next_perm(s: list[str]) -> bool:
     """Advance ``s`` to the next lexicographic permutation, in place.
 
     Returns ``True`` when wrapping from the last permutation to the first
