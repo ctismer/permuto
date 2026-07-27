@@ -1,8 +1,8 @@
 # Handover — permuto (Modula-2 → Python port)
 
 Read this first, then `CLAUDE.md`, `docs/ARCHITECTURE.md` and
-`git log --oneline`. Last updated 2026-07-27, in the second session of phase 3
-— the refactor lives on the branch `phase3-refactor`, see below.
+`git log --oneline`. Last updated 2026-07-27, at the end of the second session
+of phase 3 — which has landed on `main`, see below.
 
 ## Where we are
 
@@ -98,11 +98,14 @@ python -m permuto render pgl5 out.png 700
 python -m permuto export pgl4 out.ps 600
 ```
 
-## Phase 3 — the refactor, on `phase3-refactor`
+## Phase 3 — the refactor, now on `main`
 
-**On `origin`, and read by nobody but its author.** Tests green at every
-commit; `python -m pytest --cov=permuto` reports 93%. `git log --oneline
-main..phase3-refactor` is the whole story in twenty-odd lines.
+**It landed on 2026-07-27**, as a fast-forward: `main` was a direct ancestor,
+so there is no merge commit and the history stays linear. `2a5af72` is where it
+starts, so `git diff 2a5af72` is the whole refactor and `git log --oneline
+2a5af72..` is what it did.
+
+Tests green at every commit; `python -m pytest --cov=permuto` reports 94%.
 
 Three rules still bind, unchanged from when phase 3 started:
 
@@ -366,7 +369,7 @@ Deferred by the author, not forgotten.
 
 ### Reading this branch (for a reviewer)
 
-Thirty-nine commits, but eight arcs. `git log --oneline main..phase3-refactor` reads
+Fifty-one commits, but nine arcs. `git log --oneline 2a5af72..main` reads
 newest first; the arcs below are oldest first, which is the order they make
 sense in. Each commit builds and its tests pass, so bisecting works.
 
