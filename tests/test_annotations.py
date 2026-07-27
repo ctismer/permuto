@@ -12,6 +12,7 @@ does far more, but only where mypy is installed and run.
 
 import importlib
 import inspect
+import pathlib
 import pkgutil
 import typing
 
@@ -54,3 +55,22 @@ def test_every_annotation_in_the_module_resolves(module):
             except Exception as exc:              # NameError, mostly
                 bad.append(f"{name}.{getattr(target, '__name__', '')}: {exc}")
     assert not bad, "annotations naming something undefined:\n  " + "\n  ".join(bad)
+
+
+def test_mypy_is_happy_with_the_package():
+    """The broader net, where the tool is installed.
+
+    Default strictness, configured in pyproject.toml -- clean, and it catches
+    what actually went wrong on this branch: a slot that only ever held None, a
+    menu handed another menu's action, an annotation naming nothing.  Skipped
+    rather than failed where mypy is absent, because the suite has to run on a
+    plain checkout; the test above needs no tooling and always runs.
+    """
+    import subprocess
+    import sys
+
+    mypy = pytest.importorskip("mypy")          # noqa: F841
+    root = pathlib.Path(__file__).resolve().parent.parent
+    proc = subprocess.run([sys.executable, "-m", "mypy"],
+                          cwd=root, capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stdout + proc.stderr

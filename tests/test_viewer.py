@@ -39,16 +39,16 @@ def _press(view, ch):
     from PySide6.QtCore import Qt
     from PySide6.QtGui import QKeyEvent
 
-    special = {"esc": Qt.Key_Escape, "enter": Qt.Key_Return,
-               "back": Qt.Key_Backspace, "space": Qt.Key_Space,
-               "up": Qt.Key_Up, "down": Qt.Key_Down,
-               "home": Qt.Key_Home, "end": Qt.Key_End}
+    special = {"esc": Qt.Key.Key_Escape, "enter": Qt.Key.Key_Return,
+               "back": Qt.Key.Key_Backspace, "space": Qt.Key.Key_Space,
+               "up": Qt.Key.Key_Up, "down": Qt.Key.Key_Down,
+               "home": Qt.Key.Key_Home, "end": Qt.Key.Key_End}
     if ch in special:
         view.keyPressEvent(QKeyEvent(QKeyEvent.KeyPress, special[ch],
-                                     Qt.NoModifier, ""))
+                                     Qt.KeyboardModifier.NoModifier, ""))
     else:
         view.keyPressEvent(QKeyEvent(QKeyEvent.KeyPress, ord(ch.upper()),
-                                     Qt.NoModifier, ch))
+                                     Qt.KeyboardModifier.NoModifier, ch))
 
 
 def _node_pixels(view, img):
@@ -248,7 +248,7 @@ def test_editing_the_base_leaves_a_full_size_picture(qapp):
     from PySide6.QtGui import QKeyEvent
 
     def key(ch):
-        return QKeyEvent(QKeyEvent.KeyPress, ord(ch.upper()), Qt.NoModifier, ch)
+        return QKeyEvent(QKeyEvent.KeyPress, ord(ch.upper()), Qt.KeyboardModifier.NoModifier, ch)
 
     captured = {}
 
@@ -257,12 +257,12 @@ def test_editing_the_base_leaves_a_full_size_picture(qapp):
         view.keyPressEvent(key("e"))                  # into the editor
         assert view.ui_mode is viewer.UiMode.EDIT
         for _ in range(len(view.session.pm.base)):    # clear the field
-            view.keyPressEvent(QKeyEvent(QKeyEvent.KeyPress, Qt.Key_Backspace,
-                                         Qt.NoModifier, "\b"))
+            view.keyPressEvent(QKeyEvent(QKeyEvent.KeyPress, Qt.Key.Key_Backspace,
+                                         Qt.KeyboardModifier.NoModifier, "\b"))
         for ch in "12345":
             view.keyPressEvent(key(ch))
-        view.keyPressEvent(QKeyEvent(QKeyEvent.KeyPress, Qt.Key_Return,
-                                     Qt.NoModifier, "\r"))
+        view.keyPressEvent(QKeyEvent(QKeyEvent.KeyPress, Qt.Key.Key_Return,
+                                     Qt.KeyboardModifier.NoModifier, "\r"))
         captured["mode"] = view.ui_mode
         captured["nodes"] = view.g.nnodes
         captured["spread"] = _spread(view)
@@ -310,9 +310,9 @@ def test_escape_asks_before_leaving(qapp):
 
     def key(ch, code=None):
         return QKeyEvent(QKeyEvent.KeyPress, code or ord(ch.upper()),
-                         Qt.NoModifier, ch)
+                         Qt.KeyboardModifier.NoModifier, ch)
 
-    esc = QKeyEvent(QKeyEvent.KeyPress, Qt.Key_Escape, Qt.NoModifier, "\x1b")
+    esc = QKeyEvent(QKeyEvent.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier, "\x1b")
     captured = {}
 
     def drive(view):

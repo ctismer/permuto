@@ -62,6 +62,7 @@ def value_of(pm, fld: OpField) -> str:
     """What *fld* currently holds in *pm*."""
     if fld.is_base:
         return pm.base
+    assert fld.op is not None and fld.cyc is not None   # not is_base, so both set
     return pm.optable[fld.op - 1][fld.cyc - 1]
 
 

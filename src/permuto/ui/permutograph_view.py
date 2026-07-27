@@ -59,14 +59,14 @@ class PermutographView(ViewBase):
         self.ui_mode = UiMode.MAIN
         # a load note (e.g. a truncated session) shows in the status line
         self.message = load_note(session.load_warnings)
-        self.pending = None         # a ProgramAction awaiting its node number
-
+        # the ProgramAction waiting for the node number being typed
+        self.pending: ProgramAction | None = None
         # an OperatorEditor while UiMode.EDIT, otherwise None
-        self.editor = None
-
-        # a FieldPrompt while typing a file name or node number
-        self.prompt_kind = None
-        self.select = None          # SelectCard state, when picking a neighbour
+        self.editor: OperatorEditor | None = None
+        # which prompt is open, while UiMode.PROMPT
+        self.prompt_kind: PromptKind | None = None
+        # SelectCard state, while a neighbour is being picked
+        self.select: Selection | None = None
 
         title = self.spec_name if ops is None \
             else f"{self.spec_name} {' '.join(ops)}"

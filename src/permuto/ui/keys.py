@@ -16,17 +16,17 @@ from ..session import confirms_exit
 from .prompt import PromptResult
 
 #: Enter on the main keyboard and Enter on the numeric pad are two key codes
-ENTER_KEYS = (Qt.Key_Return, Qt.Key_Enter)
+ENTER_KEYS = (Qt.Key.Key_Return, Qt.Key.Key_Enter)
 
-_NAMED = {Qt.Key_Escape: Key.ESCAPE,
-          Qt.Key_Return: Key.ENTER,
-          Qt.Key_Enter: Key.ENTER,
-          Qt.Key_Space: Key.SPACE,
-          Qt.Key_Backspace: Key.BACKSPACE,
-          Qt.Key_Up: Key.UP,
-          Qt.Key_Down: Key.DOWN,
-          Qt.Key_Home: Key.HOME,
-          Qt.Key_End: Key.END}
+_NAMED = {Qt.Key.Key_Escape: Key.ESCAPE,
+          Qt.Key.Key_Return: Key.ENTER,
+          Qt.Key.Key_Enter: Key.ENTER,
+          Qt.Key.Key_Space: Key.SPACE,
+          Qt.Key.Key_Backspace: Key.BACKSPACE,
+          Qt.Key.Key_Up: Key.UP,
+          Qt.Key.Key_Down: Key.DOWN,
+          Qt.Key.Key_Home: Key.HOME,
+          Qt.Key.Key_End: Key.END}
 
 #: where the editor's cursor keys go, as :class:`permuto.editor.Move` names it
 EDIT_MOVES = {Key.UP: Move.UP, Key.DOWN: Move.DOWN,

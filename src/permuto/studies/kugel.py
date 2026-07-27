@@ -74,7 +74,8 @@ def _palette() -> list[tuple[int, int, int]]:
     for c in range(MIN_COLOR, MAX_COLOR + 1):
         i = c - MIN_COLOR
         r, g, b = 22 + 31 * i // 10, 35 * i // 10, 3 + 38 * i // 10
-        pal[c] = tuple(min(255, v * 255 // 63) for v in (r, g, b))
+        pal[c] = (min(255, r * 255 // 63), min(255, g * 255 // 63),
+                  min(255, b * 255 // 63))
     return pal
 
 

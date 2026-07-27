@@ -64,7 +64,7 @@ def _draw_discs(sc: Scene, painter) -> None:
     """The direction discs, on top of the edges they belong to."""
     if not sc.discs:
         return
-    painter.setPen(Qt.NoPen)
+    painter.setPen(Qt.PenStyle.NoPen)
     for d in sc.discs:
         painter.setBrush(QBrush(QColor(*d.rgb)))
         painter.drawEllipse(QPointF(*d.at), sc.disc_radius, sc.disc_radius)
@@ -79,27 +79,27 @@ def _draw_digits(sc: Scene, painter) -> None:
     pad = sc.digit_pad
     for d in sc.digits:
         box = QRectF(d.at[0] - pad, d.at[1] - pad * 1.25, pad * 2, pad * 2.5)
-        painter.setPen(Qt.NoPen)
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(QColor(*BACKGROUND)))
         painter.drawRect(box)
         painter.setPen(QColor(*d.rgb))
-        painter.drawText(box, Qt.AlignCenter, str(d.op))
+        painter.drawText(box, Qt.AlignmentFlag.AlignCenter, str(d.op))
 
 
 def _draw_balls(sc: Scene, painter) -> None:
     """The nodes: a filled disc, hollow if dead, ringed white if active."""
     for b in sc.balls:
         at = QPointF(*b.at)
-        painter.setPen(Qt.NoPen)
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(QColor(*(b.fill or BACKGROUND))))
         painter.drawEllipse(at, b.radius, b.radius)
         if b.fill is None:                      # dead: background, black rim
             painter.setPen(_pen((0, 0, 0), sc.rim_width))
-            painter.setBrush(Qt.NoBrush)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawEllipse(at, b.radius, b.radius)
         if b.ringed:
             painter.setPen(_pen(scene.RING, sc.rim_width))
-            painter.setBrush(Qt.NoBrush)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
             ring = b.radius + sc.ring_extra
             painter.drawEllipse(at, ring, ring)
 
@@ -117,7 +117,7 @@ def _draw_labels(sc: Scene, painter) -> None:
         x, y = b.at
         r = b.radius
         painter.drawText(QRectF(x - r, y - r, 2 * r, 2 * r),
-                         Qt.AlignCenter, b.label)
+                         Qt.AlignmentFlag.AlignCenter, b.label)
 
 
 def draw_scene(sc: Scene, painter) -> None:

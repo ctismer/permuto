@@ -17,6 +17,7 @@ from PySide6.QtGui import QColor, QFont, QPainter
 from PySide6.QtWidgets import QWidget
 
 from . import render
+from .prompt import FieldPrompt
 
 
 def _report_paint_error(exc: Exception) -> None:
@@ -48,9 +49,9 @@ class ViewBase(QWidget):
     def __init__(self, width: int, height: int):
         super().__init__()
         self.message = ""
-        self._paint_error = None    # last exception in paintEvent, for tests
-        self.prompt = None          # a FieldPrompt while typing
-        self.setFocusPolicy(Qt.StrongFocus)   # make sure keys arrive here
+        self._paint_error: Exception | None = None   # last paintEvent error
+        self.prompt: FieldPrompt | None = None       # while typing
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)   # make sure keys arrive here
         self.resize(width, height)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._on_timer)

@@ -24,12 +24,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 from .core import layout, spa
 from .core.graph import Graph
 from .core.pm import PM
 from .errors import ProgramStateError
-from .menus import FILE_MENU, MAIN_MENU, PROGRAM_MENU, ProgramAction
+from .menus import (FILE_MENU, MAIN_MENU, PROGRAM_MENU, Menu,
+                    ProgramAction)
 
 DIMENSION_CHECK_INTERVAL = 25   # "IF Iteration MOD 25 = 0 THEN Changed := TRUE"
 
@@ -101,6 +103,9 @@ class PromptKind(Enum):
     "Node 1=" and "Uncollapse node=" are the same kind of prompt.
     """
 
+    menu: UiMode         # the menu whose line stays on screen while typing
+    label: str           # what the prompt says, if it has wording of its own
+
     PS = ("ps", UiMode.FILE, "PostScript out = ")
     SAVE = ("save", UiMode.FILE, "Save .pms = ")
     LOAD = ("load", UiMode.FILE, "Load (.pms/.ply) = ")
@@ -119,10 +124,13 @@ EDIT_MENU_LINE = ("editing operators: digits, arrows move, "
 
 
 #: which menu each keyboard mode is talking to; anything else gets the main one
-MENU_FOR_MODE = {UiMode.MAIN: MAIN_MENU,
-                 UiMode.FILE: FILE_MENU,
-                 UiMode.PROGRAM: PROGRAM_MENU,
-                 UiMode.SELECT: PROGRAM_MENU}   # picking the second node
+#: Menus of different action types, so what is common to them is a Menu of
+#: *some* action -- all this map is asked for is the line to print.
+MENU_FOR_MODE: dict[UiMode, Menu[Any]] = {
+    UiMode.MAIN: MAIN_MENU,
+    UiMode.FILE: FILE_MENU,
+    UiMode.PROGRAM: PROGRAM_MENU,
+    UiMode.SELECT: PROGRAM_MENU}               # picking the second node
 
 
 @dataclass
@@ -372,7 +380,7 @@ class Session:
         return PROGRAM_MENU.line(self)
 
     def top_line(self, ui_mode: "UiMode",
-                 prompt_kind: "PromptKind" = None) -> str:
+                 prompt_kind: "PromptKind | None" = None) -> str:
         """The line above the picture: the menu the keyboard is in.
 
         A prompt shows the menu it was opened from, so typing a file name still
@@ -388,7 +396,7 @@ class Session:
             self, permuto=self.permuto)
 
     def label_mode(self, ui_mode: "UiMode",
-                   prompt_kind: "PromptKind" = None) -> int:
+                   prompt_kind: "PromptKind | None" = None) -> int:
         """What to write in the balls right now.
 
         Node numbers are forced on while a node is being chosen, so there is

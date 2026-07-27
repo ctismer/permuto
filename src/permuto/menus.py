@@ -24,6 +24,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
+from typing import Generic, TypeVar
 
 
 class Key(Enum):
@@ -84,6 +85,10 @@ class ProgramAction(Enum):
     chain and a second enum listing the same five actions again.
     """
 
+    prompt: str          # what the node prompt says, e.g. "Node 1="
+    purpose: str         # what the number will be used for
+    second: str          # how to ask for the second node, if any
+
     KILL = ("kill", "Node=", "kill/repair", "")
     BREAK = ("break", "Node 1=", "break/repair a line",
              "select the other end")
@@ -123,6 +128,8 @@ class IridiumAction(Enum):
     "this field is done" from "the prompt is done".
     """
 
+    fields: tuple[str, ...]      # what the prompt collects, in order
+
     KILL = ("kill", ("Node",))
     TRANSMIT = ("transmit", ("Node1", "Node2", "Repeat"))
     STEP = ("step", ())
@@ -143,8 +150,14 @@ class IridiumAction(Enum):
 
 # ---------------------------------------------------------------- the table
 
+#: one menu, one kind of action -- which ``test_menus.py`` asserts at run time
+#: and this lets the type say, so a handler table cannot be indexed with the
+#: wrong menu's action
+A = TypeVar("A", bound=Enum)
+
+
 @dataclass(frozen=True)
-class Binding:
+class Binding(Generic[A]):
     """One key of one menu.
 
     *label* is how the menu line names it; an empty label means the key works
@@ -155,7 +168,7 @@ class Binding:
     """
 
     key: str | Key
-    action: Enum
+    action: A
     label: str = ""
     flag: str = ""
     when: str = ""
@@ -166,22 +179,22 @@ class Binding:
         return bool(self.label)
 
 
-class Menu:
+class Menu(Generic[A]):
     """A set of bindings that both answers keys and writes its own line."""
 
-    def __init__(self, name: str, bindings: Sequence[Binding],
+    def __init__(self, name: str, bindings: Sequence[Binding[A]],
                  text: str = ""):
         self.name = name
-        self.bindings: tuple[Binding, ...] = tuple(bindings)
+        self.bindings: tuple[Binding[A], ...] = tuple(bindings)
         self.text = text                    # the 1995 line, where it is literal
-        self._by_char: dict[str, Binding] = {
+        self._by_char: dict[str, Binding[A]] = {
             b.key.lower(): b for b in self.bindings if isinstance(b.key, str)}
-        self._by_key: dict[Key, Binding] = {
+        self._by_key: dict[Key, Binding[A]] = {
             b.key: b for b in self.bindings if isinstance(b.key, Key)}
 
     # -- looking a key up ------------------------------------------
     def binding(self, char: str = "", key: Key | None = None,
-                *, permuto: bool = True) -> Binding | None:
+                *, permuto: bool = True) -> Binding[A] | None:
         """The binding for a keystroke, or None if this menu ignores it."""
         found = self._by_key.get(key) if key is not None else None
         if found is None and char:
@@ -191,7 +204,7 @@ class Menu:
         return found
 
     def action(self, char: str = "", key: Key | None = None,
-               *, permuto: bool = True) -> Enum | None:
+               *, permuto: bool = True) -> A | None:
         found = self.binding(char, key, permuto=permuto)
         return found.action if found is not None else None
 
@@ -215,7 +228,7 @@ class Menu:
             parts.append(b.label + flag)
         return "  ".join(parts)
 
-    def unadvertised(self) -> tuple[Binding, ...]:
+    def unadvertised(self) -> tuple[Binding[A], ...]:
         """The keys that work without being offered -- each with its reason."""
         return tuple(b for b in self.bindings if not b.advertised)
 

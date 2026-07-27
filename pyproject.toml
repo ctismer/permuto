@@ -41,3 +41,18 @@ where = ["src"]
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.mypy]
+# Default strictness on purpose.  It is clean, and it catches what actually
+# went wrong here: an annotation naming something that does not exist, a slot
+# that only ever held None, a menu handed the wrong menu's action.  --strict
+# would add 243 "missing annotation" complaints, which is a different project
+# and the fastest way to teach everyone to ignore the checker.
+files = ["src/permuto"]
+python_version = "3.10"
+pretty = true
+
+[[tool.mypy.overrides]]
+# PySide6 ships stubs, but not for everything it exposes at run time.
+module = ["PySide6.*"]
+follow_imports = "skip"

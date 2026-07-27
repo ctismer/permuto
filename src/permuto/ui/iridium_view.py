@@ -56,7 +56,7 @@ class IridiumView(ViewBase):
         self.phase = IriPhase.BUILD
         self.settle = 0
         self.stepbuf = 0             # queued step keys (autorepeat)
-        self.prompt_action = None
+        self.prompt_action: IridiumAction | None = None
         self.message = ("SIMONE   building the network"
                         "   (any key skips the wait)")
         self.setWindowTitle("permuto - Iridium / SIMONE")

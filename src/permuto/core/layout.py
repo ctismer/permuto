@@ -25,6 +25,8 @@ class Algorithm(Enum):
     lookup table in the session that had to agree with it.
     """
 
+    label: str          # what the status line prints, padded as PCalc did
+
     def __new__(cls, value: str, label: str):
         # __new__, not __init__: only this way does Algorithm("rubber") find
         # the member, so a plain name still works wherever one is handier
@@ -42,6 +44,22 @@ class Algorithm(Enum):
 
 #: in cycling order, for the ``A`` key
 ALGORITHMS = tuple(Algorithm)
+
+
+def as_algorithm(alg: "Algorithm | str") -> Algorithm:
+    """Either spelling in, an :class:`Algorithm` out; anything else raises.
+
+    Written out rather than as ``Algorithm(alg)``, which a type checker reads
+    as a call to the two-argument ``__new__`` -- and this way the refusal says
+    what the choices are instead of "is not a valid Algorithm".
+    """
+    if isinstance(alg, Algorithm):
+        return alg
+    for member in Algorithm:
+        if member.value == alg:
+            return member
+    raise ValueError(f"no such relaxation algorithm: {alg!r} "
+                     f"(have {', '.join(a.value for a in Algorithm)})")
 
 
 def backup(g) -> None:
@@ -131,9 +149,9 @@ _CONTRACTIONS = {Algorithm.RUBBER: _rubber, Algorithm.RUBBER2: _rubber2,
                  Algorithm.NEW: _new}
 
 
-def contract(g, alg: Algorithm = Algorithm.RUBBER) -> None:
+def contract(g, alg: Algorithm | str = Algorithm.RUBBER) -> None:
     """One contraction pass over every node, by the chosen algorithm."""
-    alg = Algorithm(alg)          # a name still works, and rejects a wrong one
+    alg = as_algorithm(alg)       # a name still works, and rejects a wrong one
     iv.set_dimensions(g.dimensions)
     step = _CONTRACTIONS[alg]
     mean = _mean_edge_length(g) if alg is Algorithm.NEW else 0
@@ -231,10 +249,10 @@ def can_shrink(g) -> bool:
     return vec[d - 1] <= vec[0] // 100
 
 
-def relax_step(g, alg: Algorithm = Algorithm.RUBBER, calculating: bool = True,
-               spinning: bool = True) -> int:
+def relax_step(g, alg: Algorithm | str = Algorithm.RUBBER,
+               calculating: bool = True, spinning: bool = True) -> int:
     """One iteration of the main loop. Returns how many dimensions were shed."""
-    alg = Algorithm(alg)
+    alg = as_algorithm(alg)
     backup(g)
     if calculating:
         contract(g, alg)
