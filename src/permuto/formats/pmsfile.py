@@ -144,14 +144,6 @@ def write_pms(path, session: PlySession) -> None:
 
 # --- reading -----------------------------------------------------------
 
-def _parse_int_list(path, lineno, text) -> list[int]:
-    try:
-        return [int(v) for v in text.split(",") if v != ""]
-    except ValueError:
-        raise FileFormatError(path, f"expected integers, got {text!r}",
-                              where=f"line {lineno}")
-
-
 def _parse_node(path, lineno, tokens, dim, warn, salvage) -> Node:
     """Parse one node line.
 
@@ -214,10 +206,61 @@ def _parse_node(path, lineno, tokens, dim, warn, salvage) -> Node:
     return nd
 
 
+def _build_pm(path, base: str, optable, op_lines) -> PM:
+    """The operator table, through the setter that validates it.
+
+    The reader used to hand the table to ``PM``'s constructor, which only
+    checks the base -- so a cycle addressing positions the base does not have
+    was loaded without a word and the editor opened on it.  ``set_cycle`` is
+    where that rule lives, so the table goes in one cell at a time and a bad
+    one can name its own line, as every other refusal in this file does.
+    """
+    from ..errors import InvalidBase, InvalidCycle
+
+    try:
+        pm = PM(base=base)
+    except InvalidBase as exc:
+        raise FileFormatError(path, f"unusable operators: {exc}") from exc
+    for row in pm.optable:                    # start from an empty table
+        for j in range(len(row)):
+            row[j] = ""
+    for i, row in enumerate(optable, start=1):
+        for j, cyc in enumerate(row, start=1):
+            if not cyc:
+                continue
+            try:
+                pm.set_cycle(i, j, cyc)
+            except InvalidCycle as exc:
+                line = op_lines.get(i)
+                raise FileFormatError(
+                    path, f"unusable operators: {exc}",
+                    where=f"line {line}" if line else None) from exc
+    return pm
+
+
 def _coords(path, lineno, field, text, dim, num, warn, salvage) -> list[int]:
-    """Exactly *dim* coordinates; a short count is a truncation only in the
-    salvage tail, otherwise a hard error."""
-    coords = [int(v) for v in text.split(",") if v.lstrip("-").isdigit()]
+    """Exactly *dim* whole numbers.
+
+    Two ways to be wrong, and they are not the same thing.  A *short count* is
+    what a truncated file looks like, so in the salvage tail it is zero-filled
+    with a warning.  A field that is *not a number* is corruption, and is
+    refused by name -- this used to drop the offending text and then count what
+    was left, so ``pos=1,2,x`` at dim=2 came out as a clean node and the junk
+    went unmentioned (PORT-GAPS section 0: never swallow bad input).
+    """
+    coords = []
+    for value in text.split(","):
+        if value == "":
+            continue
+        try:
+            coords.append(int(value))
+        except ValueError:
+            if not salvage:
+                raise FileFormatError(
+                    path, f"{field} has {value!r} where a number belongs",
+                    where=f"line {lineno}")
+            warn(f"line {lineno}: node {num} {field} cut at {value!r}")
+            break
     if len(coords) != dim:
         if not salvage:
             raise FileFormatError(
@@ -285,6 +328,7 @@ def read_pms(path) -> PlySession:
     mode = "permuto"
     base = ""
     optable = [["" for _ in range(MAX_CYC)] for _ in range(DEFAULT_OPS)]
+    op_lines: dict[int, int] = {}      # so a bad cycle can name its own line
     last_edit_line = 0
     iteration = 0
     dim = 3
@@ -323,6 +367,7 @@ def read_pms(path) -> PlySession:
                         where=f"line {lineno}")
                 while len(optable) < i:      # a table wider than the default
                     optable.append(["" for _ in range(MAX_CYC)])
+                op_lines[i] = lineno
                 for j, cyc in enumerate(rest.split()[1:]):
                     if j < MAX_CYC:
                         optable[i - 1][j] = cyc
@@ -371,13 +416,15 @@ def read_pms(path) -> PlySession:
 
     pm = None
     if base:
-        from ..errors import InvalidBase, InvalidCycle
         try:
-            pm = PM(base=base, optable=[list(r) for r in optable])
-        except (InvalidBase, InvalidCycle) as exc:
-            if has_end:
-                raise FileFormatError(path, f"unusable operators: {exc}")
-            warnings.append(f"operators unusable, editor disabled: {exc}")
+            pm = _build_pm(path, base, optable, op_lines)
+        except FileFormatError as exc:
+            if has_end:                       # a complete file: this is wrong
+                raise
+            # truncated: the table may simply be half-written, so carry on
+            # without an editor rather than refusing the whole session
+            warnings.append(f"operators unusable, editor disabled: {exc.detail}")
+            pm = None
 
     # A cleanly written file ends with the 'end' marker (checked above when it is
     # present).  If it is missing, the file is either an older save from before

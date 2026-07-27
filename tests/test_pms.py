@@ -236,3 +236,74 @@ def test_a_file_without_the_end_marker_is_flagged_but_loaded(tmp_path):
     assert len(s.warnings) == 1 and "loaded fully" in s.warnings[0]
 
 
+
+
+# -- the refusals ------------------------------------------------------------
+# "Reject with a reason instead of swallowing it" is the port's stated
+# advantage over the original (PORT-GAPS section 0).  Nobody had checked that
+# the reasons arrive -- and two of them did not.
+
+HEAD = "permuto session 1\nmode polytop\ndim 2\nnodes 1\n"
+
+
+@pytest.mark.parametrize("text,detail", [
+    (HEAD + "node 1 pos=1,2,x\nend\n", "'x' where a number belongs"),
+    (HEAD + "node 1 pos=1,zzz\nend\n", "'zzz' where a number belongs"),
+    (HEAD + "node 1 pos=1.5,2.5\nend\n", "'1.5' where a number belongs"),
+    (HEAD + "node 1 pos=0,0 rubbish\nend\n", "expected key=value"),
+    (HEAD + "node 1 pos=0,0 links=x:y\nend\n", "bad link"),
+    (HEAD + "node 1 pos=0,0 wobble=3\nend\n", "unknown node field 'wobble'"),
+    ("permuto session 1\nmode permuto\nbase 1234\nop 99 12\ndim 2\nnodes 0\nend\n",
+     "operator 99 is outside 1..12"),
+    ("permuto session 1\nmode permuto\nbase 1234\nop 1 99\ndim 2\nnodes 0\nend\n",
+     "outside 1..4 of base '1234'"),
+])
+def test_a_refusal_says_which_text_it_choked_on(tmp_path, text, detail):
+    p = tmp_path / "bad.pms"
+    p.write_text(text)
+    with pytest.raises(FileFormatError) as exc:
+        read_pms(p)
+    assert detail in str(exc.value)
+    assert "line" in str(exc.value), "and where"
+
+
+def test_junk_among_the_right_number_of_coordinates_is_not_swallowed(tmp_path):
+    """`pos=1,2,x` at dim=2 used to load as a clean node: the parser dropped
+    anything that was not a number and then counted what was left, so the count
+    happened to match and nothing was said."""
+    p = tmp_path / "junk.pms"
+    p.write_text(HEAD + "node 1 pos=1,2,x\nend\n")
+    with pytest.raises(FileFormatError):
+        read_pms(p)
+
+
+def test_an_operator_the_base_cannot_carry_is_refused(tmp_path):
+    """The reader passed the table straight to PM's constructor, which only
+    validates the base -- so a cycle addressing positions the base does not
+    have was loaded without a word, and the editor opened on it.  It goes
+    through set_cycle now, which is where that rule lives."""
+    p = tmp_path / "ops.pms"
+    p.write_text("permuto session 1\nmode permuto\nbase 1234\nop 1 99\n"
+                 "dim 2\nnodes 0\nend\n")
+    with pytest.raises(FileFormatError) as exc:
+        read_pms(p)
+    assert "unusable operators" in str(exc.value)
+
+
+def test_a_number_cut_in_half_is_still_a_truncation_not_corruption(tmp_path):
+    """The leniency has to survive the stricter parse: a file cut mid-number
+    ends with something like `pos=7,-`, which is a cut and not junk."""
+    p = tmp_path / "cut.pms"
+    p.write_text("permuto session 1\nmode polytop\ndim 2\nnodes 2\n"
+                 "node 1 pos=5,6\nnode 2 pos=7,-\n")
+    s = read_pms(p)                      # loads, does not raise
+    assert s.graph.nnodes == 2
+    assert any("cut at '-'" in w for w in s.warnings)
+    assert any("zero-filled" in w for w in s.warnings)
+
+
+def test_negative_coordinates_are_ordinary(tmp_path):
+    """The stricter parse must not start refusing the minus sign."""
+    p = tmp_path / "neg.pms"
+    p.write_text(HEAD + "node 1 pos=-3,4\nend\n")
+    assert read_pms(p).graph.nodes[1].pos[:2] == [-3, 4]
