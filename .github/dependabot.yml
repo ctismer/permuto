@@ -1,0 +1,10 @@
+version: 2
+updates:
+  # The actions go stale silently: checkout@v4 and setup-python@v5 were still
+  # green, only annotated as Node 20 -- which is noticed by looking, and this
+  # is what looks instead.  Actions only; the Python dependency is one line in
+  # pyproject.toml and PySide6 is deliberately not pinned tight.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
