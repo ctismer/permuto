@@ -327,6 +327,52 @@ Careful with one thing found on the way: `drawLine(x1, y1, x2, y2)` with floats
 hits the *integer* overload and truncates the coordinates, which is a different
 picture. Pass `QPointF`.
 
+### To do: nothing runs the tests on GitHub (author, 2026-07-28)
+
+The repo is public and MIT, there are 372 tests and a clean `mypy`, and none of
+it runs when anything is pushed -- there is no `.github/workflows` at all. About
+fifteen lines, and the author asked for the successor to write them rather than
+this session.
+
+One job is enough, because `tests/test_annotations.py` already shells out to
+`mypy`: install it and a plain `pytest` covers both.
+
+```yaml
+# .github/workflows/tests.yml  -- sketch, not tested
+on: [push, pull_request]
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: {python: ["3.10", "3.12"]}      # the floor and what is used
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "${{ matrix.python }}"}
+      - run: sudo apt-get install -y libegl1 libgl1 libxkbcommon-x11-0
+      - run: pip install -e . mypy pytest pytest-cov
+      - run: python -m pytest
+```
+
+Three things that will otherwise cost an evening:
+
+* **PySide6 will not even import** on a bare ubuntu runner without `libegl1`
+  (and usually `libgl1`, `libxkbcommon-x11-0`). The error names a missing `.so`
+  and looks nothing like the real cause.
+* **`QT_QPA_PLATFORM=offscreen`** at the job level. `conftest.py` and
+  `test_render.py` set it themselves, but only once they are imported; setting
+  it in the environment is what makes an early import safe.
+* **The 1995 bytes survive the checkout already** -- `.gitattributes` says
+  `* -text`, so no line-ending conversion anywhere. The golden tests read
+  `legacy/` as CP437 and depend on that. Nobody should "fix" that line.
+
+Worth adding at the same time: `python tools/framehash.py` as a job of its own
+would notice a picture change, but only against hashes committed somewhere, and
+those are machine-dependent (font rasterisation). Probably not worth it -- the
+tool is for a person comparing before and after, not for CI.
+
 ### Open: reactivity still is not good -- probably a thread (author, 2026-07-27)
 
 The frame budget took the dead keyboard from 13.9 s to 0.63 s, and 0.63 s is
