@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 *.egg-info/
 .pytest_cache/
+.coverage
 
 # user session files saved while playing (root only; the 1995 .ply/.nod
 # under legacy/ are project data and stay tracked)

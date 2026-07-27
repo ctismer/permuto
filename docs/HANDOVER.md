@@ -201,12 +201,64 @@ rewrite is `ui/keys.py` and five drawing loops, because `menus.py`, `scene.py`,
    `FileFormatError` branches. "Reject with a reason instead of swallowing it"
    is the port's stated advantage over the original; nobody checks the reasons
    arrive.
-2. **Have someone else read the branch diff** before it lands on `main`.
+2. **Have someone else read the branch diff** before it lands on `main` — see
+   the reading guide below.
 
 Done since: the loader rules (three defects, see the table above) and
 `ui/render.py`, which turned into `scene.py` + five drawing loops — the
 direction discs, the hollow dead ball and the white ring now have tests on both
 sides, what the scene says and what reaches the pixels.
+
+### Reading this branch (for a reviewer)
+
+Thirty commits, but six arcs. `git log --oneline main..phase3-refactor` reads
+newest first; the arcs below are oldest first, which is the order they make
+sense in. Each commit builds and its tests pass, so bisecting works.
+
+| Arc | Commits | What to check |
+|---|---|---|
+| The widgets become visible to a language server | `57b7925`..`2568940` | pure moves |
+| Types instead of strings and dicts | `550a44f`..`4ad9727`, `a05eb84` | that no enum lost a case |
+| Logic leaves the widget | `cf9c60a`, `338beca`, `d9ccd0e`, `0b013c1`, `e0d6ebc`, `ec65497` | that `core/` and `session.py` stayed UI-free |
+| Painting becomes layers, then a scene | `92e09fe`..`bd19861`, `39b7020` | the layer order, and that nothing draws twice |
+| The menus become one table | `820748a` | **the parity claims** — see below |
+| The look, on purpose | `24b18bf`, `6b1360b` | whether you agree with the judgement |
+
+**Where the risk actually is**, honestly:
+
+* **`820748a` (the menu table).** The main menu line is now *generated*. It is
+  pinned byte-for-byte against `polytop.mod:372-392` in
+  `test_menus.py::test_the_1995_menu_lines_are_reproduced_exactly`, but if the
+  original prints something that table cannot express, this is where it breaks.
+  Note the two deliberately unadvertised keys (`C`/`U` in the program menu) —
+  `polytop.mod:467` versus `:498`/`:508` says the original hid them too.
+* **`39b7020` (scene/render split).** Claimed invisible, and checked over
+  thirteen frames with `tools/framehash.py`. The residual risk is a
+  configuration nobody rendered. If you think of one, add it to that file.
+* **`f58dd80` (name resolution).** This one **changes CLI behaviour**: a typed
+  extension now wins, bare names are looked for in the working directory first,
+  and a seed behind a session name resumes the session. Three defects, three
+  tests; but if you relied on `show alle6.nod` giving you the `.pgd`, it no
+  longer does.
+* **`24b18bf` / `6b1360b` (the look).** The only intentional visual change, at
+  the author's request: marks stop growing past `scene.MARK_REFERENCE`, and the
+  operator table takes the width its text needs instead of a flat 260 px. The
+  window the viewer opens with is bit-identical apart from the wider picture.
+
+**What was not touched**: `core/` (`pm`, `graph`, `spa`, `iri`, `layout`,
+`intvector`), the generators, and the file formats other than where the loader
+calls them. The golden tests against `legacy/modula/nod/*` and the eight 1995
+`.ply` files are unchanged and green — if a reviewer only checks one thing,
+check that no golden expectation was edited to make something pass.
+
+Useful while reading:
+
+```bash
+python -m pytest -q                       # 311 tests
+python -m pytest --cov=permuto            # 94%
+python tools/framehash.py                 # the picture, as thirteen hashes
+permuto show pgl5                         # and then pull the window open
+```
 
 ### How to read a "coverage hole" on this list
 
