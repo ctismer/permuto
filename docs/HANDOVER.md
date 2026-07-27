@@ -296,6 +296,34 @@ Careful with one thing found on the way: `drawLine(x1, y1, x2, y2)` with floats
 hits the *integer* overload and truncates the coordinates, which is a different
 picture. Pass `QPointF`.
 
+### Open: reactivity still is not good -- probably a thread (author, 2026-07-27)
+
+The frame budget took the dead keyboard from 13.9 s to 0.63 s, and 0.63 s is
+still too long. It is one relaxation iteration, the smallest thing that can
+happen, and the repaint after it is another second in the next turn of the
+event loop. Both run in the GUI thread, so nothing else can.
+
+What a worker thread would and would not buy, before anyone is disappointed:
+
+* **Not speed.** The relaxation is pure Python integer arithmetic, so the GIL
+  serialises it either way. What a thread buys is that the interpreter switches
+  every few milliseconds, so keystrokes are handled *while* it computes.
+* Only the GUI thread may paint a widget, so the split is: the worker relaxes,
+  hands over, the GUI paints.
+* The shared state is the graph, and the painter reads positions the worker
+  would be writing. There is already a two-buffer structure to build on --
+  `layout.backup()` keeps `old` beside `pos`, which is what `contract` reads
+  from. Painting from `old` while the worker fills `pos` may be most of the
+  answer without a lock.
+* `core/` is Qt-free, which is what makes this a small change rather than a
+  rewrite: nothing in the relaxation touches a widget.
+* The cheaper thing to try first is `processEvents()` between iterations. It is
+  a few lines, and the hazard is re-entrancy -- a keystroke can start a rebuild
+  in the middle of a relaxation.
+
+Worth doing together with the cheaper balls below: at 40320 nodes the repaint
+is the larger of the two blocks.
+
 ### Wanted: smaller balls, cheaper balls, and real ones (author, 2026-07-27)
 
 Three things about the nodes, from looking at 40320 of them. They belong
