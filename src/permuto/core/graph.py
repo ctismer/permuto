@@ -24,14 +24,35 @@ MAX_LINKS = 12   # NodeMgr.MaxLinks -- how many edges a node has room for
 
 
 @dataclass
+class Link:
+    """One end of one edge: where it goes, and what it is doing.
+
+    An edge is stored twice, once at each end, and the two ends genuinely
+    differ: the same edge is ``L_INPUT`` where the SPA wave enters and
+    ``L_OUTPUT`` where it leaves, which is what the direction discs read.
+
+    Everything an edge knows lives here.  It used to be spread over four
+    containers sharing an index -- ``links``/``opno`` on the node and
+    ``lines``/``broken`` on its state -- in *two* index conventions, ``broken``
+    counting from 1 and ``lines`` from 0.  ``PM.Disconnect`` shifted the first
+    pair and not the second, so after a disconnect the marks described other
+    edges (``docs/PORT-GAPS.md`` section 0).  With one object there is no index
+    left to get wrong.
+    """
+
+    to: int                      # the neighbour's number, 1-based
+    op: int = 0                  # which operator made this edge, 0 if unknown
+    status: int = L_FREE         # LineStatus, while a program runs
+    broken: bool = False         # cut by hand in the program menu
+
+
+@dataclass
 class NodeState:
     step: int = 0
     active: bool = False
     dead: bool = False
     sum: int = 0
     display: int = 0
-    broken: set[int] = field(default_factory=set)  # 1-based link indices
-    lines: list[int] = field(default_factory=list)  # LineStatus per link
 
 
 @dataclass
@@ -61,30 +82,25 @@ class Node:
     pos: list[int] = field(default_factory=iv.new_vector)
     old: list[int] = field(default_factory=iv.new_vector)
     color: int = 7
-    nlink: int = 0
-    links: list[int] = field(default_factory=list)  # 1-based neighbour numbers
-    opno: list[int] = field(default_factory=list)
+    links: list[Link] = field(default_factory=list)
     perm: str = ""
     state: NodeState = field(default_factory=NodeState)
     iri: IriState = field(default_factory=IriState)
 
-    def remove_link(self, k: int) -> None:
-        """Drop link *k* (1-based), keeping every per-link array aligned.
+    @property
+    def nlink(self) -> int:
+        """``NodeType.nlink`` -- the original had to carry the count beside a
+        fixed array; here it is simply how many links there are."""
+        return len(self.links)
 
-        ``PM.Disconnect`` shifted ``links`` and ``opno`` but left ``state.lines``
-        and ``state.broken`` at their old indices, although they address the
-        same link numbers -- so after a Disconnect the marks referred to
-        different edges (``docs/PORT-GAPS.md`` section 0).  Everything indexed
-        by link lives here now, and shifts together.
-        """
+    @property
+    def neighbours(self) -> list[int]:
+        """Just the node numbers, for the callers that want nothing else."""
+        return [link.to for link in self.links]
+
+    def remove_link(self, k: int) -> None:
+        """Drop link *k* (1-based).  Everything that edge knew goes with it."""
         del self.links[k - 1]
-        if k - 1 < len(self.opno):
-            del self.opno[k - 1]
-        self.nlink = len(self.links)
-        if k - 1 < len(self.state.lines):
-            del self.state.lines[k - 1]
-        self.state.broken = {i if i < k else i - 1
-                             for i in self.state.broken if i != k}
 
 
 class Graph:
@@ -105,9 +121,8 @@ class Graph:
         g = cls()
         g.nnodes = base.nnodes
         for num in sorted(base.links):
-            nd = Node(num=num, links=list(base.links[num]))
-            nd.nlink = len(nd.links)
-            g.nodes[num] = nd
+            g.nodes[num] = Node(num=num,
+                                links=[Link(to=j) for j in base.links[num]])
         g.set_dimensions(dimensions)
         # "colors simply derived from nodenumbers" (SetupPolytope) -- a .nod
         # file has no permutations to colour by, so the numbering has to do,
@@ -143,9 +158,7 @@ class Graph:
                 if j is None or j == i or j in seen:
                     continue
                 seen[j] = opk
-                nd.links.append(j)
-                nd.opno.append(opk)
-            nd.nlink = len(nd.links)
+                nd.links.append(Link(to=j, op=opk))
             g.nodes[i] = nd
         g.set_dimensions(dimensions)
         if init:
@@ -176,8 +189,8 @@ class Graph:
         nd = self.nodes.get(n1)
         if nd is None:
             return 0
-        for i, j in enumerate(nd.links, start=1):
-            if j == n2:
+        for i, link in enumerate(nd.links, start=1):
+            if link.to == n2:
                 return i
         return 0
 
@@ -216,12 +229,9 @@ class Graph:
         self.nodes = {}
         for new_num, nd in enumerate(kept, start=1):
             nd.num = new_num
-            # drop links to removed nodes, keeping opno aligned
-            pairs = [(renumber[j], nd.opno[k] if k < len(nd.opno) else 0)
-                     for k, j in enumerate(nd.links) if j in renumber]
-            nd.links = [j for j, _ in pairs]
-            nd.opno = [op for _, op in pairs]
-            nd.nlink = len(nd.links)
+            for link in nd.links:                  # follow the renumbering
+                link.to = renumber.get(link.to, 0)
+            nd.links = [link for link in nd.links if link.to]
             self.nodes[new_num] = nd
         dropped = self.nnodes - len(kept)
         self.nnodes = len(kept)

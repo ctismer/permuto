@@ -54,8 +54,8 @@ def _mean_edge_length(g) -> int:
     """The average edge length, which only ``New`` needs."""
     lsum = lcount = 0
     for nd in g.ordered():
-        for j in nd.links:
-            tmp = list(g.nodes[j].old)
+        for link in nd.links:
+            tmp = list(g.nodes[link.to].old)
             iv.sub_vector(tmp, nd.pos)
             lsum += iv.vector_length(tmp)
             lcount += 1
@@ -65,8 +65,8 @@ def _mean_edge_length(g) -> int:
 def _rubber(g, nd, nlink, mean) -> None:
     """Pull toward the neighbours, all edges equally."""
     vec = iv.new_vector()
-    for j in nd.links:
-        tmp = list(g.nodes[j].old)
+    for link in nd.links:
+        tmp = list(g.nodes[link.to].old)
         iv.sub_vector(tmp, nd.pos)
         iv.add_vector(vec, tmp)
     iv.scale_vector(vec, 1, 3 * nlink)
@@ -76,8 +76,8 @@ def _rubber(g, nd, nlink, mean) -> None:
 def _rubber2(g, nd, nlink, mean) -> None:
     """As Rubber, but each pull weighted by its own length."""
     vec = iv.new_vector()
-    for j in nd.links:
-        tmp = list(g.nodes[j].old)
+    for link in nd.links:
+        tmp = list(g.nodes[link.to].old)
         iv.sub_vector(tmp, nd.pos)
         length = iv.vector_length(tmp)
         iv.scale_vector(tmp, length, nlink * iv.NORM)
@@ -90,8 +90,8 @@ def _ribbon(g, nd, nlink, mean) -> None:
     """Move along the longest edge only, by how much it exceeds the shortest."""
     vec = iv.new_vector()
     mx, mn = 1, 1 << 30
-    for j in nd.links:
-        cmp = list(g.nodes[j].old)
+    for link in nd.links:
+        cmp = list(g.nodes[link.to].old)
         iv.sub_vector(cmp, nd.pos)
         length = iv.vector_length(cmp)
         if length > mx:
@@ -105,20 +105,20 @@ def _ribbon(g, nd, nlink, mean) -> None:
 
 def _mean(g, nd, nlink, mean) -> None:
     """Add the neighbours outright -- Normalize scales the result back."""
-    for j in nd.links:
-        iv.add_vector(nd.pos, g.nodes[j].old)
+    for link in nd.links:
+        iv.add_vector(nd.pos, g.nodes[link.to].old)
 
 
 def _new(g, nd, nlink, mean) -> None:
     """Gather gently, then contract the over-long edges -- twice."""
     vec = iv.new_vector()
-    for j in nd.links:
-        iv.add_vector(vec, g.nodes[j].old)
+    for link in nd.links:
+        iv.add_vector(vec, g.nodes[link.to].old)
     iv.scale_vector(vec, 1, 20 * nlink)
     iv.add_vector(nd.pos, vec)
     for _ in range(2):  # "nochmal!" -- contract long edges twice
-        for j in nd.links:
-            tmp = list(g.nodes[j].old)
+        for link in nd.links:
+            tmp = list(g.nodes[link.to].old)
             iv.sub_vector(tmp, nd.pos)
             length = iv.vector_length(tmp)
             if length > mean:

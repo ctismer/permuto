@@ -8,7 +8,7 @@ from conftest import ply_files
 
 from permuto import FileFormatError
 from permuto.core import layout
-from permuto.core.graph import Graph, Node
+from permuto.core.graph import Graph, Link, Node
 from permuto.core.iri import Iridium
 from permuto.formats import (
     PlySession,
@@ -23,12 +23,9 @@ PLY = ply_files()
 PLY_IDS = [p.stem for p in PLY]
 
 
-def _state_key(st, nlink):
-    # normalise line states to length nlink, so [] and [0]*nlink -- both meaning
-    # "no line states" -- compare equal regardless of how the node was created
-    lines = tuple((list(st.lines) + [0] * nlink)[:nlink])
-    return (st.dead, st.active, st.display, st.step, st.sum,
-            frozenset(st.broken), lines)
+def _links_key(nd):
+    """Everything the edges of *nd* know, in one comparable value."""
+    return tuple((lk.to, lk.op, lk.status, lk.broken) for lk in nd.links)
 
 
 def graphs_agree(a: Graph, b: Graph) -> bool:
@@ -40,9 +37,9 @@ def graphs_agree(a: Graph, b: Graph) -> bool:
             return False
         if na.pos[:a.dimensions] != nb.pos[:b.dimensions]:
             return False
-        if na.links != nb.links or list(na.opno) != list(nb.opno):
+        if _links_key(na) != _links_key(nb):
             return False
-        if _state_key(na.state, na.nlink) != _state_key(nb.state, nb.nlink):
+        if na.state != nb.state:
             return False
         if na.iri != nb.iri:
             return False
@@ -102,19 +99,24 @@ def test_an_iridium_session_round_trips_which_ply_could_not(tmp_path):
 
 
 def test_program_state_survives(tmp_path):
-    """SPA/ParSum fields and the broken-edge set are part of a session too."""
+    """SPA/ParSum fields and the broken edges are part of a session too.
+
+    (This test used to mark link 3 of a node that has two -- the old `broken`
+    set took any number.  A link carries its own mark now, so there is no
+    number to be wrong about.)"""
     g = Graph.build("123", ["12", "+", "23"], seed=1)
     nd = g.nodes[1]
     nd.state.dead = True
     nd.state.display, nd.state.step, nd.state.sum = 5, 2, 9
-    nd.state.broken = {1, 3}
-    nd.state.lines = [1, 0, 2]
+    nd.links[0].broken = True
+    nd.links[1].broken = True
+    nd.links[0].status, nd.links[1].status = 1, 2
 
     out = tmp_path / "prog.pms"
     write_pms(out, PlySession(graph=g, mode="permuto", base="123"))
     back = read_pms(out).graph.nodes[1]
     assert back.state.dead and back.state.display == 5
-    assert back.state.broken == {1, 3}
+    assert [lk.broken for lk in back.links] == [True, True]
 
 
 def test_iteration_counter_round_trips(tmp_path):

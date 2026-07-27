@@ -319,7 +319,7 @@ class PermutographView(ViewBase):
         This is the original's second step for line-break and collapse --
         ``UserIO.SelectCard`` over the node's link list.
         """
-        neighbours = list(self.g.nodes[node].links)
+        neighbours = self.g.nodes[node].neighbours
         if not neighbours:
             self.message = f"node {node} has no neighbours"
             self._done_pending()

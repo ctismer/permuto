@@ -333,7 +333,8 @@ class Session:
         for a, b in ((n1, n2), (n2, n1)):
             k = self.graph.find_link(a, b)
             if k:
-                self.graph.nodes[a].state.broken ^= {k}
+                link = self.graph.nodes[a].links[k - 1]
+                link.broken = not link.broken
 
     def _table(self) -> PM:
         """The operator table, or a refusal: a ``.nod`` graph has none, and the

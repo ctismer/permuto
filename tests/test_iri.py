@@ -31,7 +31,7 @@ def test_neighbours_differ_by_one_step_in_two_coordinates(net):
     """Every edge moves one unit from one coordinate to another, so the digit
     sum -- the grid -- is preserved."""
     for nd in net.graph.nodes.values():
-        for j in nd.links:
+        for j in nd.neighbours:
             other = net.graph.nodes[j].perm
             deltas = [int(a) - int(b) for a, b in zip(nd.perm, other)]
             assert sorted(deltas) == [-1, 0, 1]
@@ -76,7 +76,7 @@ def test_damage_spreads_a_dent_into_the_neighbourhood(net):
 
     avail = net.availability()
     assert avail[victim] == 0
-    neighbours = net.graph.nodes[victim].links
+    neighbours = net.graph.nodes[victim].neighbours
     assert all(avail[j] < FULL for j in neighbours), "neighbours must sag"
     # and the dent is local: something far away is untouched
     far = net.seek_node("009")

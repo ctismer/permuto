@@ -7,7 +7,7 @@ import pytest
 
 from conftest import ply_files
 from permuto import FileFormatError
-from permuto.core.graph import Graph, Node
+from permuto.core.graph import Graph, Link, Node
 from permuto.formats import PlySession, read_ply, write_ply
 from permuto.formats.plyfile import HEADER_SIZE, RECORD_SIZE
 
@@ -29,11 +29,12 @@ def test_stored_graph_matches_what_pm_recomputes(path):
     assert [nd.perm for nd in stored.ordered()] == [nd.perm for nd in built.ordered()]
 
     def edges(g):
-        return {tuple(sorted((n, j))) for n in g.nodes for j in g.nodes[n].links}
+        return {tuple(sorted((n, j)))
+                for n in g.nodes for j in g.nodes[n].neighbours}
 
     def ops(g):
-        return {(n, j): o for n in g.nodes
-                for j, o in zip(g.nodes[n].links, g.nodes[n].opno)}
+        return {(n, lk.to): lk.op for n in g.nodes
+                for lk in g.nodes[n].links}
 
     assert edges(stored) == edges(built)
     assert ops(stored) == ops(built)
@@ -75,14 +76,12 @@ def test_session_roundtrip_keeps_program_and_iridium_state(tmp_path):
     g.nnodes = 2
     g.dimensions = 3
     for n in (1, 2):
-        nd = Node(num=n, perm=f"12{n}", color=n + 1, links=[3 - n], opno=[2],
+        nd = Node(num=n, perm=f"12{n}", color=n + 1,
+                  links=[Link(to=3 - n, op=2, status=2, broken=True)],
                   pos=[n, -n, 7, 0, 0, 0, 0, 0], old=[1, 2, 3, 0, 0, 0, 0, 0])
-        nd.nlink = 1
         nd.state.dead = n == 2
         nd.state.active = n == 1
         nd.state.display, nd.state.step, nd.state.sum = -5, 3, 9
-        nd.state.lines = [2]
-        nd.state.broken = {1}
         nd.iri.avail, nd.iri.target = 10000, 3 - n
         nd.iri.message_num, nd.iri.sender_repeat = 42, 7
         g.nodes[n] = nd
@@ -98,7 +97,7 @@ def test_session_roundtrip_keeps_program_and_iridium_state(tmp_path):
     for n in (1, 2):
         a, b = g.nodes[n], back.graph.nodes[n]
         assert (a.pos, a.old, a.color, a.perm) == (b.pos, b.old, b.color, b.perm)
-        assert (a.links, a.opno) == (b.links, b.opno)
+        assert a.links == b.links
         assert a.state == b.state
         assert a.iri == b.iri
 

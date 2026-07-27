@@ -18,30 +18,28 @@ def reset_machine(g: Graph) -> None:
     for nd in g.nodes.values():
         nd.state.step = 0
         nd.state.active = False
-        nd.state.lines = [L_FREE] * nd.nlink
+        for link in nd.links:
+            link.status = L_FREE
 
 
 def update_linestates(g: Graph) -> None:
     """Port of ``_update_linestates``: edge state from the two step values."""
     for nd in g.ordered():
         st = nd.state
-        if len(st.lines) != nd.nlink:
-            st.lines = [L_FREE] * nd.nlink
-        for k, j in enumerate(nd.links, start=1):
-            ot = g.nodes[j].state
+        for link in nd.links:
+            ot = g.nodes[link.to].state
             if st.dead or ot.dead:
-                v = L_LOCKED
-            elif k in st.broken:
-                v = L_FREE
+                link.status = L_LOCKED
+            elif link.broken:
+                link.status = L_FREE
             elif st.step == 0 or ot.step == 0:
-                v = L_FREE
+                link.status = L_FREE
             elif st.step < ot.step:
-                v = L_OUTPUT
+                link.status = L_OUTPUT
             elif st.step == ot.step:
-                v = L_LOCKED
+                link.status = L_LOCKED
             else:  # st.step > ot.step
-                v = L_INPUT
-            st.lines[k - 1] = v
+                link.status = L_INPUT
 
 
 def activate_maxstep(g: Graph) -> int:
@@ -86,10 +84,10 @@ def shortest_path(g: Graph) -> bool:
             continue
         nd = g.nodes[i]
         phase = nd.state.step
-        for link, j in enumerate(nd.links, start=1):
-            if link in nd.state.broken or g.nodes[j].state.dead:
+        for link in nd.links:
+            if link.broken or g.nodes[link.to].state.dead:
                 continue
-            js = g.nodes[j].state
+            js = g.nodes[link.to].state
             if js.step == 0:
                 js.step = phase + 1
                 js.active = True
@@ -128,15 +126,16 @@ def par_sum(g: Graph) -> bool:
             continue
         nd = g.nodes[i]
         nd.state.step = -nd.state.step  # clear, so it will not reactivate
-        for link, j in enumerate(nd.links, start=1):
-            if link in nd.state.broken or g.nodes[j].state.dead:
+        for link in nd.links:
+            if link.broken or g.nodes[link.to].state.dead:
                 continue
-            if g.nodes[j].state.sum != 0:
+            other = g.nodes[link.to].state
+            if other.sum != 0:
                 message = nd.state.sum
                 nd.state.sum = 0
                 nd.state.display = nd.state.sum
-                g.nodes[j].state.sum += message
-                g.nodes[j].state.display = g.nodes[j].state.sum
+                other.sum += message
+                other.display = other.sum
     update_linestates(g)
     return activate_maxstep(g) > 0
 

@@ -124,7 +124,7 @@ def geodesic(freq: int = 1):
     ``makeikos.awk``'s second parameter asked for "the original unmapped node
     labels ... character strings that show up nicely".
     """
-    from ..core.graph import Graph, Node
+    from ..core.graph import Graph, Link, Node
 
     labels = geodesic_labels(freq)
     number: dict[str, int] = {lab: i for i, lab in enumerate(labels, start=1)}
@@ -135,10 +135,9 @@ def geodesic(freq: int = 1):
         g.nodes[num] = Node(num=num, perm=lab)
     for u, v in geodesic_edges(freq):
         for a, b in ((number[u], number[v]), (number[v], number[u])):
-            g.nodes[a].links.append(b)
+            g.nodes[a].links.append(Link(to=b))
     for nd in g.nodes.values():
-        nd.links.sort()
-        nd.nlink = len(nd.links)
+        nd.links.sort(key=lambda link: link.to)
         # colour by degree: the twelve original corners (5) stand out from the
         # subdivision nodes (6), which is what makes the icosahedron visible
         nd.color = 4 if nd.nlink == 5 else 7

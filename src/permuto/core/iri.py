@@ -49,7 +49,7 @@ from __future__ import annotations
 
 from ..errors import NodeNotFound, ProgramStateError
 from . import intvector as iv
-from .graph import Graph, IriState, Node
+from .graph import Graph, IriState, Link, Node
 
 FREQ = 9
 LIMIT = (FREQ + 1) * (FREQ + 2) // 2      # 55 satellites
@@ -179,10 +179,8 @@ class Iridium:
                 other = self.seek_node(name)
                 if other == 0:
                     continue
-                node.links.append(other)
-                g.nodes[other].links.append(num)
-                node.nlink = len(node.links)
-                g.nodes[other].nlink = len(g.nodes[other].links)
+                node.links.append(Link(to=other))
+                g.nodes[other].links.append(Link(to=num))
 
         # advanced even when the network is full, exactly as in the original
         self._namestr = self._sweep()
@@ -305,7 +303,8 @@ class Iridium:
             nd = nodes[num]
             if nd.iri.avail == 0 or nd.nlink == 0:
                 continue
-            neighbourhood = sum(nodes[j].iri.avbak for j in nd.links) // nd.nlink
+            neighbourhood = sum(nodes[link.to].iri.avbak
+                                for link in nd.links) // nd.nlink
             nd.iri.avail = (iv.scale(nd.iri.avail, OWN_WEIGHT, FULL)
                             + iv.scale(neighbourhood, NEIGHBOUR_WEIGHT, FULL)
                             + iv.scale(FULL, RECHARGE, FULL))
@@ -329,27 +328,27 @@ class Iridium:
         here = self._distance(nd.perm, target_label)
 
         qual, avail = [], []
-        for j in nd.links:
-            there = self._distance(nodes[j].perm, target_label)
+        for link in nd.links:
+            there = self._distance(nodes[link.to].perm, target_label)
             qual.append(QUAL_AWAY if here < there else
                         QUAL_SIDEWAYS if here == there else QUAL_TOWARDS)
-            avail.append(nodes[j].iri.avbak)
+            avail.append(nodes[link.to].iri.avbak)
 
         # the original scans backwards for a first candidate, so ties resolve
         # to the lowest link index
         best = -1
         for i in range(nd.nlink - 1, -1, -1):
-            if avail[i] != 0 and nodes[nd.links[i]].iri.target == 0:
+            if avail[i] != 0 and nodes[nd.links[i].to].iri.target == 0:
                 best = i
         if best < 0:
             return num
 
         for i in range(nd.nlink):
-            if (nodes[nd.links[i]].iri.target == 0
+            if (nodes[nd.links[i].to].iri.target == 0
                     and iv.scale(qual[i], avail[i], 5)
                     > iv.scale(qual[best], avail[best], 5)):
                 best = i
-        return nd.links[best]
+        return nd.links[best].to
 
     def _movements(self) -> None:
         """``Movements`` -- one hop per packet, then repaint.

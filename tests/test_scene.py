@@ -14,7 +14,7 @@ import pytest
 
 from permuto import scene
 from permuto.core.graph import (L_FREE, L_INPUT, L_LOCKED, L_OUTPUT, Graph,
-                                Node)
+                                Link, Node)
 from permuto.loader import load_graph
 
 SIZE = 700
@@ -33,9 +33,7 @@ def _two_nodes(dimensions=2, z=0):
     g.dimensions = dimensions
     for num, x in ((1, -(1 << 23)), (2, 1 << 23)):
         nd = Node(num=num, pos=[x, 0, z] + [0] * 5, color=num, perm=str(num))
-        nd.links = [3 - num]
-        nd.opno = [1]
-        nd.nlink = 1
+        nd.links = [Link(to=3 - num, op=1)]
         g.nodes[num] = nd
     g.n_operators = 1
     return g
@@ -52,7 +50,7 @@ def test_a_broken_edge_is_black_and_stays_wide_at_the_back():
     """Breaking a line is the one mark that must read the same front or back:
     it says the graph was edited, not how far away it is."""
     g = _two_nodes()
-    g.nodes[1].state.broken = {1}
+    g.nodes[1].links[0].broken = True
     e = _edge(scene.build(g, SIZE, SIZE, op_colors=True, program=True))
     assert e.reason == "broken"
     assert e.rgb == scene.BROKEN
@@ -63,7 +61,7 @@ def test_the_program_wave_outranks_the_operator_colour():
     """While SPA runs, the line state is what the picture is about; the
     operator number keeps its digit but loses the colour."""
     g = _two_nodes(3, z=1)                  # facing the viewer: undimmed
-    g.nodes[1].state.lines = [L_LOCKED]
+    g.nodes[1].links[0].status = L_LOCKED
     plain = _edge(scene.build(g, SIZE, SIZE, op_colors=True))
     running = _edge(scene.build(g, SIZE, SIZE, op_colors=True, program=True))
     assert plain.reason == "operator"
@@ -95,14 +93,14 @@ def test_an_input_disc_sits_near_this_node_and_an_output_near_the_other():
     """Colour says the edge carries the wave; the disc says which way -- a
     sixth of the way along, from whichever end the wave enters."""
     g = _two_nodes()
-    g.nodes[1].state.lines = [L_INPUT]
+    g.nodes[1].links[0].status = L_INPUT
     sc = scene.build(g, SIZE, SIZE, program=True)
     (disc,) = sc.discs
     a, b = sc.edges[0].a, sc.edges[0].b
     assert disc.incoming
     assert disc.at == ((5 * a[0] + b[0]) / 6, (5 * a[1] + b[1]) / 6)
 
-    g.nodes[1].state.lines = [L_OUTPUT]
+    g.nodes[1].links[0].status = L_OUTPUT
     (disc,) = scene.build(g, SIZE, SIZE, program=True).discs
     assert not disc.incoming
     assert disc.at == ((5 * b[0] + a[0]) / 6, (5 * b[1] + a[1]) / 6)
@@ -112,15 +110,15 @@ def test_an_input_disc_sits_near_this_node_and_an_output_near_the_other():
 def test_only_a_moving_wave_gets_a_disc(state):
     """A locked or free edge goes nowhere, so there is no direction to show."""
     g = _two_nodes()
-    g.nodes[1].state.lines = [state]
+    g.nodes[1].links[0].status = state
     assert scene.build(g, SIZE, SIZE, program=True).discs == []
 
 
 def test_a_broken_edge_carries_no_disc_even_mid_wave():
     """It is out of the graph; a leftover arrow on it would be a lie."""
     g = _two_nodes()
-    g.nodes[1].state.lines = [L_INPUT]
-    g.nodes[1].state.broken = {1}
+    g.nodes[1].links[0].status = L_INPUT
+    g.nodes[1].links[0].broken = True
     assert scene.build(g, SIZE, SIZE, program=True).discs == []
 
 
@@ -191,7 +189,7 @@ def test_writing_nothing_leaves_the_links_bare_too():
 
 def test_a_broken_edge_loses_its_operator_digit():
     g = _two_nodes()
-    g.nodes[1].state.broken = {1}
+    g.nodes[1].links[0].broken = True
     assert not scene.build(g, SIZE, SIZE, op_colors=True, name_mode=1).digits
 
 

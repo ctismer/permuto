@@ -92,7 +92,7 @@ def test_permutograph_view_paints_in_every_mode(qapp):
         view.ui_mode = viewer.UiMode.SELECT
         n = 1
         view.select = viewer.Selection(node=n, action=viewer.ProgramAction.BREAK,
-                                       items=list(view.g.nodes[n].links))
+                                       items=view.g.nodes[n].neighbours)
         _repaint(view)
         captured["error"] = view._paint_error
         view.close()
@@ -439,12 +439,13 @@ def test_running_spa_from_the_program_menu_marks_the_path(qapp):
         pts = render.project(view.g, pic_w, view.height())
         greens = 0
         for nd in view.g.ordered():
-            for idx, j in enumerate(nd.links):
-                if j <= nd.num or nd.state.lines[idx] not in (L_INPUT, L_OUTPUT):
+            for link in nd.links:
+                j = link.to
+                if j <= nd.num or link.status not in (L_INPUT, L_OUTPUT):
                     continue
                 xi, yi, _ = pts[nd.num]
                 xj, yj, _ = pts[j]
-                if nd.state.lines[idx] == L_INPUT:
+                if link.status == L_INPUT:
                     qx, qy = (5 * xi + xj) / 6, (5 * yi + yj) / 6
                 else:
                     qx, qy = (5 * xj + xi) / 6, (5 * yj + yi) / 6
@@ -547,8 +548,9 @@ def _edges_with_a_digit_patch(view):
     found = 0
     for nd in view.g.ordered():
         xi, yi, _zi = pts[nd.num]
-        for idx, j in enumerate(nd.links):
-            if j <= nd.num or idx >= len(nd.opno) or not nd.opno[idx]:
+        for link in nd.links:
+            j = link.to
+            if j <= nd.num or not link.op:
                 continue
             xj, yj, _zj = pts[j]
             for t in (0.44, 0.47, 0.5, 0.53, 0.56):
@@ -636,7 +638,8 @@ def test_breaking_a_line_needs_two_steps_and_blackens_that_edge(qapp):
         other = break_the_line(view)
         captured["broken"] = _black_pixels_on_edge(view, 1, other)
         captured["mode"] = view.ui_mode
-        captured["marks"] = set(view.g.nodes[1].state.broken)
+        captured["marks"] = {i for i, lk in enumerate(view.g.nodes[1].links, 1)
+                             if lk.broken}
         assert break_the_line(view) == other, "the same neighbour, second time"
         captured["repaired"] = _black_pixels_on_edge(view, 1, other)
         view.close()

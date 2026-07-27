@@ -48,7 +48,7 @@ from pathlib import Path
 
 from ..errors import FileFormatError
 from ..core import intvector as iv
-from ..core.graph import Graph, IriState, Node, NodeState
+from ..core.graph import Graph, IriState, Link, Node, NodeState
 from ..core.pm import MAX_CYC, MAX_OPS, PM
 from .plyfile import PlySession
 
@@ -71,13 +71,12 @@ def _node_line(nd: Node, dim: int) -> str:
     if any(nd.old[:dim]):
         parts.append(f"old={_ints(nd.old[:dim])}")
     if nd.links:
-        if any(nd.opno):     # permuto edges carry an operator number
-            opno = list(nd.opno) + [0] * (len(nd.links) - len(nd.opno))
-            parts.append("links=" + ",".join(f"{j}:{op}"
-                                              for j, op in zip(nd.links, opno)))
+        if any(link.op for link in nd.links):   # permuto edges carry an operator
+            parts.append("links=" + ",".join(f"{lk.to}:{lk.op}"
+                                             for lk in nd.links))
         else:                # iridium / .nod edges have none -- write bare
-            parts.append("links=" + _ints(nd.links))
-    state = _state_field(nd.state, nd.nlink)
+            parts.append("links=" + _ints(link.to for link in nd.links))
+    state = _state_field(nd.state, nd.links)
     if state:
         parts.append("state=" + state)
     iri = _iri_field(nd.iri)
@@ -86,7 +85,15 @@ def _node_line(nd: Node, dim: int) -> str:
     return " ".join(parts)
 
 
-def _state_field(st: NodeState, nlink: int) -> str:
+def _state_field(st: NodeState, links) -> str:
+    """The state as the file has always spelled it.
+
+    ``broken`` and ``lines`` live on the links now, but the format keeps them
+    as index-based fields -- a .pms written before this change must still read,
+    and one written after it must still be readable by anything that expects
+    the old spelling.  This is the boundary where 1-based ``broken`` and
+    0-based ``lines`` still meet; nothing above it has to know.
+    """
     items = []
     if st.dead:
         items.append("dead")
@@ -96,10 +103,11 @@ def _state_field(st: NodeState, nlink: int) -> str:
                         ("sum", st.sum)):
         if value:
             items.append(f"{name}:{value}")
-    if st.broken:
-        items.append("broken:" + "|".join(str(b) for b in sorted(st.broken)))
-    if any(st.lines[:nlink]):
-        items.append("lines:" + _ints(st.lines[:nlink]))
+    broken = [i for i, link in enumerate(links, start=1) if link.broken]
+    if broken:
+        items.append("broken:" + "|".join(str(b) for b in broken))
+    if any(link.status for link in links):
+        items.append("lines:" + _ints(link.status for link in links))
     return ",".join(items)
 
 
@@ -156,6 +164,8 @@ def _parse_node(path, lineno, tokens, dim, warn, salvage) -> Node:
     """
     nd = Node(num=int(tokens[0]))
     have_pos = False
+    broken: set[int] = set()          # index-based in the file, per-link here
+    lines: list[int] = []
     for tok in tokens[1:]:
         if "=" not in tok:
             if not salvage:
@@ -184,11 +194,9 @@ def _parse_node(path, lineno, tokens, dim, warn, salvage) -> Node:
                                               where=f"line {lineno}")
                     warn(f"line {lineno}: node {nd.num} link cut at {pair!r}")
                     break
-                nd.links.append(int(j))
-                if sep:
-                    nd.opno.append(int(op))
+                nd.links.append(Link(to=int(j), op=int(op) if sep else 0))
         elif key == "state":
-            _parse_state(nd.state, val)
+            broken, lines = _parse_state(nd.state, val)
         elif key == "iri":
             _parse_iri(nd.iri, val)
         else:
@@ -199,7 +207,11 @@ def _parse_node(path, lineno, tokens, dim, warn, salvage) -> Node:
             raise FileFormatError(path, f"node {nd.num} has no pos",
                                   where=f"line {lineno}")
         warn(f"line {lineno}: node {nd.num} has no pos, set to 0")
-    nd.nlink = len(nd.links)
+    # the file numbers its per-link fields; the links carry them from here on
+    for i, link in enumerate(nd.links, start=1):
+        link.broken = i in broken
+        if i - 1 < len(lines):
+            link.status = lines[i - 1]
     return nd
 
 
@@ -217,7 +229,11 @@ def _coords(path, lineno, field, text, dim, num, warn, salvage) -> list[int]:
     return (coords + [0] * iv.MAXDIMEN)[:iv.MAXDIMEN]
 
 
-def _parse_state(st: NodeState, val) -> None:
+def _parse_state(st: NodeState, val) -> tuple[set[int], list[int]]:
+    """Fill *st* and hand back the two per-link fields, which the caller
+    applies once it knows how many links the node has."""
+    broken: set[int] = set()
+    lines: list[int] = []
     for item in val.split(","):
         if not item:
             continue
@@ -233,9 +249,10 @@ def _parse_state(st: NodeState, val) -> None:
         elif key == "sum":
             st.sum = int(num)
         elif key == "broken":
-            st.broken = {int(b) for b in num.split("|") if b}
+            broken = {int(b) for b in num.split("|") if b}
         elif key == "lines":
-            st.lines = [int(x) for x in num.split(",") if x]
+            lines = [int(x) for x in num.split(",") if x]
+    return broken, lines
 
 
 _IRI_KEYS = {
@@ -381,17 +398,14 @@ def _resolve_links(path, g: Graph, warnings: list[str], strict: bool) -> int:
     truncation artefact otherwise (dropped, counted).  Returns how many dropped."""
     dropped = 0
     for nd in g.nodes.values():
-        opno = list(nd.opno) + [0] * (len(nd.links) - len(nd.opno))
-        kept = [(j, op) for j, op in zip(nd.links, opno) if j in g.nodes]
+        kept = [link for link in nd.links if link.to in g.nodes]
         if len(kept) != len(nd.links):
             if strict:
-                bad = next(j for j in nd.links if j not in g.nodes)
+                bad = next(lk.to for lk in nd.links if lk.to not in g.nodes)
                 raise FileFormatError(
                     path, f"node {nd.num} links to {bad}, which does not exist")
             dropped += len(nd.links) - len(kept)
             warnings.append(f"node {nd.num}: dropped {len(nd.links) - len(kept)} "
                             f"link(s) to missing node(s)")
-            nd.links = [j for j, _ in kept]
-            nd.opno = [op for _, op in kept] if nd.opno else []
-        nd.nlink = len(nd.links)
+            nd.links = kept
     return dropped

@@ -60,7 +60,7 @@ def vierdrei_edges(mode: int = MODE_ALL) -> list[tuple[str, str]]:
 
 def vierdrei(mode: int = MODE_ALL):
     """Build the graph as a :class:`~permuto.core.graph.Graph`, labels kept."""
-    from ..core.graph import Graph, Node
+    from ..core.graph import Graph, Link, Node
 
     edges = vierdrei_edges(mode)
     labels = sorted({u for e in edges for u in e})
@@ -71,9 +71,8 @@ def vierdrei(mode: int = MODE_ALL):
     for lab, num in number.items():
         g.nodes[num] = Node(num=num, perm=lab)
     for u, v in edges:
-        g.nodes[number[u]].links.append(number[v])
-        g.nodes[number[v]].links.append(number[u])
+        g.nodes[number[u]].links.append(Link(to=number[v]))
+        g.nodes[number[v]].links.append(Link(to=number[u]))
     for nd in g.nodes.values():
-        nd.links.sort()
-        nd.nlink = len(nd.links)
+        nd.links.sort(key=lambda link: link.to)
     return g

@@ -42,7 +42,7 @@ from ..errors import InvalidBase, InvalidCycle, LimitExceeded, limit_check
 from ..gen.operate import apply_cycle
 from ..perms import next_perm
 from . import intvector as iv
-from .graph import MAX_LINKS, Graph, Node, NodeState
+from .graph import MAX_LINKS, Graph, Link, Node, NodeState
 
 MAX_OPS = 6      # PM.MaxOps -- "should be MaxLinks / 2, each op has max 2 arms"
 MAX_CYC = 3      # PM.MaxCyc
@@ -219,9 +219,7 @@ class PM:
             last_dimension = 0
         else:
             for nd in g.nodes.values():
-                nd.nlink = 0
                 nd.links.clear()
-                nd.opno.clear()
                 nd.state = NodeState()
             last_dimension = g.dimensions
 
@@ -251,15 +249,13 @@ class PM:
                     continue
                 for a, b in ((frm, to), (to, frm)):
                     node = g.nodes[a]
-                    if b in node.links:
+                    if g.is_linked(a, b):
                         continue
                     if node.nlink >= MAX_LINKS:
                         raise LimitExceeded(
                             f"links of node {a}", node.nlink + 1, 0, MAX_LINKS
                         )
-                    node.links.append(b)
-                    node.opno.append(op)
-                    node.nlink = len(node.links)
+                    node.links.append(Link(to=b, op=op))
 
     def _seed_positions(self, g: Graph, last_dimension: int) -> None:
         """Seed coordinates from the link numbers (``NewPermutograph``'s tail).
@@ -270,7 +266,7 @@ class PM:
         """
         for nd in g.ordered():
             def link(k: int) -> int:      # links[k], 1-based, 0 past the end
-                return nd.links[k - 1] if k <= nd.nlink else 0
+                return nd.links[k - 1].to if k <= nd.nlink else 0
             for i in range(last_dimension):
                 nd.pos[i] += link(i + 1) % 43       # "primes are good here"
             for i in range(last_dimension, iv.MAXDIMEN):
@@ -310,10 +306,7 @@ class PM:
             return False
         op = self.which_operator(g, n1, n2)
         for a, b in ((n1, n2), (n2, n1)):
-            nd = g.nodes[a]
-            nd.links.append(b)
-            nd.opno.append(op)
-            nd.nlink = len(nd.links)
+            g.nodes[a].links.append(Link(to=b, op=op))
         return True
 
     def collapse(self, g: Graph, n1: int, n2: int) -> int:
@@ -331,7 +324,7 @@ class PM:
         lost = 0
         nd = g.nodes[n1]
         for _ in range(nd.nlink):
-            node = nd.links[0]        # disconnect shifts, so index 0 is fine
+            node = nd.links[0].to     # disconnect shifts, so index 0 is fine
             g.disconnect(n1, node)
             if not self.connect(g, node, n2):
                 lost += 1
@@ -339,7 +332,7 @@ class PM:
 
     def uncollapse(self, g: Graph, n1: int) -> None:
         """``PM.Uncollapse`` -- drop all edges of *n1* and restore canonical ones."""
-        for other in list(g.nodes[n1].links):
+        for other in g.nodes[n1].neighbours:
             g.disconnect(n1, other)
         for op in range(1, MAX_OPS + 1):
             node = self.exec_operator(g, n1, op)

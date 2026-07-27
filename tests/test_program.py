@@ -15,7 +15,8 @@ def test_spa_line_states_and_parsum():
     assert dist[1] == 0
     assert max(dist.values()) >= 1
     # the wave marks some edges as input/output/locked
-    assert any(s != L_FREE for nd in g.nodes.values() for s in nd.state.lines)
+    assert any(link.status != L_FREE
+               for nd in g.nodes.values() for link in nd.links)
     # ParSum: seed and run backwards to completion
     assert spa.init_par_sum(g) is True
     n = 0

@@ -99,7 +99,7 @@ def isomorphic(adj1, adj2):
 
 
 def as_adjacency(g):
-    return {n: set(nd.links) for n, nd in g.nodes.items()}
+    return {n: set(nd.neighbours) for n, nd in g.nodes.items()}
 
 
 # --- the actual tests --------------------------------------------------

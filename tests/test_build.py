@@ -14,11 +14,11 @@ def test_build_labels_and_operators():
     n1 = g.nodes[1]
     assert n1.perm == "123"
     # op1 (swap places 1,2) -> "213" = node 3 ; op2 (swap 2,3) -> "132" = node 2
-    assert dict(zip(n1.links, n1.opno)) == {3: 1, 2: 2}
+    assert {lk.to: lk.op for lk in n1.links} == {3: 1, 2: 2}
 
 
 def test_build_topology_matches_nod():
     g = Graph.build("123", ["12", "+", "23"], init=False)
     base = read_nod(modula_dir() / "nod" / "pgl3.nod")
     for i in g.nodes:
-        assert sorted(g.nodes[i].links) == base.links[i]
+        assert sorted(g.nodes[i].neighbours) == base.links[i]

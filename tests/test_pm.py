@@ -26,7 +26,7 @@ def degrees(g):
 def is_connected(g):
     seen, stack = {1}, [1]
     while stack:
-        for y in g.nodes[stack.pop()].links:
+        for y in g.nodes[stack.pop()].neighbours:
             if y not in seen:
                 seen.add(y)
                 stack.append(y)
@@ -68,8 +68,8 @@ def test_operator_table_agrees_with_the_golden_generation_path():
     assert got.nnodes == want.nnodes
     for num in sorted(want.nodes):
         a, b = got.nodes[num], want.nodes[num]
-        assert (a.perm, dict(zip(a.links, a.opno))) == \
-               (b.perm, dict(zip(b.links, b.opno)))
+        assert (a.perm, {lk.to: lk.op for lk in a.links}) == \
+               (b.perm, {lk.to: lk.op for lk in b.links})
 
 
 def test_grouping_cycles_shares_one_operator_number_across_edges():
@@ -83,11 +83,12 @@ def test_grouping_cycles_shares_one_operator_number_across_edges():
     gg, ga = grouped.new_permutograph(), apart.new_permutograph()
 
     def edges(g):
-        return {tuple(sorted((n, j))) for n in g.nodes for j in g.nodes[n].links}
+        return {tuple(sorted((n, j)))
+                for n in g.nodes for j in g.nodes[n].neighbours}
 
     assert edges(gg) == edges(ga)                    # same solid
     assert gg.n_operators == 4 and ga.n_operators == 6
-    assert max(max(nd.opno) for nd in gg.nodes.values()) == 4
+    assert max(lk.op for nd in gg.nodes.values() for lk in nd.links) == 4
 
     # and the composition itself is a single move, not two hops
     assert grouped.apply_operator("11111112", 3) == "21111111"
@@ -136,7 +137,7 @@ def test_rebuild_with_the_same_base_keeps_the_picture():
 
     for n, nd in g.nodes.items():
         shift = [a - b for a, b in zip(nd.pos, before[n])]
-        assert shift == [nd.links[i] % 43 if i < nd.nlink else 0
+        assert shift == [nd.links[i].to % 43 if i < nd.nlink else 0
                          for i in range(len(shift))]
     assert any(nd.nlink == 4 for nd in g.nodes.values())    # the new operator landed
 
@@ -155,10 +156,10 @@ def test_reset_seeds_from_topology_so_rebuilds_are_reproducible():
 def test_connect_recovers_the_operator_number_after_a_disconnect():
     pm = PM(base="1234")
     g = pm.new_permutograph()
-    op = dict(zip(g.nodes[1].links, g.nodes[1].opno))[2]
+    op = {lk.to: lk.op for lk in g.nodes[1].links}[2]
     g.disconnect(1, 2)
     assert pm.connect(g, 1, 2)
-    assert dict(zip(g.nodes[1].links, g.nodes[1].opno))[2] == op
+    assert {lk.to: lk.op for lk in g.nodes[1].links}[2] == op
 
 
 def test_connect_refuses_a_full_node_instead_of_swallowing_the_edge():
@@ -177,8 +178,8 @@ def test_collapse_moves_the_neighbours_and_reports_what_was_lost():
     pm = PM(base="1234")
     g = pm.new_permutograph()
     n1 = 1
-    n2 = g.nodes[n1].links[0]
-    others = [j for j in g.nodes[n1].links if j != n2]
+    n2 = g.nodes[n1].links[0].to
+    others = [j for j in g.nodes[n1].neighbours if j != n2]
     assert pm.collapse(g, n1, n2) == 0
     assert g.nodes[n1].nlink == 0                 # left isolated, not deleted
     assert all(g.is_linked(j, n2) for j in others)
@@ -187,20 +188,25 @@ def test_collapse_moves_the_neighbours_and_reports_what_was_lost():
 def test_uncollapse_restores_exactly_the_canonical_edges():
     pm = PM(base="1234")
     g = pm.new_permutograph()
-    before = sorted(g.nodes[1].links)
-    pm.collapse(g, 1, g.nodes[1].links[0])
+    before = sorted(g.nodes[1].neighbours)
+    pm.collapse(g, 1, g.nodes[1].links[0].to)
     assert g.nodes[1].nlink == 0
     pm.uncollapse(g, 1)
-    assert sorted(g.nodes[1].links) == before
+    assert sorted(g.nodes[1].neighbours) == before
 
 
 def test_broken_marks_follow_their_edge_through_a_disconnect():
     """The original shifted links and opno but left state.broken indexing the
-    old positions, so removing one edge silently re-targeted the mark."""
+    old positions, so removing one edge silently re-targeted the mark.
+
+    The port fixed that by hand, and then removed the shape that allowed it:
+    the mark lives on the edge, so there is no index left to go stale.  The
+    test stays because the property is what matters, not how it is achieved.
+    """
     pm = PM(base="1234")
     g = pm.new_permutograph()
     nd = g.nodes[1]
     marked = nd.links[2]
-    nd.state.broken = {3}
-    g.disconnect(1, nd.links[0])
-    assert nd.links[nd.state.broken.pop() - 1] == marked
+    marked.broken = True
+    g.disconnect(1, nd.links[0].to)
+    assert [lk for lk in nd.links if lk.broken] == [marked]

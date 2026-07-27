@@ -49,13 +49,12 @@ def body_lines(g):
     w("")
     w("% List of Links:")
     for nd in g.ordered():
-        for idx, j in enumerate(nd.links):
-            if nd.num < g.nodes[j].num:  # each undirected edge once
-                op = nd.opno[idx] if idx < len(nd.opno) else 0
-                if op == 0:
-                    w(f" /N{nd.num} /N{g.nodes[j].num} DefEdge")
+        for link in nd.links:
+            if nd.num < g.nodes[link.to].num:  # each undirected edge once
+                if link.op == 0:
+                    w(f" /N{nd.num} /N{g.nodes[link.to].num} DefEdge")
                 else:
-                    w(f" /N{nd.num} /N{g.nodes[j].num}  {op} DefEdgeOp")
+                    w(f" /N{nd.num} /N{g.nodes[link.to].num}  {link.op} DefEdgeOp")
     w("")
     w("% Generate the Picture:")
     w("Finish")

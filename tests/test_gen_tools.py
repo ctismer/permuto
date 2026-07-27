@@ -28,7 +28,7 @@ PGL6 = ("123456", ["12", "+", "23", "+", "34", "+", "45", "+", "56"])
 def edges_of(g):
     """Edge set keyed by the numeric labels, which is what the .nod holds."""
     return {tuple(sorted((int(g.nodes[n].perm), int(g.nodes[j].perm))))
-            for n in g.nodes for j in g.nodes[n].links}
+            for n in g.nodes for j in g.nodes[n].neighbours}
 
 
 def edges_of_nod(path):
@@ -52,7 +52,7 @@ def test_vierdrei_is_the_hamming_graph():
     assert g.nnodes == 64
     assert set(nd.nlink for nd in g.nodes.values()) == {9}
     for nd in g.nodes.values():
-        for j in nd.links:
+        for j in nd.neighbours:
             differing = sum(a != b for a, b in zip(nd.perm, g.nodes[j].perm))
             assert differing == 1
 
@@ -100,7 +100,7 @@ def test_factorising_merges_nodes_sharing_a_prefix():
     assert {nd.perm for nd in f.nodes.values()} == \
         {a + b for a in "123456" for b in "123456" if a != b}
     # 720 nodes over 30 classes, and no class links to itself
-    assert all(nd.num not in nd.links for nd in f.nodes.values())
+    assert all(nd.num not in nd.neighbours for nd in f.nodes.values())
 
 
 def test_truncate_lines_is_the_awk_transformation():

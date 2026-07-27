@@ -213,8 +213,9 @@ def test_the_operator_digit_punches_its_patch_through_the_edge():
         found = 0
         for nd in g.ordered():
             xi, yi, _zi = pts[nd.num]
-            for idx, j in enumerate(nd.links):
-                if j <= nd.num or idx >= len(nd.opno) or not nd.opno[idx]:
+            for link in nd.links:
+                j = link.to
+                if j <= nd.num or not link.op:
                     continue
                 xj, yj, _zj = pts[j]
                 for t in (0.44, 0.47, 0.5, 0.53, 0.56):

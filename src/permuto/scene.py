@@ -295,15 +295,14 @@ def build(g, width: int, height: int, *, labels: bool = False,
 
     for nd in g.ordered():
         xi, yi, zi = pts[nd.num]
-        for idx, j in enumerate(nd.links):
-            if j <= nd.num:
+        for link in nd.links:
+            if link.to <= nd.num:
                 continue                     # every undirected edge once
-            xj, yj, zj = pts[j]
+            xj, yj, zj = pts[link.to]
             front = (zi + zj) > 0
-            broken = (idx + 1) in nd.state.broken
-            state = nd.state.lines[idx] if program and idx < len(nd.state.lines) \
-                else None
-            op = nd.opno[idx] if have_ops and idx < len(nd.opno) else None
+            broken = link.broken
+            state = link.status if program else None
+            op = link.op if have_ops and link.op else None
 
             if broken:
                 rgb, reason = BROKEN, "broken"
@@ -357,9 +356,9 @@ def iridium_scene(g, width: int, height: int) -> Scene:
     width_ = stroke_width(extent, 0.9)
     for nd in g.ordered():
         xi, yi, _zi = pts[nd.num]
-        for j in nd.links:
-            if j > nd.num:
-                xj, yj, _zj = pts[j]
+        for link in nd.links:
+            if link.to > nd.num:
+                xj, yj, _zj = pts[link.to]
                 scene.edges.append(Edge((xi, yi), (xj, yj), (150, 150, 160),
                                         width_, True, "iridium"))
     for nd in g.ordered():

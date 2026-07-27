@@ -42,7 +42,7 @@ def factorize(g, places: int = DEFAULT_PLACES):
     truncate -- a ``.nod`` load keeps only topology, so there is nothing to
     factor by, and the original would silently have produced one giant node.
     """
-    from ..core.graph import Graph, Node
+    from ..core.graph import Graph, Link, Node
 
     if not any(nd.perm for nd in g.nodes.values()):
         raise LimitExceeded("labelled nodes to factorise", 0, 1, g.nnodes)
@@ -64,12 +64,9 @@ def factorize(g, places: int = DEFAULT_PLACES):
 
     for nd in g.ordered():
         a = of_node[nd.num]
-        for j, op in zip(nd.links, list(nd.opno) + [0] * len(nd.links)):
-            b = of_node[j]
-            if a == b or b in out.nodes[a].links:
+        for link in nd.links:
+            b = of_node[link.to]
+            if a == b or b in out.nodes[a].neighbours:
                 continue
-            out.nodes[a].links.append(b)
-            out.nodes[a].opno.append(op)
-    for nd in out.nodes.values():
-        nd.nlink = len(nd.links)
+            out.nodes[a].links.append(Link(to=b, op=link.op))
     return out

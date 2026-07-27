@@ -63,7 +63,7 @@ def _mid_spa() -> Graph:
         spa.shortest_path(g)
     g.nodes[3].state.dead = True          # a hollow ball with a black rim
     g.nodes[5].state.active = True        # and the white ring
-    g.nodes[2].state.broken = {1}         # a black edge, and no digit on it
+    g.nodes[2].links[0].broken = True     # a black edge, and no digit on it
     return g
 
 

@@ -52,7 +52,7 @@ from pathlib import Path
 
 from ..errors import FileFormatError, InvalidBase, InvalidCycle
 from ..core import intvector as iv
-from ..core.graph import Graph, IriState, Node, NodeState
+from ..core.graph import Graph, IriState, Link, Node, NodeState
 from ..core.graph import MAX_LINKS
 from ..core.pm import MAX_CYC, MAX_OPS, PM
 
@@ -188,19 +188,19 @@ def _read_record(path, data: bytes, off: int, nnodes: int) -> Node:
                 where=f"offset {off + 38}",
             )
 
-    state = NodeState(
-        step=step, active=active, dead=dead, sum=ssum, display=display,
-        # BITSET over 1-based link indices; bit 0 is unused
-        broken={j for j in range(1, MAX_LINKS + 1) if broken_bits & (1 << j)},
-        lines=lines[:nlink],
-    )
+    state = NodeState(step=step, active=active, dead=dead, sum=ssum,
+                      display=display)
+    # the four per-link arrays of the 1995 record become one Link each;
+    # `broken` was a BITSET over 1-based indices, bit 0 unused
+    edges = [Link(to=links[i], op=opno[i], status=lines[i],
+                  broken=bool(broken_bits & (1 << (i + 1))))
+             for i in range(nlink)]
     iri = IriState(avail=avail, avbak=avbak, target=target, tarbak=tarbak,
                    message_num=msg_num, message_color=msg_color,
                    sender_repeat=snd_repeat, sender_target=snd_target,
                    sender_color=snd_color)
-    return Node(num=num, pos=pos, old=old, color=color, nlink=nlink,
-                links=links[:nlink], opno=opno[:nlink], perm=perm,
-                state=state, iri=iri)
+    return Node(num=num, pos=pos, old=old, color=color, links=edges,
+                perm=perm, state=state, iri=iri)
 
 
 # --- writing -----------------------------------------------------------
@@ -249,19 +249,20 @@ def _write_record(nd: Node) -> bytes:
 
     st, iri = nd.state, nd.iri
     broken_bits = 0
-    for b in st.broken:
-        if 0 <= b <= 15:
-            broken_bits |= 1 << b
+    for i, link in enumerate(nd.links, start=1):     # a BITSET, bit 0 unused
+        if link.broken and i <= 15:
+            broken_bits |= 1 << i
 
     rec = bytearray()
     rec += struct.pack("<8h", *coords(nd.pos, "coordinate"))
     rec += struct.pack("<8h", *coords(nd.old, "previous coordinate"))
     rec += struct.pack("<HHH", nd.color, nd.num, nd.nlink)
-    rec += struct.pack("<12H", *padded(nd.links, MAX_LINKS))
-    rec += struct.pack("<12B", *padded(nd.opno, MAX_LINKS))
+    rec += struct.pack("<12H", *padded([lk.to for lk in nd.links], MAX_LINKS))
+    rec += struct.pack("<12B", *padded([lk.op for lk in nd.links], MAX_LINKS))
     rec += bytes((1 if st.dead else 0, 1 if st.active else 0))
     rec += struct.pack("<hhH", st.display, st.step, st.sum)
-    rec += struct.pack("<12B", *padded(st.lines, MAX_LINKS))
+    rec += struct.pack("<12B", *padded([lk.status for lk in nd.links],
+                                       MAX_LINKS))
     rec += struct.pack("<H", broken_bits)
     rec += struct.pack("<4H", iri.avail, iri.avbak, iri.target, iri.tarbak)
     rec += struct.pack("<2H", iri.message_num, iri.message_color)
