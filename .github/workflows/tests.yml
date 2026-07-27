@@ -11,7 +11,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.10", "3.12"]     # the floor, and what is developed on
+        # the floor, what is developed on, and the two current releases
+        python: ["3.10", "3.12", "3.13", "3.14"]
     env:
       # Set here rather than only in conftest.py: an early Qt import (a test
       # module imported before any fixture runs) would otherwise look for a
@@ -30,6 +31,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends
           libegl1 libgl1 libxkbcommon-x11-0 libdbus-1-3 fonts-dejavu-core
       # mypy is not a separate job on purpose: tests/test_annotations.py shells
-      # out to it, so a plain pytest covers the type check too.
-      - run: pip install -e . pytest mypy
+      # out to it, so a plain pytest covers the type check too.  It comes from
+      # the [test] extra, so this list lives in pyproject.toml only.
+      - run: pip install -e ".[test]"
       - run: python -m pytest

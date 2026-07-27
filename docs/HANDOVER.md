@@ -329,23 +329,34 @@ picture. Pass `QPointF`.
 
 ### Done: the tests run on GitHub (2026-07-28)
 
-`.github/workflows/tests.yml`, one job, `push` and `pull_request`, Python 3.10
-and 3.12. `mypy` is not a job of its own on purpose --
-`tests/test_annotations.py` shells out to it, so installing it and running a
-plain `pytest` covers both.
+`.github/workflows/tests.yml`, one job, `push` and `pull_request`, Python
+**3.10, 3.12, 3.13 and 3.14** -- the floor, what is developed on, and the two
+current releases (3.15 is still alpha). `mypy` is not a job of its own on
+purpose: `tests/test_annotations.py` shells out to it, so a plain `pytest`
+covers both.
 
-**It is green** -- run `30310008124`, both matrix jobs, 38 s and 42 s, first
-try. The 3.10 floor was checked locally first (fresh venv, `pip install -e .
-pytest mypy`, 372 passed) rather than by pushing at CI until it worked.
+**It is green** -- run `30310008124`, 38 s and 42 s, first try, when the matrix
+was still 3.10/3.12. The floor was checked locally first (fresh venv, 372
+passed) rather than by pushing at CI until it worked, and so were 3.13 and 3.14
+before they were added.
+
+The test tools come from the `[test]` extra in `pyproject.toml`, which the
+workflow installs as `pip install -e ".[test]"`. That list used to exist twice,
+and the copy in `pyproject.toml` had no `mypy` in it -- which matters, because
+the mypy test *skips* where mypy is absent instead of failing. Nothing is
+version-pinned there: the suite was checked against mypy 2.3 as well as the
+1.15 that happens to be installed locally.
 
 The actions are pinned at `checkout@v5` / `setup-python@v6`; `@v4`/`@v5` still
 run but are annotated as Node 20, which the runners now force onto Node 24.
-The README carries the badge.
+`.github/dependabot.yml` watches them monthly, so the next such bump arrives as
+a pull request rather than by somebody reading the annotations. The README
+carries the badge.
 
 Beyond the sketch this replaced: `fonts-dejavu-core` (the widget tests paint
 chrome text and read the pixels back; a runner without a font is a different
-picture), `apt-get update` before the install, `fail-fast: false` so 3.10 and
-3.12 do not hide each other, and no `pytest-cov` -- nothing in `addopts` asks
+picture), `apt-get update` before the install, `fail-fast: false` so one
+version does not hide another, and no `pytest-cov` -- nothing in `addopts` asks
 for coverage.
 
 Three things that would otherwise have cost an evening, and still apply to

@@ -10,12 +10,21 @@ keywords = ["permutograph", "permutohedron", "visualization", "PySide6", "Gottha
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Visualization",
 ]
 dependencies = ["PySide6>=6.5"]
 
 [project.optional-dependencies]
-test = ["pytest"]
+# mypy belongs here: tests/test_annotations.py shells out to it and *skips*
+# where it is absent, so leaving it out means the type check quietly does not
+# happen.  The CI installs this extra rather than a hand-written list, so the
+# two cannot drift apart.
+test = ["pytest", "mypy"]
 
 [project.urls]
 Homepage = "https://github.com/ctismer/permuto"
