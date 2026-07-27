@@ -121,7 +121,7 @@ def _valid_bytes():
     (lambda d: d[:174] + struct.pack("<H", 0) + d[176:], "outside 1..8"),
     (lambda d: d[:174] + struct.pack("<H", 9) + d[176:], "outside 1..8"),
     (lambda d: d[:HEADER_SIZE + 36] + struct.pack("<H", 13)
-               + d[HEADER_SIZE + 38:], "maximum is 12"),
+               + d[HEADER_SIZE + 38:], "the record holds 12"),
 ])
 def test_damaged_files_are_reported_not_silently_accepted(tmp_path, mangle, expect):
     path = tmp_path / "damaged.ply"

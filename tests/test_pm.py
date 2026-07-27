@@ -6,7 +6,8 @@ import pytest
 from permuto import InvalidBase, InvalidCycle
 from permuto.core import Graph
 from permuto.core.graph import MAX_LINKS
-from permuto.core.pm import MAX_CYC, MAX_OPS, PM
+from permuto.core.pm import DEFAULT_OPS, MAX_CYC, MAX_OPS, PM
+from permuto.errors import LimitExceeded
 
 
 def make_pm(base, ops):
@@ -164,8 +165,11 @@ def test_connect_recovers_the_operator_number_after_a_disconnect():
 
 def test_connect_refuses_a_full_node_instead_of_swallowing_the_edge():
     """The original's Connect returned nothing, so a full node silently ate
-    the edge and Collapse could lose edges without a word."""
-    pm = PM(base="1234")
+    the edge and Collapse could lose edges without a word.
+
+    A five-place base, because filling a node to MAX_LINKS needs more
+    neighbours than the 24 nodes of base 1234 can offer."""
+    pm = PM(base="12345")
     g = pm.new_permutograph()
     free = [n for n in sorted(g.nodes) if n != 1 and not g.is_linked(1, n)]
     while g.nodes[1].nlink < MAX_LINKS:
@@ -210,3 +214,38 @@ def test_broken_marks_follow_their_edge_through_a_disconnect():
     marked.broken = True
     g.disconnect(1, nd.links[0].to)
     assert [lk for lk in nd.links if lk.broken] == [marked]
+
+
+# -- the six-operator ceiling ------------------------------------------------
+
+def test_the_table_grows_past_the_six_rows_the_1995_screen_had():
+    """`MaxOps = 6` was `MaxLinks / 2` (pm.def:56) and MaxLinks was 12 because
+    the links lived in a fixed array.  They are lists now, so the ceiling moved
+    -- and with a six-place base there are fifteen transpositions to choose
+    from, of which six was an arbitrary few."""
+    pm = PM(base="123456")
+    assert pm.n_ops == DEFAULT_OPS == 6, "a fresh table is what the screen had"
+    for i, cyc in enumerate(["12", "23", "34", "45", "56", "16", "13", "46"],
+                            start=1):
+        pm.set_cycle(i, 1, cyc)
+    assert pm.n_ops == 8, "typing into row 7 has to make room for it"
+
+    g = pm.new_permutograph()
+    assert g.nnodes == 720
+    assert {nd.nlink for nd in g.nodes.values()} == {8}, \
+        "every node gets one edge per operator"
+    assert max(lk.op for nd in g.nodes.values() for lk in nd.links) == 8
+
+
+def test_the_operator_ceiling_is_the_link_ceiling_halved():
+    """The original said so in a comment and then hard-coded both numbers.  It
+    is the arithmetic itself now, so the two cannot drift apart."""
+    assert MAX_OPS == MAX_LINKS // 2
+
+
+def test_an_operator_past_the_ceiling_is_refused_with_its_limits():
+    pm = PM(base="1234")
+    with pytest.raises(LimitExceeded) as exc:
+        pm.set_cycle(MAX_OPS + 1, 1, "12")
+    assert str(MAX_OPS) in str(exc.value)
+    assert pm.n_ops == DEFAULT_OPS, "a refused operator may not grow the table"

@@ -44,8 +44,20 @@ from ..perms import next_perm
 from . import intvector as iv
 from .graph import MAX_LINKS, Graph, Link, Node, NodeState
 
-MAX_OPS = 6      # PM.MaxOps -- "should be MaxLinks / 2, each op has max 2 arms"
-MAX_CYC = 3      # PM.MaxCyc
+#: ``PM.MaxOps``.  The original's own comment says what it should be --
+#: *"should be MaxLinks / 2, each op has max 2 arms"* (pm.def:56) -- so here it
+#: is that sentence rather than a second hard-coded 6.
+MAX_OPS = MAX_LINKS // 2
+
+#: What a fresh table offers, which is what the 1995 program had room for on
+#: its screen.  The table grows past this when an operator is typed into it.
+DEFAULT_OPS = 6
+
+#: ``PM.MaxCyc``.  Not raised, because it does not bind: an operator is a
+#: product of *disjoint* cycles over the base, and a base long enough to need a
+#: fourth would need eight places -- which the 2000-node limit rules out well
+#: before MAXDIMEN does (7! = 5040).
+MAX_CYC = 3
 MAX_NODES_TOT = 2000  # NodeMgr.MaxNodesTot ("aber weniger koennte allokiert werden")
 
 DEFAULT_BASE = "1234"
@@ -121,6 +133,16 @@ class PM:
         """``PM.Order`` -- the length of the base permutation."""
         return len(self.base)
 
+    @property
+    def n_ops(self) -> int:
+        """How many operator slots the table currently offers.
+
+        A fresh table has :data:`DEFAULT_OPS` of them, which is what the 1995
+        screen had room for; typing into a higher one grows the table, up to
+        :data:`MAX_OPS`.
+        """
+        return len(self.optable)
+
     def set_base(self, base: str) -> None:
         """Validate, normalise and adopt a new base; rebuild the perm cache.
 
@@ -153,6 +175,8 @@ class PM:
         """
         limit_check("operator number", op, 1, MAX_OPS)
         limit_check("cycle number", cyc, 1, MAX_CYC)
+        while self.n_ops < op:               # the table grows into its ceiling
+            self.optable.append(["" for _ in range(MAX_CYC)])
         if not valid_cycle(self.order, value):
             raise InvalidCycle(
                 f"cycle {value!r} addresses positions outside 1..{self.order} "
@@ -240,7 +264,7 @@ class PM:
         """
         for frm in sorted(g.nodes):
             nd = g.nodes[frm]
-            for op in range(1, MAX_OPS + 1):
+            for op in range(1, self.n_ops + 1):
                 if not any(self.optable[op - 1]):
                     continue
                 to = self.perm_name(self.apply_operator(nd.perm, op))
@@ -287,7 +311,7 @@ class PM:
 
     def which_operator(self, g: Graph, n1: int, n2: int) -> int:
         """``PM.WhichOperator`` -- reconstruct which operator joins two nodes."""
-        for op in range(1, MAX_OPS + 1):
+        for op in range(1, self.n_ops + 1):
             if self.exec_operator(g, n1, op) == n2 or \
                self.exec_operator(g, n2, op) == n1:
                 return op
@@ -333,7 +357,7 @@ class PM:
         """``PM.Uncollapse`` -- drop all edges of *n1* and restore canonical ones."""
         for other in g.nodes[n1].neighbours:
             g.disconnect(n1, other)
-        for op in range(1, MAX_OPS + 1):
+        for op in range(1, self.n_ops + 1):
             node = self.exec_operator(g, n1, op)
             if node != n1:
                 self.connect(g, n1, node)
@@ -341,7 +365,7 @@ class PM:
 
 def _default_optable() -> list[list[str]]:
     """PM's module initialisation: base ``1234`` with operators 12, 23, 34."""
-    table = [["" for _ in range(MAX_CYC)] for _ in range(MAX_OPS)]
+    table = [["" for _ in range(MAX_CYC)] for _ in range(DEFAULT_OPS)]
     for i, cyc in enumerate(DEFAULT_OPERATORS):
         table[i][0] = cyc
     return table

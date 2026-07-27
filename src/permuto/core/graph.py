@@ -20,7 +20,12 @@ from . import intvector as iv
 # LineStatus (NodeMgr): edge state used by the PmProgs programs / display
 L_FREE, L_INPUT, L_OUTPUT, L_LOCKED = 0, 1, 2, 3
 
-MAX_LINKS = 12   # NodeMgr.MaxLinks -- how many edges a node has room for
+# How many edges a node may have.  ``NodeMgr.MaxLinks`` was 12 because the
+# links lived in a fixed array of that size and the operator table held six
+# operators of at most two arms each (pm.def:56).  The array is a list now, so
+# this is only a ceiling -- doubled, and PM derives its operator count from it
+# rather than repeating the arithmetic.
+MAX_LINKS = 24
 
 
 @dataclass

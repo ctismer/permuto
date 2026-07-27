@@ -49,7 +49,7 @@ from pathlib import Path
 from ..errors import FileFormatError
 from ..core import intvector as iv
 from ..core.graph import Graph, IriState, Link, Node, NodeState
-from ..core.pm import MAX_CYC, MAX_OPS, PM
+from ..core.pm import DEFAULT_OPS, MAX_CYC, MAX_OPS, PM
 from .plyfile import PlySession
 
 MAGIC = "permuto session"
@@ -128,8 +128,7 @@ def write_pms(path, session: PlySession) -> None:
            f"mode {session.mode}"]
     if session.mode == "permuto" and session.base:
         out.append(f"base {session.base}")
-        for i in range(MAX_OPS):
-            row = session.optable[i] if i < len(session.optable) else []
+        for i, row in enumerate(session.optable):   # as many as the table has
             cycles = [c for c in row if c]
             if cycles:
                 out.append(f"op {i + 1} " + " ".join(cycles))
@@ -285,7 +284,7 @@ def read_pms(path) -> PlySession:
     warnings: list[str] = []
     mode = "permuto"
     base = ""
-    optable = [["" for _ in range(MAX_CYC)] for _ in range(MAX_OPS)]
+    optable = [["" for _ in range(MAX_CYC)] for _ in range(DEFAULT_OPS)]
     last_edit_line = 0
     iteration = 0
     dim = 3
@@ -318,8 +317,14 @@ def read_pms(path) -> PlySession:
                 base = rest
             elif head == "op":
                 i = int(rest.split(" ", 1)[0])
+                if not 1 <= i <= MAX_OPS:
+                    raise FileFormatError(
+                        path, f"operator {i} is outside 1..{MAX_OPS}",
+                        where=f"line {lineno}")
+                while len(optable) < i:      # a table wider than the default
+                    optable.append(["" for _ in range(MAX_CYC)])
                 for j, cyc in enumerate(rest.split()[1:]):
-                    if 1 <= i <= MAX_OPS and j < MAX_CYC:
+                    if j < MAX_CYC:
                         optable[i - 1][j] = cyc
             elif head == "lastedit":
                 last_edit_line = int(rest)

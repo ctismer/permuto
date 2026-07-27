@@ -53,8 +53,15 @@ from pathlib import Path
 from ..errors import FileFormatError, InvalidBase, InvalidCycle
 from ..core import intvector as iv
 from ..core.graph import Graph, IriState, Link, Node, NodeState
-from ..core.graph import MAX_LINKS
-from ..core.pm import MAX_CYC, MAX_OPS, PM
+from ..core.pm import PM
+
+# The 1995 record's own sizes.  They are *not* the program's limits: a node may
+# hold more links than this file can express, and the operator table may have
+# more rows.  Reading uses these; writing refuses what will not fit, rather
+# than truncating a graph into a shape the file can hold.
+PLY_LINKS = 12
+PLY_OPS = 6
+PLY_CYC = 3
 
 HEADER_SIZE = 178
 RECORD_SIZE = 123
@@ -118,9 +125,9 @@ def read_ply(path) -> PlySession:
     permuto = data[0] != 0
     base = _read_permstr(data[1:10])
     optable = [
-        [_read_permstr(data[10 + (i * MAX_CYC + j) * PERMSTR_SIZE:][:PERMSTR_SIZE])
-         for j in range(MAX_CYC)]
-        for i in range(MAX_OPS)
+        [_read_permstr(data[10 + (i * PLY_CYC + j) * PERMSTR_SIZE:][:PERMSTR_SIZE])
+         for j in range(PLY_CYC)]
+        for i in range(PLY_OPS)
     ]
     last_edit_line, dimensions, nnodes = struct.unpack_from("<HHh", data, 172)
 
@@ -175,9 +182,9 @@ def _read_record(path, data: bytes, off: int, nnodes: int) -> Node:
     snd_repeat, snd_target, snd_color = struct.unpack_from("<3H", data, off + 108)
     perm = _read_permstr(data[off + 114:off + 114 + PERMSTR_SIZE])
 
-    if nlink > MAX_LINKS:
+    if nlink > PLY_LINKS:
         raise FileFormatError(
-            path, f"node {num} claims {nlink} links, the maximum is {MAX_LINKS}",
+            path, f"node {num} claims {nlink} links, the record holds {PLY_LINKS}",
             where=f"offset {off + 36}",
         )
     for j in links[:nlink]:
@@ -206,26 +213,31 @@ def _read_record(path, data: bytes, off: int, nnodes: int) -> Node:
 
 def write_ply(path, session: PlySession) -> None:
     g = session.graph
-    optable = session.optable or [["" for _ in range(MAX_CYC)] for _ in range(MAX_OPS)]
+    optable = session.optable or [["" for _ in range(PLY_CYC)]
+                                  for _ in range(PLY_OPS)]
+    if len(optable) > PLY_OPS or any(len(row) > PLY_CYC for row in optable):
+        raise FileFormatError(
+            path, f"the operator table is {len(optable)}x{max(map(len, optable))}, "
+                  f"and the 1995 record holds {PLY_OPS}x{PLY_CYC} -- save as .pms")
 
     out = bytearray()
     out += b"\x01" if session.permuto else b"\x00"
     out += _write_permstr(session.base)
-    for i in range(MAX_OPS):
-        for j in range(MAX_CYC):
+    for i in range(PLY_OPS):
+        for j in range(PLY_CYC):
             out += _write_permstr(optable[i][j] if i < len(optable) else "")
     out += struct.pack("<HHh", session.last_edit_line, g.dimensions, g.nnodes)
     assert len(out) == HEADER_SIZE
 
     for nd in g.ordered():
-        out += _write_record(nd)
+        out += _write_record(path, nd)
     Path(path).write_bytes(bytes(out))
 
 
 _I16_MIN, _I16_MAX = -0x8000, 0x7FFF
 
 
-def _write_record(nd: Node) -> bytes:
+def _write_record(path, nd: Node) -> bytes:
     def padded(seq, size, fill=0):
         return list(seq)[:size] + [fill] * max(0, size - len(seq))
 
@@ -256,12 +268,16 @@ def _write_record(nd: Node) -> bytes:
     rec += struct.pack("<8h", *coords(nd.pos, "coordinate"))
     rec += struct.pack("<8h", *coords(nd.old, "previous coordinate"))
     rec += struct.pack("<HHH", nd.color, nd.num, nd.nlink)
-    rec += struct.pack("<12H", *padded([lk.to for lk in nd.links], MAX_LINKS))
-    rec += struct.pack("<12B", *padded([lk.op for lk in nd.links], MAX_LINKS))
+    if len(nd.links) > PLY_LINKS:
+        raise FileFormatError(
+            path, f"node {nd.num} has {len(nd.links)} links and the 1995 record "
+                  f"holds {PLY_LINKS} -- save as .pms")
+    rec += struct.pack("<12H", *padded([lk.to for lk in nd.links], PLY_LINKS))
+    rec += struct.pack("<12B", *padded([lk.op for lk in nd.links], PLY_LINKS))
     rec += bytes((1 if st.dead else 0, 1 if st.active else 0))
     rec += struct.pack("<hhH", st.display, st.step, st.sum)
     rec += struct.pack("<12B", *padded([lk.status for lk in nd.links],
-                                       MAX_LINKS))
+                                       PLY_LINKS))
     rec += struct.pack("<H", broken_bits)
     rec += struct.pack("<4H", iri.avail, iri.avbak, iri.target, iri.tarbak)
     rec += struct.pack("<2H", iri.message_num, iri.message_color)
