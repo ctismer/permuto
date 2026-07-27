@@ -412,7 +412,12 @@ in `studies/` next to `kugel`, and there is something to build from it.
   re-add `normalize()` calls at the use sites; add them at the producer.
 - `HurryUp` is "compute fast, look seldom" — it suppresses the spin *while
   calculating* (`polytop.mod:299`), so it must earn that back in iterations.
-  `Session.advance_frame` runs a whole checkpoint per timer tick.
+  `Session.advance_frame` iterates towards the next checkpoint but stops after
+  `FRAME_BUDGET` (50 ms), because **nothing else happens while it runs** — no
+  keystroke, no repaint. It used to count iterations instead, which cost
+  milliseconds on a 1995-sized graph and 13.9 seconds of dead keyboard on
+  40320 nodes. Bound the time; how many iterations fit is the machine's
+  business.
 - **A stale `.pyc` can survive a `git checkout`.** Python compares mtime *and
   size* only. An edit that keeps the size (swapping two equal-length strings)
   and a checkout in the same second leave the old bytecode in place, so the

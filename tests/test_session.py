@@ -219,3 +219,36 @@ def test_permutograph_mode_starts_from_pms_own_defaults(permuto):
     assert permuto.mode is Mode.PERMUTO
     assert permuto.pm.base == "1234"
     assert permuto.graph.nnodes == 24
+
+
+# -- the frame budget --------------------------------------------------
+
+def test_hurry_stops_at_the_budget_however_far_it_has_got():
+    """`advance_frame` runs on the frontend's clock, so nothing else -- no
+    keystroke, no repaint -- happens while it does.  It counted iterations: 25
+    of them, which cost milliseconds on a graph the 1995 machine could hold.
+    On 40320 nodes one iteration is 0.7 s, so a checkpoint held the event loop
+    for the better part of twenty seconds and the keyboard was simply dead."""
+    s = new_permutograph_session()
+    s.hurry_up = True
+    s.calculating = True
+    for _ in range(3):
+        s.tick()                       # past the checkpoint at iteration 0
+
+    before = s.iteration
+    s.advance_frame(budget=0)          # no time at all: one iteration, no more
+    assert s.iteration == before + 1
+
+    before = s.iteration
+    s.advance_frame(budget=10)         # all the time it wants: a whole one
+    assert s.iteration > before + 1
+
+
+def test_without_hurry_a_frame_is_always_one_iteration():
+    """The budget is what HurryUp spends; single-stepping is unaffected."""
+    s = new_permutograph_session()
+    s.hurry_up = False
+    s.calculating = True
+    before = s.iteration
+    s.advance_frame(budget=10)
+    assert s.iteration == before + 1

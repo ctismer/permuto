@@ -22,6 +22,7 @@ Two details that are easy to miss and change the feel:
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -34,6 +35,12 @@ from .menus import (FILE_MENU, MAIN_MENU, PROGRAM_MENU, Menu,
                     ProgramAction)
 
 DIMENSION_CHECK_INTERVAL = 25   # "IF Iteration MOD 25 = 0 THEN Changed := TRUE"
+
+#: How long one frame may spend computing before it hands control back.  The
+#: frontend calls :meth:`Session.advance_frame` from its clock, so this is how
+#: long the keyboard can be dead.  50 ms is a fifth of the ~250 ms at which a
+#: keypress starts to feel ignored.
+FRAME_BUDGET = 0.05
 
 EXIT_QUESTION = "Do You want to exit? (Y/N)"   # UserIO, capital You and all
 
@@ -243,7 +250,7 @@ class Session:
         self._advance_program()
         return redraw
 
-    def advance_frame(self) -> None:
+    def advance_frame(self, budget: float = FRAME_BUDGET) -> None:
         """One frame's worth of relaxation, as the frontend's clock asks for it.
 
         Normally one iteration per frame.  With HurryUp the original traded
@@ -251,12 +258,23 @@ class Session:
         and skipped the spin while calculating (``polytop.mod:299``) -- so here
         it keeps iterating until :meth:`tick` asks for a redraw.  Without this
         the switch only costs the rotation and buys nothing.
+
+        But it stops after *budget* seconds however far it has got, because the
+        caller is a frontend's clock and nothing else can happen while this
+        runs.  Counting iterations was fine on a graph the 1995 machine could
+        hold: 25 of them cost milliseconds.  On 40320 nodes one iteration is
+        0.7 s, so a checkpoint blocked the event loop -- and the keyboard --
+        for the better part of twenty seconds.  Time is the thing to bound;
+        how many iterations fit into it is the machine's business.
         """
         if not self.hurry_up:
             self.tick()
             return
+        deadline = time.perf_counter() + budget
         for _ in range(DIMENSION_CHECK_INTERVAL):   # at most one checkpoint
             if self.tick():
+                break
+            if time.perf_counter() >= deadline:     # ... and at most a moment
                 break
 
     def _advance_program(self) -> None:
