@@ -56,8 +56,20 @@ def _menlo(pixels: float) -> QFont:
 # -- the five layers, in drawing order --------------------------------------
 
 def _draw_edges(sc: Scene, painter) -> None:
+    """One line per edge, in scene order, so what covers what does not change.
+
+    The pens are kept: a big graph has hundreds of thousands of edges and about
+    a dozen distinct (colour, width) pairs, and building a QPen and a QColor for
+    each one was a fifth of the time this layer took.  Batching by pen with
+    ``drawLines`` would save a further eighth, but it draws the colours in
+    groups and so changes which edge lies on top where they cross.
+    """
+    pens: dict[tuple, QPen] = {}
     for e in sc.edges:
-        painter.setPen(_pen(e.rgb, e.width))
+        pen = pens.get((e.rgb, e.width))
+        if pen is None:
+            pen = pens[(e.rgb, e.width)] = _pen(e.rgb, e.width)
+        painter.setPen(pen)
         painter.drawLine(QPointF(*e.a), QPointF(*e.b))
 
 
