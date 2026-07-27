@@ -139,7 +139,6 @@ def read_ply(path) -> PlySession:
         )
 
     g = Graph()
-    g.nnodes = nnodes
     g.dimensions = dimensions
     for i in range(nnodes):
         nd = _read_record(path, data, HEADER_SIZE + i * RECORD_SIZE, nnodes)

@@ -166,7 +166,6 @@ class Iridium:
         node = None
         if not self.built:
             num = g.nnodes + 1
-            g.nnodes = num
             node = Node(num=num, perm=self._namestr, color=YELLOW)
             node.iri = IriState(avail=FULL, avbak=FULL)
             node.pos[0], node.pos[1] = self._seed_position(num)

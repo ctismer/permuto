@@ -355,7 +355,6 @@ def read_pms(path) -> PlySession:
 
     if not 1 <= dim <= iv.MAXDIMEN:
         raise FileFormatError(path, f"dim {dim} is outside 1..{iv.MAXDIMEN}")
-    g.nnodes = len(g.nodes)
     g.dimensions = dim
     g.n_operators = sum(1 for row in optable if any(row))
 

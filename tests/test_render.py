@@ -34,7 +34,6 @@ def test_projection_is_isotropic_so_shapes_do_not_distort():
     must move the same number of pixels as a unit step along axis 1, whatever
     the window shape."""
     g = Graph()
-    g.nnodes = 2
     g.dimensions = 3
     g.nodes[1] = Node(num=1, pos=[iv.NORM, 0, 0, 0, 0, 0, 0, 0])
     g.nodes[2] = Node(num=2, pos=[0, iv.NORM, 0, 0, 0, 0, 0, 0])

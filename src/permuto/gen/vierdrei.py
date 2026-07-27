@@ -67,7 +67,6 @@ def vierdrei(mode: int = MODE_ALL):
     number = {lab: i for i, lab in enumerate(labels, start=1)}
 
     g = Graph()
-    g.nnodes = len(labels)
     for lab, num in number.items():
         g.nodes[num] = Node(num=num, perm=lab)
     for u, v in edges:

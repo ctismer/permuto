@@ -38,7 +38,6 @@ def test_spin_preserves_length():
     from permuto.core import layout
     from permuto.core.graph import Graph, Node
     g = Graph()
-    g.nnodes = 1
     # at the scale the layout actually works in -- a few hundred units would
     # drown in the truncation of the fixed-point multiply
     g.nodes[1] = Node(num=1, pos=[iv.NORM // 2, iv.NORM // 4, iv.NORM // 3,

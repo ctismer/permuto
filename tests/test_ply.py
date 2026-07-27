@@ -73,7 +73,6 @@ def test_session_roundtrip_keeps_program_and_iridium_state(tmp_path):
     """State the original stored but our loader could easily drop: SPA/ParSum
     fields, broken-link bitset, and the Iridium record."""
     g = Graph()
-    g.nnodes = 2
     g.dimensions = 3
     for n in (1, 2):
         nd = Node(num=n, perm=f"12{n}", color=n + 1,

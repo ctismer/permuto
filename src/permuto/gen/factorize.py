@@ -57,7 +57,6 @@ def factorize(g, places: int = DEFAULT_PLACES):
                for label, members in classes.items() for num in members}
 
     out = Graph()
-    out.nnodes = len(number)
     out.n_operators = g.n_operators
     for label, num in number.items():
         out.nodes[num] = Node(num=num, perm=label)

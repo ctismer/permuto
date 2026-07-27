@@ -29,7 +29,6 @@ def _two_nodes(dimensions=2, z=0):
     2-D graph is entirely back-facing and drawn dim throughout.
     """
     g = Graph()
-    g.nnodes = 2
     g.dimensions = dimensions
     for num, x in ((1, -(1 << 23)), (2, 1 << 23)):
         nd = Node(num=num, pos=[x, 0, z] + [0] * 5, color=num, perm=str(num))

@@ -210,7 +210,6 @@ class PM:
         fresh = reset or g is None
         if reset or g is None:
             g = Graph()
-            g.nnodes = len(self._perms)
             for i, p in enumerate(self._perms, start=1):
                 nd = Node(num=i, perm=p)
                 # colour is the position of the node's first character in the base

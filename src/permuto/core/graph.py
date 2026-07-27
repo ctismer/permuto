@@ -106,9 +106,18 @@ class Node:
 class Graph:
     def __init__(self) -> None:
         self.nodes: dict[int, Node] = {}
-        self.nnodes: int = 0
         self.dimensions: int = 3
         self.n_operators: int = 0  # >0 when built with operator identity
+
+    @property
+    def nnodes(self) -> int:
+        """``NodeMgr.NNodes`` -- how many nodes there are.
+
+        The original had to count them beside a fixed array.  Here it is the
+        length of the dict and nothing else: the two never disagreed, checked
+        across load, build, collapse, Iridium's growth and pack_nodes.
+        """
+        return len(self.nodes)
 
     # -- construction --------------------------------------------------
     @classmethod
@@ -119,7 +128,6 @@ class Graph:
 
         base = read_nod(path)
         g = cls()
-        g.nnodes = base.nnodes
         for num in sorted(base.links):
             g.nodes[num] = Node(num=num,
                                 links=[Link(to=j) for j in base.links[num]])
@@ -146,7 +154,6 @@ class Graph:
         perms = all_permutations(base)
         num = {p: i + 1 for i, p in enumerate(perms)}
         g = cls()
-        g.nnodes = len(perms)
         g.n_operators = len(operator_groups(operators))
         for i, p in enumerate(perms, start=1):
             nd = Node(num=i, perm=p)
@@ -222,8 +229,9 @@ class Graph:
         the rest renumbered densely, with every neighbour's link list rewritten
         to match.  Returns how many nodes were dropped.
         """
+        before = len(self.nodes)          # the count, before the dict is rebuilt
         kept = [nd for nd in self.ordered() if nd.num != 0]
-        if len(kept) == len(self.nodes):
+        if len(kept) == before:
             return 0
         renumber = {nd.num: i for i, nd in enumerate(kept, start=1)}
         self.nodes = {}
@@ -233,9 +241,7 @@ class Graph:
                 link.to = renumber.get(link.to, 0)
             nd.links = [link for link in nd.links if link.to]
             self.nodes[new_num] = nd
-        dropped = self.nnodes - len(kept)
-        self.nnodes = len(kept)
-        return dropped
+        return before - len(kept)
 
     def random_init(self, seed: int = 0) -> None:
         from . import layout
