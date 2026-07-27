@@ -46,6 +46,7 @@ Known defects of the original, reproduced but not hidden -- see
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 
 from ..errors import NodeNotFound, ProgramStateError
 from . import intvector as iv
@@ -64,6 +65,26 @@ DISCHARGE = 8000                          # kept when a node forwards a packet
 
 # Routing qualities, "a level of intention" in the author's words
 QUAL_AWAY, QUAL_SIDEWAYS, QUAL_TOWARDS = 2, 3, 5
+
+
+@dataclass(frozen=True)
+class _Move:
+    """A neighbour a packet could hop to, and how good that hop would be.
+
+    Three parallel lists indexed together used to say this -- the qualities,
+    the availabilities and the links -- which is the shape that cost the graph
+    a bug (see ``core.graph.Link``).  ``avail`` comes from the snapshot and
+    ``free`` is read live, a mix the original made and this keeps.
+    """
+
+    to: int
+    quality: int          # QUAL_TOWARDS / SIDEWAYS / AWAY
+    avail: int
+    free: bool            # the neighbour is not already carrying something
+
+    @property
+    def score(self) -> int:
+        return iv.scale(self.quality, self.avail, 5)
 
 # DOS palette entries the simulation uses
 BLACK, BLUE, RED, YELLOW = 0, 1, 4, 14
@@ -326,28 +347,25 @@ class Iridium:
         target_label = nodes[nd.iri.tarbak].perm
         here = self._distance(nd.perm, target_label)
 
-        qual, avail = [], []
+        moves = []
         for link in nd.links:
             there = self._distance(nodes[link.to].perm, target_label)
-            qual.append(QUAL_AWAY if here < there else
-                        QUAL_SIDEWAYS if here == there else QUAL_TOWARDS)
-            avail.append(nodes[link.to].iri.avbak)
+            moves.append(_Move(
+                to=link.to,
+                quality=(QUAL_AWAY if here < there else
+                         QUAL_SIDEWAYS if here == there else QUAL_TOWARDS),
+                avail=nodes[link.to].iri.avbak,
+                free=nodes[link.to].iri.target == 0))
 
         # the original scans backwards for a first candidate, so ties resolve
-        # to the lowest link index
-        best = -1
-        for i in range(nd.nlink - 1, -1, -1):
-            if avail[i] != 0 and nodes[nd.links[i].to].iri.target == 0:
-                best = i
-        if best < 0:
+        # to the lowest link index -- which is the first one here
+        best = next((m for m in moves if m.avail and m.free), None)
+        if best is None:
             return num
-
-        for i in range(nd.nlink):
-            if (nodes[nd.links[i].to].iri.target == 0
-                    and iv.scale(qual[i], avail[i], 5)
-                    > iv.scale(qual[best], avail[best], 5)):
-                best = i
-        return nd.links[best].to
+        for m in moves:                 # note: no avail test, as in the original
+            if m.free and m.score > best.score:
+                best = m
+        return best.to
 
     def _movements(self) -> None:
         """``Movements`` -- one hop per packet, then repaint.
@@ -356,6 +374,11 @@ class Iridium:
         this pass is not moved twice; and ``BestMove`` avoids occupied
         neighbours, which is the whole collision handling.
         """
+        self._hop_packets()
+        self._reveal_destinations()
+
+    def _hop_packets(self) -> None:
+        """Every carried packet moves one satellite along."""
         nodes = self.graph.nodes
         for num in sorted(nodes):
             nd = nodes[num]
@@ -373,8 +396,13 @@ class Iridium:
                 nodes[to].iri.message_color = col
             nd.color = YELLOW
 
-        # "hidden message numbers must be revived, if they were hidden in
-        # multiple targets" -- and the destination is marked blue
+    def _reveal_destinations(self) -> None:
+        """Repaint, and put the number back where the hop hid it.
+
+        "hidden message numbers must be revived, if they were hidden in
+        multiple targets" -- and the destination is marked blue.
+        """
+        nodes = self.graph.nodes
         for num in sorted(nodes):
             nd = nodes[num]
             if nd.iri.avail == 0 or nd.iri.target == 0:
