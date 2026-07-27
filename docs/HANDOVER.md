@@ -209,6 +209,43 @@ Done since: the loader rules (three defects, see the table above) and
 direction discs, the hollow dead ball and the white ring now have tests on both
 sides, what the scene says and what reaches the pixels.
 
+### Agreed, measured, and deliberately not done: one `Link` per edge-end
+
+An edge is stored twice, once at each end, in **four parallel structures**
+indexed by the same position — `Node.links` (the neighbour), `Node.opno` (the
+operator), `state.lines` (the LineStatus) and `state.broken` (a set of 1-based
+indices) — plus `nlink`, a cached `len(links)`. That is exactly the shape that
+produced the 1995 `Disconnect` bug: `links` and `opno` were shifted and the
+other two were not, so the marks then referred to different edges.
+
+The port fixed the symptom, and `Node.remove_link` now pays the standing tax —
+five statements, two length guards and a set renumbering, purely to keep four
+containers on the same index. The cure is one object:
+
+```python
+@dataclass
+class Link:
+    to: int                 # the neighbour's number
+    op: int = 0             # which operator made this edge
+    status: int = L_FREE    # LineStatus while a program runs
+    broken: bool = False
+```
+
+`Node.links: list[Link]`; `opno`, `nlink`, `state.lines` and `state.broken` all
+go, `remove_link` becomes `del self.links[k - 1]`, and `spa.py`'s realignment of
+`lines` "if the length no longer matches" loses its reason to exist. One `Link`
+per **edge-end**, not a shared edge object: the same edge is `L_INPUT` at one
+end and `L_OUTPUT` at the other, and the direction discs read exactly that.
+
+**Why it is not in this branch** (author's call, 2026-07-27): 204 lines across
+28 files. Most is mechanical (`for j in nd.links` → `link.to`), but 31 lines sit
+in the two serialisation modules and 24 in `test_pm.py`, which touches the
+representation directly — so the net gets rewritten while you are hanging in it.
+The golden tests against `nod/` and the `.ply` files stay untouched and would
+catch a topology error, which is what makes it safe to attempt; but the gain is
+preventive, not corrective, so it has no claim on a branch that is out for
+review. Take it as its own branch, with `tools/framehash.py` for the picture.
+
 ### Reading this branch (for a reviewer)
 
 Thirty commits, but six arcs. `git log --oneline main..phase3-refactor` reads
