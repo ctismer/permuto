@@ -914,9 +914,43 @@ def test_the_operator_table_takes_only_the_room_its_text_needs(qapp):
     reserve = captured["reserve"]
     assert reserve < 200, f"still reserving {reserve} px for a four-place base"
     assert captured["rightmost"] < captured["window"], "the table ran off the edge"
-    # and it really is the text that sets the size: a wider table needs more
+    # the size is set by the longest value the table can legally hold, not by
+    # what is in it now -- so it is the same for a small table and a full one,
+    # and the picture does not jump a few pixels on every keystroke
     narrow = render.operator_panel_width(PM(base="123"), 860)
     wide = render.operator_panel_width(
         PM(base="123456",
            optable=[["123456", "", ""]] + [["", "", ""] for _ in range(5)]), 860)
-    assert wide > narrow
+    assert wide == narrow
+
+
+
+def test_a_value_longer_than_the_stored_one_is_not_drawn_off_the_edge(qapp):
+    """Typing `12345678` into the base of a graph built from `1234` ran the
+    value past the right edge of the window and it was simply cut off.
+
+    The reserve was measured from the *stored* table, which still said `1234`,
+    plus one character for the cursor -- so anything longer than what had been
+    committed had nowhere to go.  It is measured for the longest value the
+    table can legally hold now, and for whatever is being typed on top of that.
+    """
+    from permuto.ui import render
+
+    captured = {}
+
+    def drive(view):
+        _press(view, "e")                       # into the operator editor
+        for ch in "12345678":                   # onto the base, which holds 1234
+            _press(view, ch)
+        img = _repaint(view)
+        edge = view.width() - 1
+        captured["ink_at_the_edge"] = any(
+            _rgb(img, edge, y) != render.BACKGROUND
+            for y in range(40, view.height() - 40))
+        captured["buffer"] = view.editor.buffer
+        view.close()
+
+    viewer.run("1234", operators=["12", "+", "23", "+", "34"], _drive=drive)
+    assert len(captured["buffer"]) > 8, "the point is a value longer than MAXDIMEN"
+    assert not captured["ink_at_the_edge"], \
+        "the operator table is drawn against the window edge and cut off"

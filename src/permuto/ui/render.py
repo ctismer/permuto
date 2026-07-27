@@ -18,6 +18,7 @@ from PySide6.QtGui import (QBrush, QColor, QFont, QFontMetricsF,
                            QGuiApplication, QImage, QPainter, QPen)
 
 from .. import scene
+from ..core import intvector as iv
 from ..scene import (BACKGROUND, INK, Scene, mark_size, operator_panel_rows,
                      project, stroke_width)
 
@@ -143,28 +144,39 @@ def paint_iridium(g, painter, width: int, height: int) -> None:
 
 # -- the operator panel beside the picture ----------------------------------
 
-def _panel_metrics(pm, height):
-    """Row height, font, where the value column starts, and how wide it gets."""
+def _panel_metrics(pm, height, buffer_text: str = ""):
+    """Row height, font, where the value column starts, and how wide it gets.
+
+    The width is for the longest value the table can *legally* hold -- a base
+    or a cycle is at most ``MAXDIMEN`` characters -- and not for whatever is in
+    it at this instant.  Measuring the current contents made the reserve too
+    small the moment someone typed something longer than what was committed:
+    with base 1234 stored, typing "12345678" ran the value off the window edge.
+    Reserving the maximum also stops the picture from jumping a few pixels on
+    every keystroke.
+    """
     line_px = mark_size(height, 11)
     font = _menlo(line_px * 0.7)
     fm = QFontMetricsF(font)
-    widest = max((fm.horizontalAdvance((value or "·") + "_")   # + the cursor
-                  for _, value, field in operator_panel_rows(pm)
-                  if field is not None), default=0.0)
+    longest = max([iv.MAXDIMEN * "0", buffer_text]
+                  + [value for _, value, field in operator_panel_rows(pm)
+                     if field is not None],
+                  key=len)
+    widest = fm.horizontalAdvance(longest + "_")      # + the edit cursor
     # one character clear of the label column: "Op 10" and an eight-place base
     # were touching at line_px * 3
     value_x = line_px * 3 + fm.horizontalAdvance("0")
     return line_px, font, value_x, widest
 
 
-def operator_panel_width(pm, height) -> float:
+def operator_panel_width(pm, height, buffer_text: str = "") -> float:
     """How much of the window to leave beside the picture for the table.
 
-    Measured from what is in it -- the label column, the widest cycle, room for
-    the edit cursor, and a margin either side.  It used to be a flat 260 px
-    whatever the table held, two thirds of it empty, and the picture paid.
+    The label column, the longest value it can hold, room for the edit cursor,
+    and a margin either side.  It used to be a flat 260 px whatever the table
+    held, two thirds of it empty, and the picture paid.
     """
-    line_px, _font, value_x, widest = _panel_metrics(pm, height)
+    line_px, _font, value_x, widest = _panel_metrics(pm, height, buffer_text)
     return 2 * line_px + value_x + widest
 
 
@@ -177,7 +189,8 @@ def paint_operator_panel(pm, painter, x, y, height, *,
     ``active_field`` set it shows the edit cursor, and ``buffer_text`` is the
     digits being typed into that field.
     """
-    line_px, font, value_x, _widest = _panel_metrics(pm, height)
+    line_px, font, value_x, _widest = _panel_metrics(pm, height,
+                                                     buffer_text or "")
     painter.setFont(font)
     x += line_px                                  # the left margin
     for row, (label, value, field) in enumerate(operator_panel_rows(pm)):

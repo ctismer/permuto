@@ -89,8 +89,10 @@ class PermutographView(ViewBase):
         """
         if not self._shows_operators():
             return self.width()
-        return self.width() - int(
-            render.operator_panel_width(self.session.pm, self.height()))
+        # what is being typed counts too: it can be longer than what is stored
+        typing = self.editor.buffer if self.editor else ""
+        return self.width() - int(render.operator_panel_width(
+            self.session.pm, self.height(), typing))
 
     # -- the clock -------------------------------------------------
     def _on_timer(self):
