@@ -49,9 +49,10 @@ from .graph import MAX_LINKS, Graph, Link, Node, NodeState
 #: is that sentence rather than a second hard-coded 6.
 MAX_OPS = MAX_LINKS // 2
 
-#: What a fresh table offers, which is what the 1995 program had room for on
-#: its screen.  The table grows past this when an operator is typed into it.
-DEFAULT_OPS = 6
+#: What a fresh table offers.  Seven, not the six the 1995 screen had room
+#: for: an eight-place base has seven adjacent transpositions (12, 23 ... 78),
+#: and a table that cannot hold them is a table that cannot build the thing.
+DEFAULT_OPS = 7
 
 #: ``PM.MaxCyc``.  Not raised, because it does not bind: an operator is a
 #: product of *disjoint* cycles over the base, and a base long enough to need a

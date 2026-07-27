@@ -235,17 +235,20 @@ def test_broken_marks_follow_their_edge_through_a_disconnect():
 
 # -- the six-operator ceiling ------------------------------------------------
 
-def test_the_table_grows_past_the_six_rows_the_1995_screen_had():
+def test_the_table_grows_past_the_rows_it_starts_with():
     """`MaxOps = 6` was `MaxLinks / 2` (pm.def:56) and MaxLinks was 12 because
     the links lived in a fixed array.  They are lists now, so the ceiling moved
     -- and with a six-place base there are fifteen transpositions to choose
-    from, of which six was an arbitrary few."""
+    from, of which six was an arbitrary few.
+
+    A fresh table offers seven, which is what an eight-place base needs for its
+    adjacent transpositions."""
     pm = PM(base="123456")
-    assert pm.n_ops == DEFAULT_OPS == 6, "a fresh table is what the screen had"
+    assert pm.n_ops == DEFAULT_OPS == 7
     for i, cyc in enumerate(["12", "23", "34", "45", "56", "16", "13", "46"],
                             start=1):
         pm.set_cycle(i, 1, cyc)
-    assert pm.n_ops == 8, "typing into row 7 has to make room for it"
+    assert pm.n_ops == 8, "typing into row 8 has to make room for it"
 
     g = pm.new_permutograph()
     assert g.nnodes == 720

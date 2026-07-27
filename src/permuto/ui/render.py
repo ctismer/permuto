@@ -151,7 +151,10 @@ def _panel_metrics(pm, height):
     widest = max((fm.horizontalAdvance((value or "·") + "_")   # + the cursor
                   for _, value, field in operator_panel_rows(pm)
                   if field is not None), default=0.0)
-    return line_px, font, line_px * 3, widest
+    # one character clear of the label column: "Op 10" and an eight-place base
+    # were touching at line_px * 3
+    value_x = line_px * 3 + fm.horizontalAdvance("0")
+    return line_px, font, value_x, widest
 
 
 def operator_panel_width(pm, height) -> float:
