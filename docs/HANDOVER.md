@@ -334,10 +334,13 @@ and 3.12. `mypy` is not a job of its own on purpose --
 `tests/test_annotations.py` shells out to it, so installing it and running a
 plain `pytest` covers both.
 
-It has **not run on GitHub yet** -- the commit is unpushed at the time of
-writing, so the first green tick is still owed. What was verified locally: the
-3.10 floor really holds (fresh venv, `pip install -e . pytest mypy`, 372
-passed), and the file parses as the workflow it looks like.
+**It is green** -- run `30310008124`, both matrix jobs, 38 s and 42 s, first
+try. The 3.10 floor was checked locally first (fresh venv, `pip install -e .
+pytest mypy`, 372 passed) rather than by pushing at CI until it worked.
+
+The actions are pinned at `checkout@v5` / `setup-python@v6`; `@v4`/`@v5` still
+run but are annotated as Node 20, which the runners now force onto Node 24.
+The README carries the badge.
 
 Beyond the sketch this replaced: `fonts-dejavu-core` (the widget tests paint
 chrome text and read the pixels back; a runner without a font is a different

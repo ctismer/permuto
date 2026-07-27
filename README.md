@@ -1,5 +1,7 @@
 # permuto — Polytop / Permutograph viewer
 
+[![tests](https://github.com/ctismer/permuto/actions/workflows/tests.yml/badge.svg)](https://github.com/ctismer/permuto/actions/workflows/tests.yml)
+
 A **PySide6** reincarnation of Christian Tismer's 1990–95 Modula-2
 **Polytop / Permutograph** viewer.
 
