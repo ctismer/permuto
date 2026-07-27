@@ -347,11 +347,12 @@ the mypy test *skips* where mypy is absent instead of failing. Nothing is
 version-pinned there: the suite was checked against mypy 2.3 as well as the
 1.15 that happens to be installed locally.
 
-The actions are pinned at `checkout@v5` / `setup-python@v6`; `@v4`/`@v5` still
-run but are annotated as Node 20, which the runners now force onto Node 24.
-`.github/dependabot.yml` watches them monthly, so the next such bump arrives as
-a pull request rather than by somebody reading the annotations. The README
-carries the badge.
+The actions are at `checkout@v7` / `setup-python@v7`. `@v4`/`@v5` still ran but
+were annotated as Node 20, which the runners now force onto Node 24; `v5`/`v6`
+fixed that and were themselves a major behind, which is exactly what nobody
+tracks by hand. `.github/dependabot.yml` watches them monthly and said so
+within the hour -- two pull requests, taken here as a one-line edit instead, so
+they close themselves. The README carries the badge.
 
 Beyond the sketch this replaced: `fonts-dejavu-core` (the widget tests paint
 chrome text and read the pixels back; a runner without a font is a different
