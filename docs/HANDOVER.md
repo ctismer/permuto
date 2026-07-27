@@ -159,7 +159,7 @@ Three rules still bind, unchanged from when phase 3 started:
 * **The CLI is argparse** with a subparser per command; `--pg` and `--iridium`
   for the two modes. The DOS spellings `/PG` and `/I` are gone.
 
-### Seven defects found — each has its own test, each was red first
+### Nine defects found — each has its own test, each was red first
 
 | What went wrong | Test that pins it |
 |---|---|
@@ -170,8 +170,10 @@ Three rules still bind, unchanged from when phase 3 started:
 | A typed extension was honoured or not depending on where the file was: `./alle6.nod` was displaced by its `.pgd` sibling, the same name among the samples was not. Same keystrokes, two different graphs and two different modes | `test_a_typed_extension_is_honoured_wherever_the_file_lives` |
 | `permuto build knot …` writes `knot.pg/.nod/.pgd` here, and `permuto show knot` said "nothing found": bare names were only ever looked for in the sample directory. The two commands did not compose | `test_a_graph_just_built_is_found_by_its_bare_name` |
 | `show mine 3` built a nonsense permutograph out of the file name instead of resuming `mine.pms` with a seed. The CLI asked "is this a file?" of the graph loader alone, which knows nothing about sessions | `test_a_seed_behind_a_session_file_still_resumes_the_session` |
+| `pos=1,2,x` at `dim=2` loaded as a clean node: the `.pms` reader dropped whatever was not a number and *then* counted what was left, so the count matched and the junk went unmentioned — the one thing PORT-GAPS §0 says the port must never do | `test_junk_among_the_right_number_of_coordinates_is_not_swallowed` |
+| An operator table the base cannot carry loaded silently, and the editor opened on it: the reader handed the table to `PM`'s constructor, which validates only the base, bypassing the `set_cycle` where that rule lives | `test_an_operator_the_base_cannot_carry_is_refused` |
 
-Four of those seven turned up by accident — one from a user question, three
+Six of those nine turned up by accident — one from a user question, three
 while moving code or writing the tests that were meant to *cover* it. Nobody
 went looking for any of them. The three loader ones came out of what the list
 below called a coverage hole: writing the tests as asked would have frozen all
@@ -195,19 +197,26 @@ is now six named files instead of two; what a second frontend would have to
 rewrite is `ui/keys.py` and five drawing loops, because `menus.py`, `scene.py`,
 `session.py`, `editor.py` and `loader.py` are all frontend-neutral.
 
-### What to do next, in this order
+### What to do next
 
-1. **`formats/pmsfile.py` (88%) — the refusals.** The open lines are the
-   `FileFormatError` branches. "Reject with a reason instead of swallowing it"
-   is the port's stated advantage over the original; nobody checks the reasons
-   arrive.
-2. **Have someone else read the branch diff** before it lands on `main` — see
-   the reading guide below.
+**Have someone else read the branch diff** before it lands on `main` — see the
+reading guide below. Everything else on this list has been done; what is left is
+deliberately left.
 
-Done since: the loader rules (three defects, see the table above) and
-`ui/render.py`, which turned into `scene.py` + five drawing loops — the
-direction discs, the hollow dead ball and the white ring now have tests on both
-sides, what the scene says and what reaches the pixels.
+Done, newest first: the six-operator ceiling, the `.pms` refusals (two of which
+were wrong — see the defect table), `nnodes`, one `Link` per edge-end, the
+loader rules, and `ui/render.py`, which turned into `scene.py` plus five drawing
+loops.
+
+**Not done, on purpose.** `MAXDIMEN = 8` binds nothing reachable — the base is
+capped at six places by the 2000-node limit long before eight dimensions matter
+— and unpicking it costs both file formats and the golden `.ply` tests for no
+visible gain. Qt chrome (a menu bar, a status bar, the operator table as a
+dock): the menu line is a *display* of what the keys do, flags and all, and a
+real `QMenuBar` would have to be clickable, which means a second input path
+through a program that has been keyboard-only since 1995. The dock alone is
+defensible and worth doing together with the size control, when that arrives —
+`scene.UI_SCALE` and `scene.MARK_REFERENCE` are the two numbers it would turn.
 
 ### How an edge is stored, and why it stopped being four things
 
@@ -257,7 +266,7 @@ Worth knowing for the next such change:
 
 ### Reading this branch (for a reviewer)
 
-Thirty-four commits, but seven arcs. `git log --oneline main..phase3-refactor` reads
+Thirty-nine commits, but eight arcs. `git log --oneline main..phase3-refactor` reads
 newest first; the arcs below are oldest first, which is the order they make
 sense in. Each commit builds and its tests pass, so bisecting works.
 
@@ -269,7 +278,8 @@ sense in. Each commit builds and its tests pass, so bisecting works.
 | Painting becomes layers, then a scene | `92e09fe`..`bd19861`, `39b7020` | the layer order, and that nothing draws twice |
 | The menus become one table | `820748a` | **the parity claims** — see below |
 | The look, on purpose | `24b18bf`, `6b1360b` | whether you agree with the judgement |
-| One `Link` per edge-end | `b3629e3` | the two serialisation modules; see above |
+| One `Link` per edge-end | `b3629e3`, `e00c3b9` | the two serialisation modules; see above |
+| Limits that were fixed arrays | `769c3c5`, `c0b1ce3`, `b0f83e5` | the .ply refusals, and .pms's stricter parse |
 
 **Where the risk actually is**, honestly:
 
@@ -301,8 +311,8 @@ check that no golden expectation was edited to make something pass.
 Useful while reading:
 
 ```bash
-python -m pytest -q                       # 311 tests
-python -m pytest --cov=permuto            # 94%
+python -m pytest -q                       # 326 tests
+python -m pytest --cov=permuto            # 94%, pmsfile 87% -> 94%
 python tools/framehash.py                 # the picture, as thirteen hashes
 permuto show pgl5                         # and then pull the window open
 ```
