@@ -209,18 +209,19 @@ Done since: the loader rules (three defects, see the table above) and
 direction discs, the hollow dead ball and the white ring now have tests on both
 sides, what the scene says and what reaches the pixels.
 
-### Agreed, measured, and deliberately not done: one `Link` per edge-end
+### How an edge is stored, and why it stopped being four things
 
-An edge is stored twice, once at each end, in **four parallel structures**
-indexed by the same position — `Node.links` (the neighbour), `Node.opno` (the
-operator), `state.lines` (the LineStatus) and `state.broken` (a set of 1-based
-indices) — plus `nlink`, a cached `len(links)`. That is exactly the shape that
-produced the 1995 `Disconnect` bug: `links` and `opno` were shifted and the
-other two were not, so the marks then referred to different edges.
+An edge is stored twice, once at each end. Until `b3629e3` each end lived in
+**four parallel containers** sharing an index — `Node.links` (the neighbour),
+`Node.opno` (the operator), `state.lines` (the LineStatus) and `state.broken`
+(a set of 1-based indices) — plus `nlink`, a cached `len(links)`. Two index
+conventions, `broken` counting from 1 and `lines` from 0, met in the same loop
+in `spa.py`. That is the shape that produced the 1995 `Disconnect` bug: the
+first pair was shifted on removal and the second was not, so the marks then
+described other edges. The port fixed the symptom, and `remove_link` held the
+four together by hand for as long as they existed.
 
-The port fixed the symptom, and `Node.remove_link` now pays the standing tax —
-five statements, two length guards and a set renumbering, purely to keep four
-containers on the same index. The cure is one object:
+Now one end is one object:
 
 ```python
 @dataclass
@@ -231,24 +232,32 @@ class Link:
     broken: bool = False
 ```
 
-`Node.links: list[Link]`; `opno`, `nlink`, `state.lines` and `state.broken` all
-go, `remove_link` becomes `del self.links[k - 1]`, and `spa.py`'s realignment of
-`lines` "if the length no longer matches" loses its reason to exist. One `Link`
-per **edge-end**, not a shared edge object: the same edge is `L_INPUT` at one
-end and `L_OUTPUT` at the other, and the direction discs read exactly that.
+One `Link` per **edge-end**, not a shared edge object: the same edge is
+`L_INPUT` where the wave enters and `L_OUTPUT` where it leaves, and the
+direction discs read exactly that. `remove_link` is a `del`, `spa.py` no longer
+realigns `lines` "if the length no longer matches", `pack_nodes` no longer
+unzips and rezips, and `nlink` is a property.
 
-**Why it is not in this branch** (author's call, 2026-07-27): 204 lines across
-28 files. Most is mechanical (`for j in nd.links` → `link.to`), but 31 lines sit
-in the two serialisation modules and 24 in `test_pm.py`, which touches the
-representation directly — so the net gets rewritten while you are hanging in it.
-The golden tests against `nod/` and the `.ply` files stay untouched and would
-catch a topology error, which is what makes it safe to attempt; but the gain is
-preventive, not corrective, so it has no claim on a branch that is out for
-review. Take it as its own branch, with `tools/framehash.py` for the picture.
+**The formats did not change.** `.pms` and `.ply` are index-based on disk and
+stay that way; the 1-based/0-based arithmetic now exists only at that boundary,
+where `pmsfile._state_field` says so in as many words.
+
+Worth knowing for the next such change:
+
+* It cost **26 files, +10 lines** — but −16 lines of *executable* code. The
+  file grew because the reasoning went in with it. An estimate that counts only
+  the code will come out too optimistic; this one did, by 36 lines.
+* `tools/framehash.py` caught two frames going wrong immediately, and the fault
+  was **the tool**: it still set `state.broken = {1}`, which after the change
+  merely creates a dead attribute, so the broken edge vanished from the picture.
+  Anything that pokes the representation directly has to be swept too.
+* `test_program_state_survives` had been marking link 3 of a node with two
+  links. The old `broken` set accepted any number, so the test passed on a mark
+  that pointed at nothing. There is no number left to be wrong about.
 
 ### Reading this branch (for a reviewer)
 
-Thirty commits, but six arcs. `git log --oneline main..phase3-refactor` reads
+Thirty-four commits, but seven arcs. `git log --oneline main..phase3-refactor` reads
 newest first; the arcs below are oldest first, which is the order they make
 sense in. Each commit builds and its tests pass, so bisecting works.
 
@@ -260,6 +269,7 @@ sense in. Each commit builds and its tests pass, so bisecting works.
 | Painting becomes layers, then a scene | `92e09fe`..`bd19861`, `39b7020` | the layer order, and that nothing draws twice |
 | The menus become one table | `820748a` | **the parity claims** — see below |
 | The look, on purpose | `24b18bf`, `6b1360b` | whether you agree with the judgement |
+| One `Link` per edge-end | `b3629e3` | the two serialisation modules; see above |
 
 **Where the risk actually is**, honestly:
 
