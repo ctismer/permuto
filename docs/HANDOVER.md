@@ -264,6 +264,38 @@ Worth knowing for the next such change:
   links. The old `broken` set accepted any number, so the test passed on a mark
   that pointed at nothing. There is no number left to be wrong about.
 
+### Open: a big graph should be much faster than this (author, 2026-07-27)
+
+Measured, at 40320 nodes and 141120 edges, 900x900: relaxation 698 ms a step,
+building the scene 436 ms, painting it 1137 ms -- about 2.3 s a frame.
+
+Nothing is quadratic: 9.3x the edges gives 8.7x the relaxation, 11.9x the
+scene, 7.6x the painting. It is linear and there is simply a lot of it.
+
+Where the painting time actually goes, measured rather than profiled (cProfile
+attributes the time *inside* `drawLine` to `drawLine`, which reads as though the
+Python->C++ crossing were the cost -- it is 0.47 of the 3.85 microseconds an
+edge takes, 12 percent). The rest is Qt's rasteriser, and the biggest item in
+it is antialiasing: the same edges cost 58 ms with and 20 ms without.
+
+Done: the pens are cached (`1d7c4bd`), a seventh off the layer, picture
+byte-identical.
+
+Not tried, and this is where to look next:
+
+* **Antialiasing off past some size.** Three times faster, and at 40320 nodes
+  the balls are a few pixels wide anyway. A judgement to make at the picture.
+* **Batching by pen** with `drawLines`: a further eighth, but it draws colour
+  by colour and so changes which edge lies on top where two cross.
+* **Not redrawing what did not change** -- the graph is repainted whole every
+  frame, including while only the chrome changes.
+* **A different surface**: `QOpenGLWidget`, or a `QPixmap` the picture is
+  composed into once. Untouched.
+
+Careful with one thing found on the way: `drawLine(x1, y1, x2, y2)` with floats
+hits the *integer* overload and truncates the coordinates, which is a different
+picture. Pass `QPointF`.
+
 ### Waiting: the chrome is painted, so none of it can be quoted
 
 Both status lines, the prompt and every error message are drawn with a
