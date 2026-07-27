@@ -327,36 +327,26 @@ Careful with one thing found on the way: `drawLine(x1, y1, x2, y2)` with floats
 hits the *integer* overload and truncates the coordinates, which is a different
 picture. Pass `QPointF`.
 
-### To do: nothing runs the tests on GitHub (author, 2026-07-28)
+### Done: the tests run on GitHub (2026-07-28)
 
-The repo is public and MIT, there are 372 tests and a clean `mypy`, and none of
-it runs when anything is pushed -- there is no `.github/workflows` at all. About
-fifteen lines, and the author asked for the successor to write them rather than
-this session.
+`.github/workflows/tests.yml`, one job, `push` and `pull_request`, Python 3.10
+and 3.12. `mypy` is not a job of its own on purpose --
+`tests/test_annotations.py` shells out to it, so installing it and running a
+plain `pytest` covers both.
 
-One job is enough, because `tests/test_annotations.py` already shells out to
-`mypy`: install it and a plain `pytest` covers both.
+It has **not run on GitHub yet** -- the commit is unpushed at the time of
+writing, so the first green tick is still owed. What was verified locally: the
+3.10 floor really holds (fresh venv, `pip install -e . pytest mypy`, 372
+passed), and the file parses as the workflow it looks like.
 
-```yaml
-# .github/workflows/tests.yml  -- sketch, not tested
-on: [push, pull_request]
-jobs:
-  tests:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix: {python: ["3.10", "3.12"]}      # the floor and what is used
-    env:
-      QT_QPA_PLATFORM: offscreen
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: "${{ matrix.python }}"}
-      - run: sudo apt-get install -y libegl1 libgl1 libxkbcommon-x11-0
-      - run: pip install -e . mypy pytest pytest-cov
-      - run: python -m pytest
-```
+Beyond the sketch this replaced: `fonts-dejavu-core` (the widget tests paint
+chrome text and read the pixels back; a runner without a font is a different
+picture), `apt-get update` before the install, `fail-fast: false` so 3.10 and
+3.12 do not hide each other, and no `pytest-cov` -- nothing in `addopts` asks
+for coverage.
 
-Three things that will otherwise cost an evening:
+Three things that would otherwise have cost an evening, and still apply to
+anyone editing that file:
 
 * **PySide6 will not even import** on a bare ubuntu runner without `libegl1`
   (and usually `libgl1`, `libxkbcommon-x11-0`). The error names a missing `.so`

@@ -1,0 +1,35 @@
+name: tests
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12"]     # the floor, and what is developed on
+    env:
+      # Set here rather than only in conftest.py: an early Qt import (a test
+      # module imported before any fixture runs) would otherwise look for a
+      # display and abort.
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "${{ matrix.python }}"
+      # PySide6 will not even import on a bare runner: the error names a
+      # missing .so and looks nothing like the real cause.  The fonts are for
+      # the chrome, which the widget tests paint and then read back.
+      - run: sudo apt-get update
+      - run: >
+          sudo apt-get install -y --no-install-recommends
+          libegl1 libgl1 libxkbcommon-x11-0 libdbus-1-3 fonts-dejavu-core
+      # mypy is not a separate job on purpose: tests/test_annotations.py shells
+      # out to it, so a plain pytest covers the type check too.
+      - run: pip install -e . pytest mypy
+      - run: python -m pytest
