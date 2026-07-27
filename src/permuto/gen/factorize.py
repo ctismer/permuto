@@ -13,14 +13,14 @@ pipeline ran ``num2`` only afterwards.
 
 from __future__ import annotations
 
-from typing import Iterable, List
+from collections.abc import Iterable
 
 from ..errors import LimitExceeded
 
 DEFAULT_PLACES = 2  # trunc.awk's fallback when the parameter is not a number
 
 
-def truncate_lines(lines: Iterable[str], places: int = DEFAULT_PLACES) -> List[str]:
+def truncate_lines(lines: Iterable[str], places: int = DEFAULT_PLACES) -> list[str]:
     """``trunc.awk`` itself: shorten every whitespace-separated field.
 
     Operates on ``.pg`` text, so the result can go straight into

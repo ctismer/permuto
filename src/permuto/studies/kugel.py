@@ -32,7 +32,6 @@ from __future__ import annotations
 
 import math
 import random
-from typing import List, Tuple
 
 # "schwarz und weiß bleiben" -- entries 0 and 15 are left alone, so the ramp is
 # 14 colours wide and the background stays a true black.
@@ -57,12 +56,12 @@ SHAKE = 3 * 600 // COLOR_STEPS
 #   . . o .   o . * .   * . * .   * . * .   * o * .   * * * o   * * * *
 #   . . . .   . . . .   . . . o   . o . *   . * . *   . * . *   o * . *
 _DITHER_STEPS = [(0, 10), (2, 8), (5, 15), (7, 13), (3, 9), (1, 11), (6, 12), (4, 14)]
-DITHER: List[frozenset] = [frozenset()]
+DITHER: list[frozenset] = [frozenset()]
 for _pair in _DITHER_STEPS:
     DITHER.append(frozenset(DITHER[-1] | set(_pair)))
 
 
-def _palette() -> List[Tuple[int, int, int]]:
+def _palette() -> list[tuple[int, int, int]]:
     """``SetRgb`` -- the hand-mixed ramp, converted from 6-bit DAC to 8-bit.
 
     Red starts high and stays the strongest channel while blue climbs fastest
@@ -91,7 +90,7 @@ def _color_for(value: int) -> int:
 
 
 def render_sphere(radius: int = 200, width: int = 640, height: int = 480, *,
-                  floyd: bool = False, seed: int = 0) -> List[List[int]]:
+                  floyd: bool = False, seed: int = 0) -> list[list[int]]:
     """The sphere as palette indices, ``[y][x]``, 0 where nothing was drawn.
 
     *floyd* picks the error-diffusion pass instead of the ordered dither.  The

@@ -13,7 +13,6 @@ which drop the nodes whose three places are all equal and/or all different.
 
 from __future__ import annotations
 
-from typing import List, Tuple
 
 from ..errors import LimitExceeded
 
@@ -26,7 +25,7 @@ MODE_NO_DIFFERENT = 2   # drop the all-different ones
 MODE_NEITHER = 3        # both filters
 
 
-def vierdrei_edges(mode: int = MODE_ALL) -> List[Tuple[str, str]]:
+def vierdrei_edges(mode: int = MODE_ALL) -> list[tuple[str, str]]:
     """Edge list as sorted label pairs, following the original's loop exactly.
 
     The awk version builds edges directly rather than enumerating nodes ("Aufbau

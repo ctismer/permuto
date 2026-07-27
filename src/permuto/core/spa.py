@@ -10,7 +10,6 @@ locked), so the programs can be watched, exactly as in the original.
 
 from __future__ import annotations
 
-from typing import Dict
 
 from .graph import (Graph, L_FREE, L_INPUT, L_LOCKED, L_OUTPUT)
 
@@ -142,7 +141,7 @@ def par_sum(g: Graph) -> bool:
     return activate_maxstep(g) > 0
 
 
-def distances(g: Graph, start: int) -> Dict[int, int]:
+def distances(g: Graph, start: int) -> dict[int, int]:
     """Shortest-path distances from ``start`` (unreached -> -1)."""
     init_spa(g, start)
     while shortest_path(g):

@@ -7,7 +7,6 @@ replaces this file and nothing else.
 
 from __future__ import annotations
 
-from typing import Optional
 
 from PySide6.QtCore import Qt
 
@@ -34,7 +33,7 @@ EDIT_MOVES = {Key.UP: Move.UP, Key.DOWN: Move.DOWN,
               Key.HOME: Move.FIRST, Key.END: Move.LAST}
 
 
-def named(ev) -> Optional[Key]:
+def named(ev) -> Key | None:
     """The :class:`Key` this event is, or None if it types a character."""
     return _NAMED.get(ev.key())
 

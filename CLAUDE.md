@@ -45,6 +45,10 @@ alongside for reference until the port is complete.
   original is deliberately float-free; `studies/kugel` is the one exception,
   it was float in 1991 too). Keep `core/` UI-free (PySide6 now, a possible
   TypeScript/web viewer later, are just frontends).
+- Python floor is **3.10** and the code says so: `match`/`case` where a value
+  runs against named cases, and the current annotation spellings — `list[int]`,
+  `dict[str, int]`, `X | None`, `Sequence` from `collections.abc`. Nothing
+  imports from `typing` any more; don't reintroduce `List`/`Optional`.
 - Origin is DOS / CP437; `legacy/**` is kept byte-exact via `.gitattributes`.
   Two consequences worth knowing before you lose an hour:
   - **Never search `legacy/` with plain `grep`.** In a UTF-8 locale macOS grep

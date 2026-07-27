@@ -49,7 +49,6 @@ from __future__ import annotations
 import struct
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
 
 from ..errors import FileFormatError, InvalidBase, InvalidCycle
 from ..core import intvector as iv
@@ -83,18 +82,18 @@ class PlySession:
     graph: Graph
     permuto: bool = True
     base: str = ""
-    optable: List[List[str]] = field(default_factory=list)
+    optable: list[list[str]] = field(default_factory=list)
     last_edit_line: int = 0
     iteration: int = 0
     """The relaxation step counter, so a reloaded session shows where it was.
     The binary ``.ply`` never stored this; ``.pms`` does."""
-    pm: Optional[PM] = None
+    pm: PM | None = None
     """The reconstructed PM, or None when the base/operators are unusable
     (a Polytop-mode session carries a leftover table that need not be valid)."""
     mode: str = "permuto"
     """``permuto`` / ``polytop`` / ``iridium`` -- the session's mode.  The binary
     ``.ply`` only knew a Permuto flag; the text ``.pms`` carries the full mode."""
-    warnings: List[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     """Non-fatal problems found while reading (e.g. a truncated file was
     salvaged).  The graph is usable; the UI should surface these."""
 

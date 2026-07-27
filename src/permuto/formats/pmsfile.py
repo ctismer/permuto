@@ -45,7 +45,6 @@ mode; ``.pms`` can.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List
 
 from ..errors import FileFormatError
 from ..core import intvector as iv
@@ -138,7 +137,7 @@ def write_pms(path, session: PlySession) -> None:
 
 # --- reading -----------------------------------------------------------
 
-def _parse_int_list(path, lineno, text) -> List[int]:
+def _parse_int_list(path, lineno, text) -> list[int]:
     try:
         return [int(v) for v in text.split(",") if v != ""]
     except ValueError:
@@ -204,7 +203,7 @@ def _parse_node(path, lineno, tokens, dim, warn, salvage) -> Node:
     return nd
 
 
-def _coords(path, lineno, field, text, dim, num, warn, salvage) -> List[int]:
+def _coords(path, lineno, field, text, dim, num, warn, salvage) -> list[int]:
     """Exactly *dim* coordinates; a short count is a truncation only in the
     salvage tail, otherwise a hard error."""
     coords = [int(v) for v in text.split(",") if v.lstrip("-").isdigit()]
@@ -266,7 +265,7 @@ def read_pms(path) -> PlySession:
     unusable.
     """
     text = Path(path).read_text(encoding="utf-8")
-    warnings: List[str] = []
+    warnings: list[str] = []
     mode = "permuto"
     base = ""
     optable = [["" for _ in range(MAX_CYC)] for _ in range(MAX_OPS)]
@@ -377,7 +376,7 @@ def read_pms(path) -> PlySession:
                       iteration=iteration, pm=pm, mode=mode, warnings=warnings)
 
 
-def _resolve_links(path, g: Graph, warnings: List[str], strict: bool) -> int:
+def _resolve_links(path, g: Graph, warnings: list[str], strict: bool) -> int:
     """Links to a missing node: corruption in a complete file (fatal), or a
     truncation artefact otherwise (dropped, counted).  Returns how many dropped."""
     dropped = 0

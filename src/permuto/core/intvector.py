@@ -17,7 +17,6 @@ Notes on fidelity:
 from __future__ import annotations
 
 import math
-from typing import List
 
 MAXDIMEN = 8
 
@@ -68,7 +67,7 @@ def get_dimensions() -> int:
     return _dim
 
 
-def new_vector() -> List[int]:
+def new_vector() -> list[int]:
     return [0] * MAXDIMEN
 
 
@@ -100,46 +99,46 @@ def sqrt(x: int) -> int:
     return math.isqrt(x) if x > 0 else 0
 
 
-def zero_vector(vec: List[int]) -> None:
+def zero_vector(vec: list[int]) -> None:
     for i in range(_dim):
         vec[i] = 0
 
 
-def random_vector(vec: List[int], rng, rng_range: int) -> None:
+def random_vector(vec: list[int], rng, rng_range: int) -> None:
     r = abs(rng_range)
     for i in range(_dim):
         vec[i] = (rng.randrange(2 * r) - r) if r else 0  # Lib.RANDOM(2*range)-range
 
 
-def scale_vector(vec: List[int], mul: int, div: int) -> None:
+def scale_vector(vec: list[int], mul: int, div: int) -> None:
     for i in range(_dim):
         vec[i] = scale(vec[i], mul, div)
 
 
-def dot_product(vec: List[int], w: List[int]) -> None:
+def dot_product(vec: list[int], w: list[int]) -> None:
     # component-wise fixed-point multiply (name kept from the original)
     for i in range(_dim):
         vec[i] = scale(vec[i], w[i], NORM)
 
 
-def add_vector(vec: List[int], w: List[int]) -> None:
+def add_vector(vec: list[int], w: list[int]) -> None:
     for i in range(_dim):
         vec[i] += w[i]
 
 
-def sub_vector(vec: List[int], w: List[int]) -> None:
+def sub_vector(vec: list[int], w: list[int]) -> None:
     for i in range(_dim):
         vec[i] -= w[i]
 
 
-def vector_length(v: List[int]) -> int:
+def vector_length(v: list[int]) -> int:
     s = 0
     for i in range(_dim):
         s += v[i] * v[i]
     return sqrt(s)
 
 
-def norm_vector(v: List[int]) -> None:
+def norm_vector(v: list[int]) -> None:
     length = vector_length(v)
     if length == 0:
         v[1] = 1

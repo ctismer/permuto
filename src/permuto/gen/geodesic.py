@@ -33,14 +33,13 @@ graph up to relabelling; the tests check that against the original files.
 
 from __future__ import annotations
 
-from typing import Dict, List, Set, Tuple
 
 from ..errors import LimitExceeded
 
 MAX_FREQ = 14  # 10*14^2+2 = 1962 nodes, just inside NodeMgr's MaxNodesTot
 
 # The base icosahedron, exactly as init_iko() wires it: 12 corners, 30 edges.
-ICOSAHEDRON_EDGES: Tuple[Tuple[int, int], ...] = (
+ICOSAHEDRON_EDGES: tuple[tuple[int, int], ...] = (
     (1, 2), (2, 3), (3, 1),
     (1, 6), (1, 4), (2, 4), (2, 5), (3, 5), (3, 6),
     (1, 7), (4, 7), (6, 7), (2, 8), (4, 8), (5, 8), (3, 9), (5, 9), (6, 9),
@@ -51,7 +50,7 @@ ICOSAHEDRON_EDGES: Tuple[Tuple[int, int], ...] = (
 _LETTERS = "abcdefghijkl"
 
 
-def icosahedron_faces() -> List[Tuple[int, int, int]]:
+def icosahedron_faces() -> list[tuple[int, int, int]]:
     """The 20 faces, as ascending corner triples.
 
     Found the way the original does it -- every triple whose three edges all
@@ -82,13 +81,13 @@ def make_key(a: int, b: int, c: int, na: int, nb: int, nc: int) -> str:
     return "".join(parts)
 
 
-def _fill_face(a: int, b: int, c: int, freq: int) -> List[Tuple[str, str]]:
+def _fill_face(a: int, b: int, c: int, freq: int) -> list[tuple[str, str]]:
     """``fill_triangle`` -- the upward sub-triangles of one face.
 
     The downward ones need no separate work: they are bounded by edges these
     already contribute.
     """
-    out: List[Tuple[str, str]] = []
+    out: list[tuple[str, str]] = []
     for i in range(freq):
         for j in range(freq - i):
             k1 = make_key(a, b, c, freq - i - j, i, j)
@@ -98,20 +97,20 @@ def _fill_face(a: int, b: int, c: int, freq: int) -> List[Tuple[str, str]]:
     return out
 
 
-def geodesic_edges(freq: int = 1) -> List[Tuple[str, str]]:
+def geodesic_edges(freq: int = 1) -> list[tuple[str, str]]:
     """All edges of the geodesic icosahedron, as sorted label pairs."""
     if freq < 1:
         raise LimitExceeded("geodesic frequency", freq, 1, MAX_FREQ)
     if freq > MAX_FREQ:
         raise LimitExceeded("geodesic frequency", freq, 1, MAX_FREQ)
-    seen: Set[Tuple[str, str]] = set()
+    seen: set[tuple[str, str]] = set()
     for a, b, c in icosahedron_faces():
         for u, v in _fill_face(a, b, c, freq):
             seen.add((u, v) if u <= v else (v, u))
     return sorted(seen)
 
 
-def geodesic_labels(freq: int = 1) -> List[str]:
+def geodesic_labels(freq: int = 1) -> list[str]:
     """Node labels in the port's deterministic order: corners first, then the
     rest by name.  Corners are the single-letter-repeated names."""
     labels = {u for e in geodesic_edges(freq) for u in e}
@@ -128,7 +127,7 @@ def geodesic(freq: int = 1):
     from ..core.graph import Graph, Node
 
     labels = geodesic_labels(freq)
-    number: Dict[str, int] = {lab: i for i, lab in enumerate(labels, start=1)}
+    number: dict[str, int] = {lab: i for i, lab in enumerate(labels, start=1)}
 
     g = Graph()
     g.nnodes = len(labels)

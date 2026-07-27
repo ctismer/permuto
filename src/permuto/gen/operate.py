@@ -13,7 +13,6 @@ Example (base ``123``, operators ``12 + 23``)::
 
 from __future__ import annotations
 
-from typing import List
 
 
 def apply_cycle(res: str, cycle: str) -> str:
@@ -33,9 +32,9 @@ def apply_cycle(res: str, cycle: str) -> str:
     return res
 
 
-def operate_line(arg: str, operators: List[str]) -> str:
+def operate_line(arg: str, operators: list[str]) -> str:
     res = arg
-    parts: List[str] = []
+    parts: list[str] = []
     for z in operators:
         if z == "+":  # end of one operator: emit (arg, res), restart from arg
             parts.append(arg)

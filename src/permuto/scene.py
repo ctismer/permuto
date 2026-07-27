@@ -21,20 +21,19 @@ labels go inside the balls.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
 
 from .core import intvector as iv
 from .core.graph import L_INPUT, L_LOCKED, L_OUTPUT
 from .editor import BASE_FIELD, fields_of, value_of
 
-Point = Tuple[float, float]
-RGB = Tuple[int, int, int]
+Point = tuple[float, float]
+RGB = tuple[int, int, int]
 
 BACKGROUND: RGB = (18, 18, 28)   # picture background; shared with the chrome
 INK: RGB = (0, 0, 0)             # PlotCenteredStr(..., 0) -- labels are black
 
 #: distinct, reasonably colour-blind-friendly hues for operators 1..n
-OPERATOR_PALETTE: List[RGB] = [
+OPERATOR_PALETTE: list[RGB] = [
     (90, 200, 255), (255, 150, 90), (140, 230, 120), (230, 120, 220),
     (240, 220, 90), (120, 190, 235), (250, 130, 150), (170, 220, 200),
 ]
@@ -42,7 +41,7 @@ OPERATOR_PALETTE: List[RGB] = [
 #: the standard DOS 16-colour palette, by index -- the balls use it, and
 #: Iridium/SIMONE colours nodes by it directly (Window.Yellow=14 idle,
 #: Blue=1 destination, Red=4 and NextColor for packets)
-DOS_PALETTE: List[RGB] = [
+DOS_PALETTE: list[RGB] = [
     (0, 0, 0), (60, 60, 220), (0, 170, 0), (0, 170, 170),
     (210, 40, 40), (200, 0, 200), (170, 85, 0), (200, 200, 200),
     (110, 110, 120), (110, 110, 255), (85, 255, 85), (85, 255, 255),
@@ -158,7 +157,7 @@ def ball_color(color: int, front: bool) -> int:
 
 # -- the projection ---------------------------------------------------------
 
-def project(g, width: int, height: int) -> Dict[int, Tuple[int, int, int]]:
+def project(g, width: int, height: int) -> dict[int, tuple[int, int, int]]:
     """Map each node to (screen x, screen y, depth z), like ``PmDisp.DrawEdges``:
     ``px = Scale(pos[1], Scale_X, Norm) + centre`` (component 3 = depth).
 
@@ -171,7 +170,7 @@ def project(g, width: int, height: int) -> Dict[int, Tuple[int, int, int]]:
     NORM = iv.NORM
     scale = (min(width, height) // 2) * 95 // 100
     cx, cy = width // 2, height // 2
-    pts: Dict[int, Tuple[int, int, int]] = {}
+    pts: dict[int, tuple[int, int, int]] = {}
     for nd in g.nodes.values():
         pos = nd.pos
         px = iv.scale(pos[0], scale, NORM) + cx
@@ -228,7 +227,7 @@ class Ball:
 
     at: Point
     radius: float
-    fill: Optional[RGB]
+    fill: RGB | None
     ringed: bool = False          # active: a white ring one pixel further out
     label: str = ""
 
@@ -237,10 +236,10 @@ class Ball:
 class Scene:
     """One frame, in drawing order.  Every layer covers the one before it."""
 
-    edges: List[Edge] = field(default_factory=list)
-    discs: List[Disc] = field(default_factory=list)
-    digits: List[Digit] = field(default_factory=list)
-    balls: List[Ball] = field(default_factory=list)
+    edges: list[Edge] = field(default_factory=list)
+    discs: list[Disc] = field(default_factory=list)
+    digits: list[Digit] = field(default_factory=list)
+    balls: list[Ball] = field(default_factory=list)
     radius: float = 0.0
     digit_size: float = 0.0
     digit_pad: float = 0.0        # half the punched-out patch behind a digit

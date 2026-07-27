@@ -37,7 +37,6 @@ Kept faithfully, because the behaviour is visible:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 
 from ..errors import InvalidBase, InvalidCycle, LimitExceeded, limit_check
 from ..gen.operate import apply_cycle
@@ -84,13 +83,13 @@ def cyclic_operate(perm: str, cycle: str) -> str:
     return apply_cycle(perm, cycle)
 
 
-def all_perms_from(base: str) -> List[str]:
+def all_perms_from(base: str) -> list[str]:
     """Every permutation of *base*, in ``NextPerm`` order starting at *base*.
 
     With a sorted base this is plain lexicographic order, and it handles
     repeated characters correctly -- ``11223`` yields 5!/(2!·2!) = 30, not 120.
     """
-    out: List[str] = []
+    out: list[str] = []
     cur = list(base)
     while True:
         out.append("".join(cur))
@@ -106,12 +105,12 @@ class PM:
     """Base permutation + operator table, and the graph built from them."""
 
     base: str = DEFAULT_BASE
-    optable: List[List[str]] = field(default_factory=lambda: _default_optable())
+    optable: list[list[str]] = field(default_factory=lambda: _default_optable())
     last_edit_line: int = 0        # PM.LastEditLine, persisted in .ply
     max_nodes: int = MAX_NODES_TOT
 
-    _perms: List[str] = field(default_factory=list, repr=False)
-    _index: Dict[str, int] = field(default_factory=dict, repr=False)
+    _perms: list[str] = field(default_factory=list, repr=False)
+    _index: dict[str, int] = field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
         self.set_base(self.base)
@@ -184,7 +183,7 @@ class PM:
 
     # -- naming ---------------------------------------------------------
     @property
-    def permutations(self) -> List[str]:
+    def permutations(self) -> list[str]:
         """All node permutations, in node-number order (node 1 = base)."""
         return list(self._perms)
 
@@ -193,7 +192,7 @@ class PM:
         return self._index.get(perm, 0)
 
     # -- construction ---------------------------------------------------
-    def new_permutograph(self, g: Optional[Graph] = None, *,
+    def new_permutograph(self, g: Graph | None = None, *,
                          reset: bool = True) -> Graph:
         """``PM.NewPermutograph`` -- (re)build the graph from base + operators.
 
@@ -348,7 +347,7 @@ class PM:
                 self.connect(g, n1, node)
 
 
-def _default_optable() -> List[List[str]]:
+def _default_optable() -> list[list[str]]:
     """PM's module initialisation: base ``1234`` with operators 12, 23, 34."""
     table = [["" for _ in range(MAX_CYC)] for _ in range(MAX_OPS)]
     for i, cyc in enumerate(DEFAULT_OPERATORS):

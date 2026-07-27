@@ -8,7 +8,6 @@ the last permutation back to the first.
 
 from __future__ import annotations
 
-from typing import List
 
 
 def next_perm(s: List) -> bool:

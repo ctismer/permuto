@@ -7,11 +7,10 @@ order).  Every field that names a known node is replaced by its number.
 
 from __future__ import annotations
 
-from typing import Dict, List
 
 
-def number(pg_lines: List[str]) -> List[str]:
-    nodes: Dict[str, int] = {}
+def number(pg_lines: list[str]) -> list[str]:
+    nodes: dict[str, int] = {}
     for line in pg_lines:
         fields = line.split()
         if not fields:
@@ -19,7 +18,7 @@ def number(pg_lines: List[str]) -> List[str]:
         key = fields[0]
         if key not in nodes:
             nodes[key] = len(nodes) + 1
-    out: List[str] = []
+    out: list[str] = []
     for line in pg_lines:
         fields = line.split()
         out.append(" ".join(str(nodes[w]) if w in nodes else w for w in fields))

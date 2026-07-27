@@ -7,16 +7,15 @@ node labels and operator-coloured edges.
 
 from __future__ import annotations
 
-from typing import List, Tuple
 
 from .operate import apply_cycle
 
 
-def operator_groups(operators: List[str]) -> List[List[str]]:
+def operator_groups(operators: list[str]) -> list[list[str]]:
     """Split the operator tokens into groups on ``+``; each group is one
     operator (a sequence of position cycles)."""
-    groups: List[List[str]] = []
-    cur: List[str] = []
+    groups: list[list[str]] = []
+    cur: list[str] = []
     for tok in operators:
         if tok == "+":
             groups.append(cur)
@@ -27,9 +26,9 @@ def operator_groups(operators: List[str]) -> List[List[str]]:
     return groups
 
 
-def neighbors(perm: str, operators: List[str]) -> List[Tuple[int, str]]:
+def neighbors(perm: str, operators: list[str]) -> list[tuple[int, str]]:
     """Return ``(operator_index, neighbour_permutation)`` for each operator."""
-    out: List[Tuple[int, str]] = []
+    out: list[tuple[int, str]] = []
     for k, group in enumerate(operator_groups(operators), start=1):
         p = perm
         for cycle in group:

@@ -21,9 +21,9 @@ and a test holds the two halves together.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Optional, Sequence, Tuple, Union
 
 
 class Key(Enum):
@@ -130,7 +130,7 @@ class IridiumAction(Enum):
     CLEAR = ("clear", ())
     QUIT = ("quit", ())
 
-    def __new__(cls, value: str, fields: Tuple[str, ...]):
+    def __new__(cls, value: str, fields: tuple[str, ...]):
         self = object.__new__(cls)
         self._value_ = value
         self.fields = fields
@@ -154,7 +154,7 @@ class Binding:
     entry to a mode ("permuto"), as ``(E)dit`` was.
     """
 
-    key: Union[str, Key]
+    key: str | Key
     action: Enum
     label: str = ""
     flag: str = ""
@@ -172,16 +172,16 @@ class Menu:
     def __init__(self, name: str, bindings: Sequence[Binding],
                  text: str = ""):
         self.name = name
-        self.bindings: Tuple[Binding, ...] = tuple(bindings)
+        self.bindings: tuple[Binding, ...] = tuple(bindings)
         self.text = text                    # the 1995 line, where it is literal
-        self._by_char: Dict[str, Binding] = {
+        self._by_char: dict[str, Binding] = {
             b.key.lower(): b for b in self.bindings if isinstance(b.key, str)}
-        self._by_key: Dict[Key, Binding] = {
+        self._by_key: dict[Key, Binding] = {
             b.key: b for b in self.bindings if isinstance(b.key, Key)}
 
     # -- looking a key up ------------------------------------------
-    def binding(self, char: str = "", key: Optional[Key] = None,
-                *, permuto: bool = True) -> Optional[Binding]:
+    def binding(self, char: str = "", key: Key | None = None,
+                *, permuto: bool = True) -> Binding | None:
         """The binding for a keystroke, or None if this menu ignores it."""
         found = self._by_key.get(key) if key is not None else None
         if found is None and char:
@@ -190,8 +190,8 @@ class Menu:
             return None                     # (E)dit does not exist in polytop
         return found
 
-    def action(self, char: str = "", key: Optional[Key] = None,
-               *, permuto: bool = True) -> Optional[Enum]:
+    def action(self, char: str = "", key: Key | None = None,
+               *, permuto: bool = True) -> Enum | None:
         found = self.binding(char, key, permuto=permuto)
         return found.action if found is not None else None
 
@@ -215,7 +215,7 @@ class Menu:
             parts.append(b.label + flag)
         return "  ".join(parts)
 
-    def unadvertised(self) -> Tuple[Binding, ...]:
+    def unadvertised(self) -> tuple[Binding, ...]:
         """The keys that work without being offered -- each with its reason."""
         return tuple(b for b in self.bindings if not b.advertised)
 

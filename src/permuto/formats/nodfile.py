@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 from ..errors import FileFormatError
 
@@ -22,7 +21,7 @@ class PgdCommand:
     prog: str
     name: str
     base: str
-    operators: List[str]
+    operators: list[str]
 
 
 def read_pgd(path) -> PgdCommand:
@@ -44,7 +43,7 @@ def read_pgd(path) -> PgdCommand:
     )
 
 
-def read_int_pairs(path) -> List[Tuple[int, int]]:
+def read_int_pairs(path) -> list[tuple[int, int]]:
     """Read the leading ``(from, to)`` node-number pairs of a ``.nod`` file.
 
     Mirrors ``NodeMgr.ReadNodes`` / ``FIO.RdCard``: numbers are read until the
@@ -59,7 +58,7 @@ def read_int_pairs(path) -> List[Tuple[int, int]]:
     ``ReadNodes`` would have accepted as a slightly smaller graph.
     """
     text = Path(path).read_bytes().decode("latin-1")
-    nums: List[int] = []
+    nums: list[int] = []
     lineno = 0
     for lineno, line in enumerate(text.splitlines(), start=1):
         stop = False
@@ -88,7 +87,7 @@ class Graph:
     """Undirected graph as built by ``NodeMgr.ReadNodes`` (deduped, sorted)."""
 
     nnodes: int = 0
-    links: Dict[int, List[int]] = field(default_factory=dict)
+    links: dict[int, list[int]] = field(default_factory=dict)
 
 
 def read_nod(path) -> Graph:

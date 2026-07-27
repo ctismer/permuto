@@ -14,7 +14,6 @@ The main-loop cadence follows ``polytop.mod``::
 from __future__ import annotations
 
 from enum import Enum
-from typing import List
 
 from . import intvector as iv
 

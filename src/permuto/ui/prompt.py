@@ -12,8 +12,8 @@ tested without a display.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from enum import Enum
-from typing import List, Sequence, Tuple
 
 
 class PromptResult(Enum):
@@ -38,10 +38,10 @@ class FieldPrompt:
     is just the common case of this.
     """
 
-    def __init__(self, title: str, fields: Sequence[Tuple[str, bool]]):
+    def __init__(self, title: str, fields: Sequence[tuple[str, bool]]):
         self.title = title
-        self.fields: List[Tuple[str, bool]] = list(fields)
-        self.values: List[str] = []
+        self.fields: list[tuple[str, bool]] = list(fields)
+        self.values: list[str] = []
         self.buffer = ""
 
     @property
@@ -91,7 +91,7 @@ class FieldPrompt:
                  for i, (label, _) in enumerate(self.fields)]
         return f" {self.title}:  " + "   ".join(parts)
 
-    def ints(self) -> List[int]:
+    def ints(self) -> list[int]:
         """The entered values as integers (empty field -> 0)."""
         return [int(v) if v else 0 for v in self.values]
 

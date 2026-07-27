@@ -8,15 +8,14 @@ lexicographic sequence; for any other base it starts there and wraps.
 
 from __future__ import annotations
 
-from typing import List
 
 from ..perms import next_perm
 
 
-def all_permutations(base: str) -> List[str]:
+def all_permutations(base: str) -> list[str]:
     s = list(base)
     orig = list(base)
-    out: List[str] = []
+    out: list[str] = []
     while True:
         out.append("".join(s))
         next_perm(s)

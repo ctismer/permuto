@@ -24,7 +24,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional
 
 from .core import layout, spa
 from .core.graph import Graph
@@ -136,7 +135,7 @@ class Selection:
 
     node: int
     action: ProgramAction
-    items: List[int] = field(default_factory=list)
+    items: list[int] = field(default_factory=list)
     pos: int = 0
 
     @property
@@ -153,7 +152,7 @@ class Session:
 
     graph: Graph
     mode: Mode = Mode.POLYTOP
-    pm: Optional[PM] = None
+    pm: PM | None = None
 
     # PCalc / main loop state, with the original's startup values
     algorithm_index: int = 0
@@ -171,7 +170,7 @@ class Session:
     changed: bool = True
     _spa_has_run: bool = False
 
-    load_warnings: List[str] = field(default_factory=list)
+    load_warnings: list[str] = field(default_factory=list)
     """Non-fatal notes from loading this session (e.g. a truncated file), for
     the viewer to show in its status line instead of printing to the console."""
 
@@ -419,7 +418,7 @@ class Session:
 
 
 def new_permutograph_session(base: str = "1234",
-                             operators: Optional[List[str]] = None) -> Session:
+                             operators: list[str] | None = None) -> Session:
     """Start in ``/PG`` mode.
 
     ``operators`` uses the generation-pipeline syntax: cycle tokens with ``+``

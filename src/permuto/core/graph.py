@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
-from typing import Dict, List, Set
 
 from . import intvector as iv
 
@@ -31,8 +30,8 @@ class NodeState:
     dead: bool = False
     sum: int = 0
     display: int = 0
-    broken: Set[int] = field(default_factory=set)  # 1-based link indices
-    lines: List[int] = field(default_factory=list)  # LineStatus per link
+    broken: set[int] = field(default_factory=set)  # 1-based link indices
+    lines: list[int] = field(default_factory=list)  # LineStatus per link
 
 
 @dataclass
@@ -59,12 +58,12 @@ class IriState:
 @dataclass
 class Node:
     num: int
-    pos: List[int] = field(default_factory=iv.new_vector)
-    old: List[int] = field(default_factory=iv.new_vector)
+    pos: list[int] = field(default_factory=iv.new_vector)
+    old: list[int] = field(default_factory=iv.new_vector)
     color: int = 7
     nlink: int = 0
-    links: List[int] = field(default_factory=list)  # 1-based neighbour numbers
-    opno: List[int] = field(default_factory=list)
+    links: list[int] = field(default_factory=list)  # 1-based neighbour numbers
+    opno: list[int] = field(default_factory=list)
     perm: str = ""
     state: NodeState = field(default_factory=NodeState)
     iri: IriState = field(default_factory=IriState)
@@ -90,7 +89,7 @@ class Node:
 
 class Graph:
     def __init__(self) -> None:
-        self.nodes: Dict[int, Node] = {}
+        self.nodes: dict[int, Node] = {}
         self.nnodes: int = 0
         self.dimensions: int = 3
         self.n_operators: int = 0  # >0 when built with operator identity
@@ -122,7 +121,7 @@ class Graph:
         return g
 
     @classmethod
-    def build(cls, base: str, operators: List[str], *,
+    def build(cls, base: str, operators: list[str], *,
               dimensions: int = iv.MAXDIMEN, seed: int = 0,
               init: bool = True) -> "Graph":
         """Build the permutograph from a base + operators, keeping the
@@ -138,7 +137,7 @@ class Graph:
             nd = Node(num=i, perm=p)
             # as PM does: the colour says which character the perm starts with
             nd.color = base.index(p[0]) + 1 if p else 7
-            seen: Dict[int, int] = {}
+            seen: dict[int, int] = {}
             for opk, nb in neighbors(p, operators):
                 j = num.get(nb)
                 if j is None or j == i or j in seen:
@@ -165,7 +164,7 @@ class Graph:
         self.dimensions = dim
         iv.set_dimensions(dim)
 
-    def ordered(self) -> List[Node]:
+    def ordered(self) -> list[Node]:
         return [self.nodes[i] for i in sorted(self.nodes)]
 
     # -- edges ---------------------------------------------------------

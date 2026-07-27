@@ -46,7 +46,6 @@ Known defects of the original, reproduced but not hidden -- see
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
 
 from ..errors import NodeNotFound, ProgramStateError
 from . import intvector as iv
@@ -85,7 +84,7 @@ def valid_label(label: str) -> bool:
 class Iridium:
     """The satellite network: builds its own grid, then routes packets on it."""
 
-    def __init__(self, graph: Optional[Graph] = None) -> None:
+    def __init__(self, graph: Graph | None = None) -> None:
         self.graph = graph if graph is not None else Graph()
         self.message_number = 0
         self._act_color = RED - 1
@@ -157,7 +156,7 @@ class Iridium:
             raise NodeNotFound(f"no satellite {label!r} in the network{hint}")
         return num
 
-    def new_node(self) -> Optional[Node]:
+    def new_node(self) -> Node | None:
         """``NewNode`` -- add the next satellite and link it to its neighbours.
 
         Only nodes that already exist get linked; later ones attach themselves
@@ -390,7 +389,7 @@ class Iridium:
                 dst.color = BLUE
 
     # -- reporting the original's known defects -------------------------
-    def stuck_senders(self) -> List[int]:
+    def stuck_senders(self) -> list[int]:
         """Senders whose stored job can never complete: the target is dead.
 
         ``Repeat`` skips them without decrementing the counter and there is no
@@ -401,7 +400,7 @@ class Iridium:
                 if nodes[n].iri.sender_repeat
                 and nodes[nodes[n].iri.sender_target].iri.avail == 0]
 
-    def orphaned_packets(self) -> List[int]:
+    def orphaned_packets(self) -> list[int]:
         """Dead nodes still holding a packet.
 
         Killing a carrier loses its packet silently, and because ``target``
@@ -422,6 +421,6 @@ class Iridium:
         """
         return f"{num % 1000:03d}"
 
-    def availability(self) -> Dict[int, int]:
+    def availability(self) -> dict[int, int]:
         """Current availability per node -- the field the display draws."""
         return {n: nd.iri.avail for n, nd in sorted(self.graph.nodes.items())}

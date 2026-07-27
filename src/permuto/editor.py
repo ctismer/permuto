@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional
 
 from .errors import PermutoError
 
@@ -39,8 +38,8 @@ class OpField:
     cycles).
     """
 
-    op: Optional[int] = None
-    cyc: Optional[int] = None
+    op: int | None = None
+    cyc: int | None = None
 
     @property
     def is_base(self) -> bool:
@@ -49,7 +48,7 @@ class OpField:
 
 BASE_FIELD = OpField()
 
-def fields_of(pm) -> List[OpField]:
+def fields_of(pm) -> list[OpField]:
     """Every editable cell of *pm*, in cursor order: the base, then the
     operators row by row."""
     out = [BASE_FIELD]
@@ -85,7 +84,7 @@ class OperatorEditor:
         """Whether the base was edited -- a rebuild has to start from scratch."""
         return self.pm.base != self.base_before
 
-    def fields(self) -> List[OpField]:
+    def fields(self) -> list[OpField]:
         return fields_of(self.pm)
 
     def value(self, fld: OpField) -> str:
@@ -99,7 +98,7 @@ class OperatorEditor:
         self.buffer = self.buffer[:-1]
 
     # -- the cursor ------------------------------------------------
-    def commit(self) -> Optional[str]:
+    def commit(self) -> str | None:
         """Write the buffer back; return an error message, or None if it took."""
         try:
             if self.field.is_base:
