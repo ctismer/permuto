@@ -264,6 +264,21 @@ Worth knowing for the next such change:
   links. The old `broken` set accepted any number, so the test passed on a mark
   that pointed at nothing. There is no number left to be wrong about.
 
+### Waiting: the chrome is painted, so none of it can be quoted
+
+Both status lines, the prompt and every error message are drawn with a
+`QPainter`, so there is nothing to select and nothing to copy -- an error you
+cannot quote is an error you have to photograph, which is how this came up
+(author, 2026-07-27).
+
+The cheap answer is a copy gesture: a logical `menus.Key.COPY` that
+`ui/keys.py` produces for Ctrl-C, and a `ViewBase.copy_chrome()` putting the
+lines on the clipboard. That keeps `menus.py` Qt-free and needs no widgets.
+The thorough answer is real chrome -- see "Nothing is off limits" on the dock
+question, which this belongs with, and which waits for the size control.
+
+Deferred by the author, not forgotten.
+
 ### Reading this branch (for a reviewer)
 
 Thirty-nine commits, but eight arcs. `git log --oneline main..phase3-refactor` reads
