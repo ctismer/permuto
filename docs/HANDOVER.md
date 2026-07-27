@@ -155,14 +155,37 @@ Three rules still bind, unchanged from when phase 3 started:
 * **`render.paint()` became `Picture`** — one frame's state as fields, five
   layer methods, and `draw()` is the layer order in five lines.
 * **`Graph` owns its edges** (`find_link`, `is_linked`, `links_avail`,
-  `disconnect`, plus `Node.remove_link`, which keeps every per-link array
-  shifting together). They sat in `pm.py` under a comment saying they needed no
-  PM state. `connect`/`collapse`/`uncollapse` stayed on `PM`: `connect` asks
-  `which_operator` to label the new edge, so they genuinely need the table.
+  `disconnect`, `Node.remove_link`). They sat in `pm.py` under a comment saying
+  they needed no PM state. `connect`/`collapse`/`uncollapse` stayed on `PM`:
+  `connect` asks `which_operator` to label the new edge, so they genuinely need
+  the table.
+* **An edge-end is one `Link`**, not four containers sharing an index in two
+  different counting conventions. See the section on it below; it is the change
+  that removed a class of bug rather than an instance.
+* **What is in the picture left the painting** into `scene.py` (UI-free): the
+  projection, both palettes, the size arithmetic, and which colour an edge is
+  and why. `ui/render.py` is five loops over five lists.
+* **The limits that were really fixed arrays are gone.** `MaxLinks` 12 → 24 and
+  `MaxOps` = `MaxLinks / 2` — the original's own comment, executable instead of
+  a second hard-coded 6; `MaxNodesTot` 2000 → 40320, which is what `MAXDIMEN`
+  already allowed, so it stopped being a second limit on the same thing. A
+  fresh operator table holds seven, because an eight-place base has seven
+  adjacent transpositions.
+* **A frame is bounded by time**, not by counting iterations. `advance_frame`
+  ran up to a 25-iteration checkpoint in one timer slot, which cost
+  milliseconds in 1995 and 13.9 seconds of dead keyboard on 40320 nodes.
+* **The look answers a bigger window with room, not with zoom** — marks stop
+  growing at `scene.MARK_REFERENCE` and are measured by the picture's short
+  side. The operator table takes the width its text needs instead of a flat
+  260 px.
 * **The CLI is argparse** with a subparser per command; `--pg` and `--iridium`
   for the two modes. The DOS spellings `/PG` and `/I` are gone.
+* **`mypy` runs clean** at its default strictness, from the suite where it is
+  installed, with no `type: ignore` anywhere. Plus a tooling-free test that
+  resolves every annotation in the package — which is what caught one naming
+  something that did not exist.
 
-### Nine defects found — each has its own test, each was red first
+### Twelve defects found — each has its own test, each was red first
 
 | What went wrong | Test that pins it |
 |---|---|
@@ -175,20 +198,24 @@ Three rules still bind, unchanged from when phase 3 started:
 | `show mine 3` built a nonsense permutograph out of the file name instead of resuming `mine.pms` with a seed. The CLI asked "is this a file?" of the graph loader alone, which knows nothing about sessions | `test_a_seed_behind_a_session_file_still_resumes_the_session` |
 | `pos=1,2,x` at `dim=2` loaded as a clean node: the `.pms` reader dropped whatever was not a number and *then* counted what was left, so the count matched and the junk went unmentioned — the one thing PORT-GAPS §0 says the port must never do | `test_junk_among_the_right_number_of_coordinates_is_not_swallowed` |
 | An operator table the base cannot carry loaded silently, and the editor opened on it: the reader handed the table to `PM`'s constructor, which validates only the base, bypassing the `set_cycle` where that rule lives | `test_an_operator_the_base_cannot_carry_is_refused` |
+| `perms.next_perm` was declared `s: List` after the typing sweep removed the import — the regex looked for `List[` and this one had no subscript. `from __future__ import annotations` means nothing ever evaluates it, so it survived a full green suite. **Introduced by this refactor** | `test_every_annotation_in_the_module_resolves` |
+| Typing a value longer than the stored one ran it off the right edge of the window, where it was cut off: the room beside the picture was measured from the *stored* table plus one character. **Introduced by this refactor** | `test_a_value_longer_than_the_stored_one_is_not_drawn_off_the_edge` |
+| `advance_frame` counted iterations, so with HurryUp it held the event loop — and the keyboard — for 13.9 s on 40320 nodes | `test_hurry_stops_at_the_budget_however_far_it_has_got` |
 
-Six of those nine turned up by accident — one from a user question, three
-while moving code or writing the tests that were meant to *cover* it. Nobody
-went looking for any of them. The three loader ones came out of what the list
-below called a coverage hole: writing the tests as asked would have frozen all
-three as expected behaviour.
+Most of those turned up by accident — from a user question, from moving code,
+or from writing the test that was meant to *cover* the line. Nobody went looking
+for any of them. The three loader ones came out of what the list below called a
+coverage hole: writing the tests as asked would have frozen all three as
+expected behaviour. Three were introduced by this refactor and caught by it.
 
 ### Measured
 
 ```
-src     main 5071 -> 6038
-tests   main 2519 -> 3835   (+1316)
-coverage  92% -> 93%,  menus.py and scene.py 100%, loader.py 84% -> 100%
-Qt-bound (files under ui/ that import PySide6)  main 1229 -> 992  = 24% -> 16%
+src     5071 -> 6354            tests   2519 -> 4202  (+1683)
+coverage  92% -> 94%,  menus.py and scene.py 100%, loader.py 84% -> 100%
+                       pmsfile 87% -> 94%
+Qt-bound (files under ui/ that import PySide6)  1229 -> 1066  = 24% -> 17%
+UI-free and frontend-neutral: menus, scene, session, editor, loader  = 1444
 ui/viewer.py  829 -> 53    (+ permutograph_view 394, iridium_view 189,
                               base_view 85, keys 70)
 ui/render.py  444 -> 201   (+ scene.py 346, UI-free)
@@ -202,19 +229,20 @@ rewrite is `ui/keys.py` and five drawing loops, because `menus.py`, `scene.py`,
 
 ### What to do next
 
-**Have someone else read the branch diff** before it lands on `main` — see the
-reading guide below. Everything else on this list has been done; what is left is
-deliberately left.
+**Have someone else read the diff** — `git diff 2a5af72`, and see the reading
+guide below. It is on `main` already; the reading is still owed. Everything else
+on this list has been done; what is left is deliberately left.
 
 Done, newest first: the six-operator ceiling, the `.pms` refusals (two of which
 were wrong — see the defect table), `nnodes`, one `Link` per edge-end, the
 loader rules, and `ui/render.py`, which turned into `scene.py` plus five drawing
 loops.
 
-**Not done, on purpose.** `MAXDIMEN = 8` binds nothing reachable — the base is
-capped at six places by the 2000-node limit long before eight dimensions matter
-— and unpicking it costs both file formats and the golden `.ply` tests for no
-visible gain. Qt chrome (a menu bar, a status bar, the operator table as a
+**Not done, on purpose.** `MAXDIMEN = 8` is now the *only* thing bounding the
+base, and it is a real bound: the coordinate vectors are eight components wide
+and both file formats store them that way, so raising it is a format change,
+not a constant. (Until 2026-07-27 the node limit refused eight places first,
+which made `MAXDIMEN` look like the slack one. It is not.) Qt chrome (a menu bar, a status bar, the operator table as a
 dock): the menu line is a *display* of what the keys do, flags and all, and a
 real `QMenuBar` would have to be clickable, which means a second input path
 through a program that has been keyboard-only since 1995. The dock alone is
@@ -369,7 +397,7 @@ Deferred by the author, not forgotten.
 
 ### Reading this branch (for a reviewer)
 
-Fifty-one commits, but nine arcs. `git log --oneline 2a5af72..main` reads
+Fifty-odd commits, but ten arcs. `git log --oneline 2a5af72..main` reads
 newest first; the arcs below are oldest first, which is the order they make
 sense in. Each commit builds and its tests pass, so bisecting works.
 
@@ -382,7 +410,9 @@ sense in. Each commit builds and its tests pass, so bisecting works.
 | The menus become one table | `820748a` | **the parity claims** — see below |
 | The look, on purpose | `24b18bf`, `6b1360b` | whether you agree with the judgement |
 | One `Link` per edge-end | `b3629e3`, `e00c3b9` | the two serialisation modules; see above |
-| Limits that were fixed arrays | `769c3c5`, `c0b1ce3`, `b0f83e5` | the .ply refusals, and .pms's stricter parse |
+| Limits that were fixed arrays | `769c3c5`, `c0b1ce3`, `b0f83e5`, `c46739e` | the .ply refusals, and .pms's stricter parse |
+| Types, and what they demanded | `909f023`, `b54b3d3` | that no `type: ignore` crept in |
+| Responsiveness and cost | `9a56bb5`, `1d7c4bd`, `7ea7add` | the frame budget; the picture is byte-identical |
 
 **Where the risk actually is**, honestly:
 
@@ -405,16 +435,21 @@ sense in. Each commit builds and its tests pass, so bisecting works.
   operator table takes the width its text needs instead of a flat 260 px. The
   window the viewer opens with is bit-identical apart from the wider picture.
 
-**What was not touched**: `core/` (`pm`, `graph`, `spa`, `iri`, `layout`,
-`intvector`), the generators, and the file formats other than where the loader
-calls them. The golden tests against `legacy/modula/nod/*` and the eight 1995
-`.ply` files are unchanged and green — if a reviewer only checks one thing,
-check that no golden expectation was edited to make something pass.
+**What the maths did not change.** `core/` was touched -- `graph` and `spa`
+for the `Link` object, `pm` for the limits, `iri` for the same parallel-list
+shape, `layout` for `as_algorithm` -- but only in *how* things are held, never
+in what is computed. `intvector` and the generators are untouched.
+
+The proof of that is not a promise: the golden tests against
+`legacy/modula/nod/*` and the eight 1995 `.ply` files are **unchanged** and
+green, and `tools/framehash.py` says the picture is byte-identical across every
+step of it. If a reviewer only checks one thing, check that no golden
+expectation was edited to make something pass.
 
 Useful while reading:
 
 ```bash
-python -m pytest -q                       # 326 tests
+python -m pytest -q                       # 372 tests
 python -m pytest --cov=permuto            # 94%, pmsfile 87% -> 94%
 python tools/framehash.py                 # the picture, as thirteen hashes
 permuto show pgl5                         # and then pull the window open
@@ -443,9 +478,9 @@ edge, a dead node, an active one, a `.nod` graph, the 812-node geodesic).
 ### Nothing is off limits
 
 An earlier version of this file said not to split `PermutographView` further.
-That was withdrawn by the author (2026-07-27): the reference implementation on
-`main` and the golden tests are the safety net, so anything may be taken apart
-as long as the suite stays green. If a change makes you uneasy, pin the
+That was withdrawn by the author (2026-07-27): the golden tests against the
+1995 data are the safety net -- with `recovered-original` and the DOSBox build
+behind them -- so anything may be taken apart as long as the suite stays green. If a change makes you uneasy, pin the
 result with a test rather than leaving it undone.
 
 Afterwards: optionally TypeScript/browser on the cleaned core — `menus.py`,
