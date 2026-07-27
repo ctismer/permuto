@@ -368,10 +368,15 @@ class Session:
         return MAIN_MENU.line(self, permuto=self.permuto)
 
     def status_line(self) -> str:
-        """The bottom line: ``iter=N dim=D nodes=N  A=Alg``."""
-        return (f" iter={self.iteration} dim={self.graph.dimensions}"
+        """The bottom line: ``iter=N dim=D nodes=N  A=Alg``.
+
+        polytop.mod:354 wrote it as ``" iter="``, one column right of the menu
+        line above it (:371, same column 1).  That was the original being
+        careless, not deliberate, so the port lines them up.
+        """
+        return (f"iter={self.iteration} dim={self.graph.dimensions}"
                 f" nodes={self.graph.nnodes}"
-                f"  A={self.algorithm.label}    ")
+                f"  A={self.algorithm.label}")
 
     def file_menu_line(self) -> str:
         return FILE_MENU.line(self)

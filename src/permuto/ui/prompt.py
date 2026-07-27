@@ -86,10 +86,10 @@ class FieldPrompt:
 
         if len(self.fields) == 1:
             label = self.fields[0][0]
-            return f" {label}{shown(0, label)}"
+            return f"{label}{shown(0, label)}"
         parts = [f"{label}={shown(i, label)}"
                  for i, (label, _) in enumerate(self.fields)]
-        return f" {self.title}:  " + "   ".join(parts)
+        return f"{self.title}:  " + "   ".join(parts)
 
     def ints(self) -> list[int]:
         """The entered values as integers (empty field -> 0)."""

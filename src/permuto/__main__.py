@@ -30,6 +30,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from .core import pm as pm_module
 from .gen import build
 
 #: what ``polytop /PG`` started with, and so does ``permuto`` on its own
@@ -158,6 +159,11 @@ def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="permuto", epilog=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--max-nodes", type=int, metavar="N",
+                   help="how many nodes a base may generate before it is "
+                        "refused (default %d); past that the relaxation stops "
+                        "being something you can watch, but it is your "
+                        "patience" % pm_module.MAX_NODES_TOT)
     sub = p.add_subparsers(dest="command", metavar="command")
 
     for name, kind, what in (("gen", "nod", "write the .nod graph to stdout"),
@@ -226,6 +232,12 @@ def main(argv=None) -> int:
         args = _parser().parse_args(argv)
     except SystemExit as exc:   # --help, or a refusal argparse has printed
         return int(exc.code or 0)
+    if getattr(args, "max_nodes", None):
+        # a policy knob, so it is set once here rather than threaded through
+        # loader -> session -> PM for the sake of one number
+        pm_module.MAX_NODES_TOT = args.max_nodes
+    if not getattr(args, "run", None):
+        return _cmd_start()
     return args.run(args)
 
 

@@ -39,6 +39,13 @@ alongside for reference until the port is complete.
   of what the original did, and of where the port deliberately differs (§0).
 - Read `docs/ARCHITECTURE.md` — it has the verified formats and the
   fixed-point rotation/projection/relaxation maths.
+- **Fidelity is no longer the goal; quality and generality are** (author,
+  2026-07-27). The original is a source, not an authority: where it was
+  careless — a status line one column off, a limit that was really a fixed
+  array, a menu line and a key handler that had to agree by hand — the port
+  does the better thing and records what it departed from in `PORT-GAPS.md`.
+  What still binds is behaviour that is *the program*: the maths, the formats,
+  the keys, the look that was settled on screen.
 - Port style: the strict-1:1 rule has done its job and no longer binds — the
   golden tests against `nod/` and the 1995 `.ply` files are what keeps a
   refactor honest, so they must stay green. Coordinates stay `int` (the

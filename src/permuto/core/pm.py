@@ -58,7 +58,23 @@ DEFAULT_OPS = 6
 #: fourth would need eight places -- which the 2000-node limit rules out well
 #: before MAXDIMEN does (7! = 5040).
 MAX_CYC = 3
-MAX_NODES_TOT = 2000  # NodeMgr.MaxNodesTot ("aber weniger koennte allokiert werden")
+#: ``NodeMgr.MaxNodesTot`` was 2000 -- *"aber weniger koennte allokiert
+#: werden"* -- because the nodes lived in ``ARRAY[0..MaxNodesTot] OF NodePtr``
+#: on a DOS machine.  That array is a dict now, so what binds is not memory but
+#: whether the thing still moves.  Measured on this port: 720 nodes relax in
+#: 11 ms a step and draw in 6, 5040 in 80 and 54 -- slow but usable, about
+#: seven frames a second, and ``HurryUp`` is there for exactly that.  A base of
+#: eight places is 40320 nodes, which is what ``MAXDIMEN`` already allows --
+#: and two limits for one thing is one too many, so this one no longer
+#: second-guesses the base length.  It stays as a bound a caller can tighten
+#: (``PM(max_nodes=...)``, ``permuto --max-nodes N``) and as a refusal that
+#: says something, rather than as a wall of its own.
+#:
+#: What the sizes cost here, measured: 720 nodes relax in 11 ms a step and draw
+#: in 6, 5040 in 80 and 54 -- seven frames a second.  40320 is about a second a
+#: frame, so it wants ``HurryUp``, which is exactly the "compute fast, look
+#: seldom" switch the original had for it.
+MAX_NODES_TOT = 40320
 
 DEFAULT_BASE = "1234"
 DEFAULT_OPERATORS = ("12", "23", "34")  # PM's module init
@@ -119,12 +135,14 @@ class PM:
     base: str = DEFAULT_BASE
     optable: list[list[str]] = field(default_factory=lambda: _default_optable())
     last_edit_line: int = 0        # PM.LastEditLine, persisted in .ply
-    max_nodes: int = MAX_NODES_TOT
+    #: 0 means "whatever MAX_NODES_TOT says now", so the CLI can raise it
+    max_nodes: int = 0
 
     _perms: list[str] = field(default_factory=list, repr=False)
     _index: dict[str, int] = field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
+        self.max_nodes = self.max_nodes or MAX_NODES_TOT
         self.set_base(self.base)
 
     # -- base and operators --------------------------------------------
@@ -160,8 +178,10 @@ class PM:
         perms = all_perms_from(normalised)
         if len(perms) > self.max_nodes:
             raise InvalidBase(
-                f"base {base!r} generates {len(perms)} permutations, "
-                f"the limit is {self.max_nodes}"
+                f"base {base!r} generates {len(perms)} permutations, and the "
+                f"limit is {self.max_nodes} -- past that the relaxation stops "
+                f"being something you can watch. Raise it with --max-nodes if "
+                f"you would rather wait"
             )
         self.base = normalised
         self._perms = perms

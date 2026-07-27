@@ -133,7 +133,7 @@ class PermutographView(ViewBase):
                        + (f"    {self.message}" if self.message else ""))
         elif self.ui_mode is UiMode.SELECT and self.select:
             p.drawText(12, self.height() - 14,
-                       f" neighbour: node {self.select.current}   "
+                       f"neighbour: node {self.select.current}   "
                        f"(space = next, Enter = pick, Esc = cancel)")
         elif self.message:
             p.setPen(QColor(255, 210, 140))

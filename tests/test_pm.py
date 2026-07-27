@@ -100,7 +100,6 @@ def test_grouping_cycles_shares_one_operator_number_across_edges():
 @pytest.mark.parametrize("base,reason", [
     ("", "empty"),
     ("123456789", "at most 8"),          # 9 places, MAXDIMEN is 8
-    ("12345678", "40320"),               # 8! exceeds max_nodes
 ])
 def test_unusable_bases_are_rejected_with_a_reason(base, reason):
     """PermBasisValid used the global Order, which is 0 on the first edit, so
@@ -108,6 +107,24 @@ def test_unusable_bases_are_rejected_with_a_reason(base, reason):
     with pytest.raises(InvalidBase) as exc:
         PM(base=base)
     assert reason in str(exc.value)
+
+
+def test_the_longest_base_the_dimensions_allow_is_not_refused_for_size():
+    """MAXDIMEN caps the base at eight places, so a node count that refused
+    eight places was a second limit for the same thing.  40320 nodes are slow
+    -- about a second a frame, which is what HurryUp is for -- but they are the
+    program working, not the program saying no."""
+    pm = PM(base="12345678")
+    assert len(pm._perms) == 40320
+
+
+def test_a_caller_can_still_tighten_the_bound_and_hear_why():
+    """The limit stayed as something to set, and the refusal says what to do
+    about it."""
+    with pytest.raises(InvalidBase) as exc:
+        PM(base="1234", max_nodes=10)
+    assert "24 permutations" in str(exc.value)
+    assert "--max-nodes" in str(exc.value)
 
 
 def test_cycle_outside_the_base_is_rejected():

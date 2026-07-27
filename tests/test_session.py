@@ -82,7 +82,9 @@ def test_edit_appears_only_with_an_operator_table(permuto, polytop):
 
 
 def test_status_line_reports_iteration_dimension_and_algorithm(polytop):
-    assert polytop.status_line().startswith(" iter=0 dim=8 nodes=24  A=Rubber")
+    # no leading space: it lines up with the menu line, which polytop.mod
+    # did not (:354 against :371)
+    assert polytop.status_line().startswith("iter=0 dim=8 nodes=24  A=Rubber")
     polytop.next_algorithm()
     assert "A=Rubber2" in polytop.status_line()
 
