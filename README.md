@@ -98,15 +98,21 @@ ParSum) · `E` edit operators. It single-steps until you press `R`.
 | path | |
 |---|---|
 | `src/permuto/core/` | UI-free engine: fixed-point vectors, graph model, `PCalc` layout, `PmProgs` (SPA/ParSum), `PM` (operator editing), `Iri` (SIMONE) |
+| `src/permuto/session.py` | the modes, the menu state and the main loop's cadence |
+| `src/permuto/menus.py` | which key does what, and how each menu line reads — one table, so the two cannot drift apart |
+| `src/permuto/scene.py` | what is *in* a frame: the projection, the palettes, which colour an edge is and why |
+| `src/permuto/editor.py`, `loader.py` | the operator cursor, and what a name on the command line resolves to |
 | `src/permuto/gen/` | generators: the `genperm`/`operate`/`num2` pipeline, geodesic icosahedra, factorisation, the `vierdrei` graph |
 | `src/permuto/formats/` | `.pg`/`.nod`/`.pgd` readers, binary `.ply` (read) and the text `.pms` session format, PostScript export |
-| `src/permuto/ui/` | the PySide6 viewer and offscreen renderer |
+| `src/permuto/ui/` | the PySide6 part: five drawing loops, the widgets, and `keys.py` — the only module that knows a Qt key code |
 | `src/permuto/studies/` | standalone experiments from the original: `kugel`, the colour/dither study |
 | `legacy/` | the recovered 1990s Modula-2 original |
 | `docs/` | `ARCHITECTURE.md` (formats, the fixed-point maths), `PORT-GAPS.md` |
 
-The core is deliberately UI-free, so a later TypeScript/web frontend can reuse
-it. Arithmetic is 32-bit integer fixed point (`NORM = 2**24` as "1.0"); there is
+Everything above `ui/` is deliberately Qt-free — not just the engine but the
+menus, the scene and the interaction model — so a later TypeScript/web frontend
+inherits them instead of retyping them, and replaces one file plus five drawing
+loops. Arithmetic is 32-bit integer fixed point (`NORM = 2**24` as "1.0"); there is
 no floating point in the layout, exactly as in the original ("absolutely no more
 REAL necessary. 11k code saved" — a comment from 1991).
 
