@@ -296,6 +296,31 @@ Careful with one thing found on the way: `drawLine(x1, y1, x2, y2)` with floats
 hits the *integer* overload and truncates the coordinates, which is a different
 picture. Pass `QPointF`.
 
+### Wanted: smaller balls, cheaper balls, and real ones (author, 2026-07-27)
+
+Three things about the nodes, from looking at 40320 of them. They belong
+together and none of them is started.
+
+**Smaller.** At that size the balls swamp the picture -- there has to be a way
+to bring them down. `scene.UI_SCALE` and `scene.MARK_REFERENCE` are the two
+numbers that decide it and they already sit in one place; what is missing is a
+control (the size slider, which is also what the dock question waits for). Worth
+asking whether the size should fall with the node count on its own, the way the
+mark size already stops growing with the window.
+
+**Cheaper.** `render._draw_balls` calls `drawEllipse` per node with a brush and
+antialiasing, plus a second one for a dead node's rim and a third for an active
+node's ring. Roughly 2.8 microseconds a ball measured at 5040 nodes, so about
+113 ms at 40320. For a ball a few pixels across that is a filled antialiased
+curve where a handful of pixels would do -- a small blitted image per (colour,
+size), or `drawPixmap`, would be a different order.
+
+**Real ones.** And then they could stop being discs: `studies/kugel` is the
+1991 colour study of a *lit sphere*, palette-indexed and Qt-free, written for
+exactly this and never wired to the viewer. It already produces the pixels; the
+cheap path above wants a small image per colour anyway. The two ideas are the
+same piece of work.
+
 ### Waiting: the chrome is painted, so none of it can be quoted
 
 Both status lines, the prompt and every error message are drawn with a
