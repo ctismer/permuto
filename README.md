@@ -49,6 +49,25 @@ the shortest-path edges:
 
 ![SPA on S₄](docs/demo/pgl4_spa.png)
 
+### Seeing the fourth dimension
+
+The S₅ permutohedron really is four-dimensional, and a projection that shows
+three components drops the fourth: two nodes differing only in it sit at the
+same pixel for ever. So the *view* turns in the (1,4) plane as well, and the
+figure visibly turns through itself — six frames out of the running viewer,
+sixty iterations apart, base `12345` with the operators 12 23 34 45:
+
+![the 4-D turn](docs/demo/viewer-4d-strip.png)
+
+Depth is drawn as a ramp rather than the original's two palette steps: the
+nearest ball is unchanged, everything behind it sinks toward the background and
+shrinks, and the picture is built back to front so the nearer mark really is
+the one on top. Same figure, same moment, before and after:
+
+| parallel projection, two-step depth | the ramp |
+|---|---|
+| ![before](docs/demo/depth-before.png) | ![after](docs/demo/depth-after.png) |
+
 Also recovered: **`kugel`**, a 1991 study in making 14 colours look like a lit
 sphere — a hand-mixed ramp plus dithering, one octant computed and mirrored
 eight ways so no seams show (`permuto kugel`, `--floyd` for Floyd-Steinberg
