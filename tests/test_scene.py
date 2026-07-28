@@ -77,13 +77,28 @@ def test_an_edge_with_nothing_to_say_is_plain():
 
 def test_back_edges_are_dimmed_because_the_palette_trick_is_gone():
     """The original flipped to the bright half of the DOS palette for the
-    front; with real colours the port dims the back instead (PORT-GAPS 6)."""
+    front; with real colours the port dims the back instead (PORT-GAPS 6).
+
+    The back end also carries FOG of the background now -- dimming alone puts
+    both ends within 45% of each other, which as a *continuous* ramp reads
+    flatter than the two steps it replaced.
+    """
     front = scene.operator_color(1, True)
     back = scene.operator_color(1, False)
-    assert back == scene.dim(front, 45)
+    assert back == scene.hazed(scene.dim(front, 45))
     assert all(b < f for b, f in zip(back, front))
     assert scene.state_color(L_LOCKED, False) == \
-        scene.dim(scene.state_color(L_LOCKED, True), 50)
+        scene.hazed(scene.dim(scene.state_color(L_LOCKED, True), 50))
+
+
+def test_depth_between_the_ends_is_a_ramp_and_the_ends_are_the_old_two():
+    """True/False still mean exactly what they meant while depth was a
+    yes/no question, so no call site changed meaning when it grew a range."""
+    back, front = scene.operator_color(1, 0.0), scene.operator_color(1, 1.0)
+    assert (back, front) == (scene.operator_color(1, False),
+                             scene.operator_color(1, True))
+    mid = scene.operator_color(1, 0.5)
+    assert all(b < m < f for b, m, f in zip(back, mid, front))
 
 
 # -- the direction discs ----------------------------------------------------
@@ -268,3 +283,83 @@ def test_every_mark_in_the_picture_follows_the_same_rule():
                  "disc_radius", "rim_width", "ring_extra"):
         assert getattr(at_reference, attr) == getattr(far_bigger, attr), attr
     assert at_reference.edges[0].width == far_bigger.edges[0].width
+
+
+# -- depth: what is nearer, and how one can tell ----------------------------
+
+def _three_at_depths(zs):
+    """One node per z, all at the same place on screen -- so only depth can
+    distinguish them.  Numbered against the order they should end up in."""
+    g = Graph()
+    g.dimensions = 3
+    for num, z in enumerate(zs, start=1):
+        g.nodes[num] = Node(num=num, pos=[0, 0, z] + [0] * 5,
+                            color=1, perm=str(num))
+    return g
+
+
+def test_the_balls_are_drawn_back_to_front():
+    """The painter has no z-buffer, so the order in the scene *is* the depth
+    order.  It used to be node order, which is to say none: which ball covered
+    which was decided by whichever the graph happened to list last."""
+    zs = [1 << 20, -(1 << 23), 1 << 23]                    # middle, far, near
+    balls = scene.build(_three_at_depths(zs), SIZE, SIZE, name_mode=1).balls
+    order = [zs[int(b.label) - 1] for b in balls]
+    assert order == sorted(order), "a nearer ball must be drawn later"
+
+
+def test_a_ball_further_back_is_darker_and_smaller():
+    """The two cues the sorting needs to be readable: without them the overlaps
+    are correct and still look like a flat tangle."""
+    far, mid, near = scene.build(_three_at_depths(
+        [-(1 << 23), 0, 1 << 23]), SIZE, SIZE).balls
+    assert far.fill < mid.fill < near.fill        # channel by channel, tuple-wise
+    assert far.radius < mid.radius < near.radius
+    assert near.radius == pytest.approx(scene.build(
+        _three_at_depths([0]), SIZE, SIZE).balls[0].radius), \
+        "the nearest ball keeps the size the original drew every ball at"
+
+
+def test_depth_shading_needs_no_reference_beyond_the_frame_itself():
+    """Measured against the deepest node *of this frame*: NORM would leave a
+    graph whose z happens to be small sitting in the middle of the ramp, with
+    no front and no back."""
+    shallow = scene.build(_three_at_depths([-100, 0, 100]), SIZE, SIZE).balls
+    deep = scene.build(_three_at_depths(
+        [-(1 << 23), 0, 1 << 23]), SIZE, SIZE).balls
+    assert [b.fill for b in shallow] == [b.fill for b in deep]
+
+
+# -- the fourth dimension ---------------------------------------------------
+
+def _four_dimensional():
+    """Two nodes that differ *only* in their fourth component."""
+    g = Graph()
+    g.dimensions = 4
+    for num, w in ((1, -(1 << 23)), (2, 1 << 23)):
+        g.nodes[num] = Node(num=num, pos=[0, 0, 0, w] + [0] * 4,
+                            color=num, perm=str(num))
+    return g
+
+
+def test_without_the_hyper_turn_a_fourth_dimension_is_invisible():
+    """The whole reason for the turn: project drops components past the third,
+    so two nodes apart only in the fourth sit at the same pixel for ever."""
+    a, b = scene.project(_four_dimensional(), SIZE, SIZE).values()
+    assert a == b
+
+
+def test_the_hyper_turn_brings_the_fourth_dimension_onto_the_screen():
+    """A quarter turn of the (1,4) plane puts it where x was."""
+    import math
+
+    pts = scene.project(_four_dimensional(), SIZE, SIZE, math.pi / 2)
+    (x1, _y1, _z1), (x2, _y2, _z2) = pts.values()
+    assert x1 < SIZE // 2 < x2, "the two must now be at opposite sides"
+
+
+def test_a_graph_with_three_dimensions_ignores_the_hyper_turn():
+    """Nothing to look at from another side, and turning the view would only
+    invent something: the fourth component is zero for every node."""
+    g = _two_nodes(dimensions=3, z=1 << 20)
+    assert scene.project(g, SIZE, SIZE, 1.0) == scene.project(g, SIZE, SIZE)

@@ -42,6 +42,12 @@ DIMENSION_CHECK_INTERVAL = 25   # "IF Iteration MOD 25 = 0 THEN Changed := TRUE"
 #: keypress starts to feel ignored.
 FRAME_BUDGET = 0.05
 
+#: How far the view turns into the fourth dimension per iteration, in radians.
+#: Slower than the layout's own spin (which turns by 1/120 of a radian) and not
+#: a divisor of it, so the two do not lock into a short repeating cycle and the
+#: figure keeps presenting new sections of itself.
+HYPER_STEP = 1 / 170
+
 EXIT_QUESTION = "Do You want to exit? (Y/N)"   # UserIO, capital You and all
 
 
@@ -185,6 +191,15 @@ class Session:
     changed: bool = True
     _spa_has_run: bool = False
 
+    hyper_angle: float = 0.0
+    """From which side the fourth dimension is being looked at.
+
+    The layout turns the figure in the (1,3) plane; this turns the *view* in
+    (1,4), so a fourth dimension reaches the picture at all instead of being
+    dropped unseen -- see :func:`permuto.scene.project`.  It advances with the
+    spin and stops with it, because it is the same act of turning something
+    round to look at it; a graph with fewer than four dimensions ignores it."""
+
     load_warnings: list[str] = field(default_factory=list)
     """Non-fatal notes from loading this session (e.g. a truncated file), for
     the viewer to show in its status line instead of printing to the console."""
@@ -230,6 +245,7 @@ class Session:
         if self.spinning and g.dimensions >= 3 \
                 and (not self.hurry_up or not self.calculating):
             layout.spin(g)
+            self.hyper_angle += HYPER_STEP
 
         layout.normalize(g)
         if self.iteration == 0:

@@ -406,6 +406,52 @@ What a worker thread would and would not buy, before anyone is disappointed:
 Worth doing together with the cheaper balls below: at 40320 nodes the repaint
 is the larger of the two blocks.
 
+### Done: depth reads as depth, and the fourth dimension is visible (2026-07-28)
+
+Asked for "realistischer", built and left for review. Three changes, all in
+`scene.py` except one line each in `session.py` and `permutograph_view.py`;
+`PORT-GAPS` section 6 has the reasoning and the rejected alternative.
+
+* **The scene is sorted back to front.** The painter has no z-buffer, so scene
+  order *is* depth order, and it used to be node order.
+* **Depth is a ramp, not a step** -- haze (`scene.FOG`) and a little size
+  (`scene.DEPTH_SIZE`) on top of the original's two palette twins, whose
+  endpoints are untouched: `operator_color(op, True)` returns exactly what it
+  always did.
+* **The view turns in the (1,4) plane** (`scene.project(..., hyper=)`), so a
+  fourth dimension reaches the picture instead of being dropped unseen.
+  `Session.hyper_angle` advances with the spin and stops with `S`.
+
+`docs/demo/depth-before.png` and `depth-after.png` are the same relaxed figure
+(base 12345, 500 steps, the hyper turn held at 0 so only the shading differs);
+`hyper-turn.png` is one figure from six angles.
+
+Measured at 5040 nodes: a scene costs 46 ms against 34 ms, a whole frame 219 ms
+against 205 ms. The +12 ms is the sort and the per-edge blend; `DEPTH_LEVELS`
+= 24 and a memo of mixed colours are what keep it that low -- a truly continuous
+ramp gives every edge its own RGB and drops `ui.render`'s pen cache from twelve
+pens to one per edge, which cost more than the sorting.
+
+**Two things found on the way, neither of them touched:**
+
+* **The same graph looks different depending on how you opened it.** The PM
+  path (typing a base and operators in the viewer) seeds positions from the link
+  numbers, and base 12345 settles at exactly 4-D. `load_graph` -- which is what
+  `show pgl5` and both offscreen writers use -- goes through `Graph.build`,
+  which calls `random_init` in 8 dimensions, and 500 iterations later it is
+  still 6-D or 7-D. Same nodes, same edges, a different picture and a different
+  dimension. Worth a decision: which of the two is *the* start layout.
+  (`permuto render` also passes `seed=1` unconditionally, `__main__._relaxed`.)
+* **A hidden ball's label still floats over the ball in front of it.**
+  `_draw_labels` is its own pass over the same sorted list, so the text is not
+  covered by what covers its ball. Rare, and it wants a decision rather than a
+  patch: labels could be drawn per ball inside the ball pass.
+
+Not started, and this is where `studies/kugel` finally belongs: the balls are
+still flat discs. See below -- the cheap path (a small image per colour and
+size) and the real one (a lit sphere) are the same piece of work, and now there
+is a depth value to pick the image by.
+
 ### Wanted: smaller balls, cheaper balls, and real ones (author, 2026-07-27)
 
 Three things about the nodes, from looking at 40320 of them. They belong

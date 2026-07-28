@@ -265,6 +265,65 @@ bisection), `PermBasisValid`, `FindBase`, `ValidCycle`, `CyclicOperate`,
   contrast, and levelling the balls into one light band, were all tried on
   screen in July 2026 and rejected: the picture is meant to look like this.
 
+### Depth: two steps became a ramp, and the picture is sorted (2026-07-28)
+
+The original's depth cue is one bit — `colour + 8` above the middle, the plain
+entry below (`z + zz > 0`), the same size everywhere, and the marks drawn in
+node order. Asked to make the picture read more like something standing in
+space, the port keeps both ends exactly where the author settled them and fills
+in what was between:
+
+- **Back to front.** The scene is now sorted by depth, because a painter has no
+  z-buffer: which ball covers which used to be decided by node number, which is
+  to say by nothing. Overlap is the strongest depth cue a flat picture has and
+  it was being spent at random.
+- **A ramp instead of a step.** `scene.blend` mixes between the two colours the
+  original chose; `False`/`True` still land on exactly those, so nothing moved
+  at either end. Between them a mark now says how far, not which half.
+- **Haze** (`scene.FOG`, 0.45). The two palette twins are only 45 % apart, and
+  a continuous mix between them reads flatter than the two steps did — so the
+  far end also takes some of the background, which is what distance does to a
+  colour.
+- **Size** (`scene.DEPTH_SIZE`, 0.3). Enough difference for the sorted overlaps
+  to be read as in-front-of. Not perspective: the projection stays orthographic,
+  as it must — the figure is 4-D and a perspective divide would have to pick a
+  viewpoint in 4-space.
+- **Rounded to `DEPTH_LEVELS` = 24 steps**, which no eye resolves on these
+  colours but which keeps the *colours* countable: a truly continuous ramp gives
+  each of a hundred thousand edges its own RGB, and that defeats the pen cache
+  in `ui.render` (a dozen pens became one per edge). With the levels and a small
+  memo of mixed colours, 5040 nodes cost 46 ms a scene against 34 ms before, and
+  a full frame 219 ms against 205 ms.
+
+`studies/kugel` is still not wired to this: a lit sphere per (colour, size) is
+the next step and belongs with the cheap-balls work in the handover.
+
+### The fourth dimension had never reached the picture (2026-07-28)
+
+`project` shows components 1, 2 and 3 and drops the rest, and `PCalc.Spin`
+turns the (1,3) plane — three visible axes rotating among themselves. So two
+nodes differing *only* in their fourth component sat at the same pixel for
+ever, and `pgl5` (base 12345, operators 12 23 34 45, which settles at exactly
+4-D) was being shown as a 3-D shadow with no way to see the rest.
+
+The port turns the **view**, not the figure: `scene.project` takes an angle and
+rotates the (1,4) plane before dropping the fourth component, so the screen's
+own x takes it in and the figure visibly turns through itself. `Session`
+advances that angle with the spin and stops it with `S`, since both are the one
+act of turning something round to look at it. `docs/demo/hyper-turn.png` is the
+same relaxed figure from six angles.
+
+It has to be a plane containing a *visible* axis: turning (3,4) would only
+change which node is nearer, and the fourth dimension would still be a rumour.
+
+**Why not in `PCalc.Spin`, where the other rotation lives.** That was tried
+first and it is wrong: turning a plane whose one axis is occupied and whose
+other is empty spreads the extent across both, so the rotation *invents* a
+fourth dimension out of the third. A genuinely 3-D graph then never satisfies
+`CanShrink` again and sits at 4-D for ever —
+`test_a_geodesic_dome_still_falls_from_8d_to_3d` caught it within the minute.
+Looking at a figure from another side may not change the figure.
+
 ### `TrueDisc`'s third argument is a **radius**
 
 `Graph` is a library module and its source did not survive, so the sizes above

@@ -20,6 +20,7 @@ labels go inside the balls.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 from .core import intvector as iv
@@ -123,20 +124,77 @@ def dim(rgb: RGB, percent: int) -> RGB:
     return (r * percent // 100, g * percent // 100, b * percent // 100)
 
 
-def operator_color(opk: int, front: bool) -> RGB:
-    rgb = OPERATOR_PALETTE[(opk - 1) % len(OPERATOR_PALETTE)]
-    return rgb if front else dim(rgb, 45)
+#: How far the back of the picture sinks into the background -- haze, and the
+#: reason the two palette twins alone are not enough of a ramp: they are only
+#: 45% apart, so a continuous mix between them spends the whole picture in the
+#: middle and reads flatter than the two steps it replaced.  0.0 is the twins
+#: alone, 1.0 would dissolve the furthest mark completely.
+FOG = 0.45
+
+#: How much of its size a mark loses at the back of the picture.  Not
+#: perspective: the projection stays orthographic, as it must -- the figure is
+#: 4-D and a perspective divide would have to pick a viewpoint in 4-space.  This
+#: is only enough size difference for the sorted overlaps to be read as
+#: in-front-of.  0.0 draws every ball the same size, which is what the original
+#: did.
+DEPTH_SIZE = 0.3
 
 
-def state_color(state: int, front: bool) -> RGB:
+def blend(back: RGB, front: RGB, depth: float) -> RGB:
+    """Mix *back* into *front* by *depth*: 0 is fully back, 1 fully front.
+
+    The endpoints are returned untouched, so a caller passing ``True``/``False``
+    -- which is what every call site did while depth was a yes/no question --
+    still gets exactly the two colours it used to get.  Everything between them
+    is new: see :func:`depth_of`.
+    """
+    if depth <= 0:
+        return back
+    if depth >= 1:
+        return front
+    r = int(back[0] + (front[0] - back[0]) * depth)
+    g = int(back[1] + (front[1] - back[1]) * depth)
+    b = int(back[2] + (front[2] - back[2]) * depth)
+    return (r, g, b)
+
+
+def hazed(rgb: RGB) -> RGB:
+    """*rgb* as the furthest mark in the picture wears it -- :data:`FOG` of the
+    background mixed in, which is what distance does to a colour."""
+    return blend(BACKGROUND, rgb, 1.0 - FOG)
+
+
+#: Mixed colours, kept by what they were mixed from.
+#:
+#: A hundred thousand edges ask for one of a few hundred colours -- operators
+#: (or line states) times :data:`DEPTH_LEVELS` -- and each answer costs three
+#: blends.  ``FOG`` is part of the key so that turning the knob is still
+#: honoured; nothing here has to be invalidated by hand.
+_MIXED: dict[tuple, RGB] = {}
+
+
+def operator_color(opk: int, depth: float) -> RGB:
+    key = ("op", opk, float(depth), FOG)
+    mixed = _MIXED.get(key)
+    if mixed is None:                        # the endpoints cost three blends
+        rgb = OPERATOR_PALETTE[(opk - 1) % len(OPERATOR_PALETTE)]
+        mixed = _MIXED[key] = blend(hazed(dim(rgb, 45)), rgb, depth)
+    return mixed
+
+
+def state_color(state: int, depth: float) -> RGB:
     """LineStatus -> colour (PmDisp): input/output green, locked red, free grey."""
-    if state in (L_INPUT, L_OUTPUT):
-        rgb = (90, 220, 110)
-    elif state == L_LOCKED:
-        rgb = (220, 80, 80)
-    else:                                    # L_FREE
-        rgb = (80, 85, 100)
-    return rgb if front else dim(rgb, 50)
+    key = ("state", state, float(depth), FOG)
+    mixed = _MIXED.get(key)
+    if mixed is None:
+        if state in (L_INPUT, L_OUTPUT):
+            rgb = (90, 220, 110)
+        elif state == L_LOCKED:
+            rgb = (220, 80, 80)
+        else:                                # L_FREE
+            rgb = (80, 85, 100)
+        mixed = _MIXED[key] = blend(hazed(dim(rgb, 50)), rgb, depth)
+    return mixed
 
 
 def ball_color(color: int, front: bool) -> int:
@@ -155,9 +213,31 @@ def ball_color(color: int, front: bool) -> int:
     return entry + 8 if front else entry
 
 
+def ball_rgb(color: int, depth: float) -> RGB:
+    """A ball's fill, continuous from hazed dark twin to bright twin.
+
+    The two entries :func:`ball_color` picks between are the whole depth cue the
+    original had, and the front end is untouched -- what the author settled on
+    at the picture (PORT-GAPS section 6) is exactly what a nearest ball still
+    looks like.  Behind it the ball now says *how far* rather than which half.
+    """
+    key = ("ball", color, float(depth), FOG)
+    mixed = _MIXED.get(key)
+    if mixed is None:
+        mixed = _MIXED[key] = blend(hazed(DOS_PALETTE[ball_color(color, False)]),
+                                    DOS_PALETTE[ball_color(color, True)], depth)
+    return mixed
+
+
+def depth_radius(radius: float, depth: float) -> float:
+    """The radius a mark is drawn at, given how deep it sits."""
+    return radius * (1.0 - DEPTH_SIZE * (1.0 - depth))
+
+
 # -- the projection ---------------------------------------------------------
 
-def project(g, width: int, height: int) -> dict[int, tuple[int, int, int]]:
+def project(g, width: int, height: int,
+            hyper: float = 0.0) -> dict[int, tuple[int, int, int]]:
     """Map each node to (screen x, screen y, depth z), like ``PmDisp.DrawEdges``:
     ``px = Scale(pos[1], Scale_X, Norm) + centre`` (component 3 = depth).
 
@@ -166,18 +246,62 @@ def project(g, width: int, height: int) -> dict[int, tuple[int, int, int]]:
     look round).  On today's square pixels the honest equivalent is a single,
     isotropic scale, so a sphere stays a sphere whatever the window shape and
     however much of the width the operator panel takes.
+
+    *hyper* turns the (1,4) plane by that angle before the fourth component is
+    dropped -- the viewer's way of walking around a four-dimensional figure.
+    It has to be a plane containing an axis one can *see*: turning (3,4) would
+    only change which node is nearer, never the outline, and the fourth
+    dimension would still be a rumour.  With the screen's own x taking the
+    fourth component in, the figure visibly turns through itself.
+
+    Only the projection is turned; ``nd.pos`` is untouched, so the relaxation
+    goes on working on the figure as it is and can still shed a dimension it
+    does not need (see :func:`permuto.core.layout.spin`).  Nothing is invented
+    by this: these are honest three-dimensional sections of the real object.
     """
     NORM = iv.NORM
     scale = (min(width, height) // 2) * 95 // 100
     cx, cy = width // 2, height // 2
+    turn = bool(hyper) and g.dimensions >= 4
+    rotc, rots = (int(math.cos(hyper) * NORM), int(math.sin(hyper) * NORM)) \
+        if turn else (NORM, 0)
     pts: dict[int, tuple[int, int, int]] = {}
     for nd in g.nodes.values():
         pos = nd.pos
-        px = iv.scale(pos[0], scale, NORM) + cx
+        x = iv.scale(pos[0], rotc, NORM) + iv.scale(pos[3], rots, NORM) \
+            if turn else pos[0]
+        px = iv.scale(x, scale, NORM) + cx
         py = iv.scale(-pos[1], scale, NORM) + cy
         z = pos[2] if g.dimensions >= 3 else 0
         pts[nd.num] = (px, py, z)
     return pts
+
+
+#: How many distinct depths a mark can be drawn at.
+#:
+#: Not a look decision -- 24 steps of brightness are already past what one can
+#: see on these colours.  It is what keeps the *colours* countable: a continuous
+#: ramp gives every one of a hundred thousand edges its own RGB, which defeats
+#: the pen cache in ``ui.render`` (a dozen pens became one per edge) and makes
+#: the blending itself the cost.  Rounded to levels, a big graph is back to a
+#: few hundred pens and the scene builds in about the time it used to.
+DEPTH_LEVELS = 24
+
+
+def depth_of(z: float, zmax: int) -> float:
+    """Where *z* sits between the back of the picture (0.0) and the front (1.0),
+    rounded to one of :data:`DEPTH_LEVELS` steps.
+
+    Measured against the frame's own deepest node rather than against ``NORM``,
+    so the cue always uses its whole range: ``normalize`` scales the longest
+    *vector* to NORM, which leaves the third component well short of it, and a
+    fixed reference would spend the picture in the middle of the ramp.  A flat
+    graph (``zmax = 0``) is all front, which is what it looked like before any
+    of this.
+    """
+    if zmax <= 0:
+        return 1.0
+    return round((z / zmax + 1) / 2 * DEPTH_LEVELS) / DEPTH_LEVELS
 
 
 # -- what is in the picture -------------------------------------------------
@@ -278,9 +402,14 @@ def label_text(nd, text_mode: int) -> str:
 
 def build(g, width: int, height: int, *, labels: bool = False,
           op_colors: bool = False, program: bool = False,
-          name_mode: int = 0, operator_digits: bool = True) -> Scene:
-    """Everything in one frame of *g*, in the order it has to be drawn."""
-    pts = project(g, width, height)
+          name_mode: int = 0, operator_digits: bool = True,
+          hyper: float = 0.0) -> Scene:
+    """Everything in one frame of *g*, in the order it has to be drawn.
+
+    *hyper* is the angle the fourth dimension is viewed from -- see
+    :func:`project`; a viewer advances it a little per frame.
+    """
+    pts = project(g, width, height, hyper)
     extent = picture_extent(width, height)
     have_ops = op_colors and g.n_operators > 0
     text_mode = text_mode_for(name_mode, labels, program)
@@ -293,12 +422,25 @@ def build(g, width: int, height: int, *, labels: bool = False,
                   rim_width=stroke_width(extent, 0.8),
                   ring_extra=mark_size(extent, 1))
 
+    zmax = max((abs(z) for _x, _y, z in pts.values()), default=0)
+    # Collected with their depth and sorted before they go into the scene: the
+    # painter has no z-buffer, so what covers what is decided here, and it used
+    # to be decided by node number -- which is to say by nothing.  Overlap is
+    # the strongest depth cue a flat picture has; this is what makes the balls
+    # sit in front of and behind each other instead of merely being lighter.
+    edges: list[tuple[float, Edge]] = []
+    discs: list[tuple[float, Disc]] = []
+    digits: list[tuple[float, Digit]] = []
+    balls: list[tuple[float, Ball]] = []
+
     for nd in g.ordered():
         xi, yi, zi = pts[nd.num]
         for link in nd.links:
             if link.to <= nd.num:
                 continue                     # every undirected edge once
             xj, yj, zj = pts[link.to]
+            zmid = (zi + zj) / 2
+            depth = depth_of(zmid, zmax)
             front = (zi + zj) > 0
             broken = link.broken
             state = link.status if program else None
@@ -308,38 +450,50 @@ def build(g, width: int, height: int, *, labels: bool = False,
                 rgb, reason = BROKEN, "broken"
                 wide = True
             elif state is not None:
-                rgb, reason = state_color(state, front), "state"
+                rgb, reason = state_color(state, depth), "state"
                 wide = front
             elif op is not None:
-                rgb, reason = operator_color(op, front), "operator"
+                rgb, reason = operator_color(op, depth), "operator"
                 wide = front
             else:
-                rgb = PLAIN_FRONT if front else PLAIN_BACK
+                rgb = blend(hazed(PLAIN_BACK), PLAIN_FRONT, depth)
                 reason, wide = "plain", front
-            scene.edges.append(Edge(
+            edges.append((zmid, Edge(
                 (xi, yi), (xj, yj), rgb,
-                stroke_width(extent, 1.1 if wide else 0.6), front, reason))
+                stroke_width(extent, 1.1 if wide else 0.6), front, reason)))
 
             if not broken and state in (L_INPUT, L_OUTPUT):
                 incoming = state == L_INPUT
                 at = ((5 * xi + xj) / 6, (5 * yi + yj) / 6) if incoming \
                     else ((5 * xj + xi) / 6, (5 * yj + yi) / 6)
-                scene.discs.append(Disc(at, state_color(state, front), incoming))
+                discs.append((zmid, Disc(at, state_color(state, depth),
+                                         incoming)))
 
             # ``IF (names>0) & (progsel # P_SPTA)`` (pmdisp.mod:94): one switch
             # for both, so "write nothing" leaves the links bare too.  The
             # P_SPTA half is Iridium, which iridium_scene draws instead.
             if operator_digits and text_mode and not broken and op:
-                scene.digits.append(Digit(((xi + xj) / 2, (yi + yj) / 2), op,
-                                          operator_color(op, front)))
+                digits.append((zmid, Digit(((xi + xj) / 2, (yi + yj) / 2), op,
+                                           operator_color(op, depth))))
 
     for nd in g.ordered():
-        x, y, _z = pts[nd.num]
-        lit = g.dimensions >= 3 and pts[nd.num][2] >= 0
-        fill = None if nd.state.dead \
-            else DOS_PALETTE[ball_color(nd.color, lit)]
-        scene.balls.append(Ball((x, y), radius, fill, nd.state.active,
-                                label_text(nd, text_mode)))
+        x, y, z = pts[nd.num]
+        # Below three dimensions there is no depth to show, and a flat graph
+        # takes the dark half outright rather than a hazed version of it: the
+        # cue is off, not merely at its lower end.
+        depth = depth_of(z, zmax) if g.dimensions >= 3 else 0.0
+        fill = None if nd.state.dead else (
+            ball_rgb(nd.color, depth) if g.dimensions >= 3
+            else DOS_PALETTE[ball_color(nd.color, False)])
+        balls.append((z, Ball((x, y), depth_radius(radius, depth), fill,
+                              nd.state.active, label_text(nd, text_mode))))
+
+    # back to front, and stably: an edge and its disc keep their order, and two
+    # marks at the same depth stay in the order the graph gave them
+    scene.edges = [e for _z, e in sorted(edges, key=lambda p: p[0])]
+    scene.discs = [d for _z, d in sorted(discs, key=lambda p: p[0])]
+    scene.digits = [d for _z, d in sorted(digits, key=lambda p: p[0])]
+    scene.balls = [b for _z, b in sorted(balls, key=lambda p: p[0])]
     return scene
 
 

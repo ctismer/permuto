@@ -9,6 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from conftest import modula_dir  # noqa: E402
 
+from permuto import scene  # noqa: E402
 from permuto.core import intvector as iv  # noqa: E402
 from permuto.core import layout  # noqa: E402
 from permuto.core.graph import Graph, Node  # noqa: E402
@@ -168,16 +169,23 @@ def _rgb(img, x, y):
 
 def test_balls_cover_the_edges_that_run_into_them():
     """Every node's own edges end at its centre, so a centre showing an edge
-    colour would mean the balls were drawn first."""
+    colour would mean the balls were drawn first.
+
+    A centre is checked against the fills the scene actually asked for, not
+    against the sixteen palette entries: a ball is shaded by how deep it sits
+    now, so its fill lies *between* two entries.  The set is still the right
+    comparison because a nearer ball may cover a further one's centre.
+    """
     g = _spread_permutograph()
     size = 700
     img = render.render_image(g, size, size, op_colors=True)
-    palette = {tuple(c) for c in render._DOS_PALETTE}
+    sc = scene.build(g, size, size, op_colors=True)
+    fills = {b.fill for b in sc.balls if b.fill is not None}
     checked = 0
     for n, (x, y, _z) in render.project(g, size, size).items():
         if not (0 <= x < size and 0 <= y < size):
             continue
-        assert _rgb(img, int(x), int(y)) in palette, \
+        assert _rgb(img, int(x), int(y)) in fills, \
             f"node {n}'s centre is not a filled ball"
         checked += 1
     assert checked > 5, "no nodes landed on the picture"

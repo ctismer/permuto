@@ -224,7 +224,17 @@ def frame(g) -> None:
 
 
 def spin(g) -> None:
-    """Rotate the (1,3) plane by a small fixed angle (integer fixed-point)."""
+    """Rotate the (1,3) plane by a small fixed angle (integer fixed-point).
+
+    Only this one plane, and deliberately: a rotation of (3,4) here would *make*
+    a fourth dimension out of the third, because turning a plane whose one axis
+    is occupied and whose other is empty spreads the extent across both.  A
+    genuinely three-dimensional graph would then never satisfy
+    :func:`can_shrink` again and would sit at 4-D for ever (which is what
+    ``test_a_geodesic_dome_still_falls_from_8d_to_3d`` caught).  Turning the
+    fourth dimension into view is a matter of *looking*, and lives in
+    :func:`permuto.scene.project`; the layout keeps the figure as it is.
+    """
     iv.set_dimensions(g.dimensions)
     NORM = iv.NORM
     rots = NORM // 120                       # sin ~ angle (small-angle)

@@ -110,7 +110,8 @@ class PermutographView(ViewBase):
                      op_colors=True,      # the viewer always colours by operator
                      program=self.session.program_mode,
                      name_mode=self.session.label_mode(self.ui_mode,
-                                                       self.prompt_kind))
+                                                       self.prompt_kind),
+                     hyper=self.session.hyper_angle)
         if self._shows_operators():
             render.paint_operator_panel(
                 self.session.pm, p, pic_w, 60, self.height(),

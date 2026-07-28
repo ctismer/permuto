@@ -252,3 +252,19 @@ def test_without_hurry_a_frame_is_always_one_iteration():
     before = s.iteration
     s.advance_frame(budget=10)
     assert s.iteration == before + 1
+
+
+def test_the_view_turns_into_the_fourth_dimension_with_the_spin(polytop):
+    """Both are the same act -- turning the figure round to look at it -- so
+    the S key stops the fourth dimension from turning too.  Otherwise a stopped
+    picture would go on changing, which is what "stopped" is supposed to rule
+    out."""
+    polytop.graph.set_dimensions(4)
+    before = polytop.hyper_angle
+    polytop.tick()
+    turning = polytop.hyper_angle
+    assert turning > before
+
+    polytop.spinning = False
+    polytop.tick()
+    assert polytop.hyper_angle == turning, "S stops the whole turning"
