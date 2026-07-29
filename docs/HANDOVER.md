@@ -634,6 +634,57 @@ for N steps" threshold stops the pressure inside a normal pause, and with the
 coordinate test blind without pressure, nothing ever falls again. "It fell
 nothing lately" is not a measurement of reducibility; the principal axes are.
 
+#### 3b. Where the thinking arrived: not a Punish, a *principal-axis preferrer*
+
+The author's closing sentence, and it is the synthesis of everything above:
+**"man braucht keinen Punish, sondern einen Hauptachsenbevorzuger."** Follow it
+and most of the open problems collapse into one small change.
+
+Punish pressed the figure until the *coordinate* frame happened to match its
+flat direction. What was ever wanted from that is the figure standing in a
+frame at all -- a stable, recognisable pose, and a last coordinate that really
+is the empty one. So do that directly: **keep the figure aligned to its own
+principal frame, continuously**, instead of pressing it toward the axes and
+instead of rotating it only at the moment a dimension falls.
+
+What that buys, item by item against the list of complaints:
+
+* **No jump.** The rotation stops being an event. `align` today fires once, at
+  the drop, and turns the whole cloud at once; applied every checkpoint it is a
+  tiny correction each time, because the frame drifts slowly. The figure is
+  always already aligned when a dimension goes.
+* **A stable pose.** The frame belongs to the figure, so the same graph comes
+  to rest the same way -- which is what Punish accidentally provided and what
+  its removal took away. (For a symmetric polytope the frame is a degenerate
+  family; see the note on snapping. Continuous alignment at least follows one
+  member smoothly instead of jumping between them.)
+* **No dent.** Nothing is squashed at any point, so no undoing in the picture
+  is needed either -- the exact-inverse trick of the previous section becomes
+  unnecessary rather than merely cheap.
+* **The cheap test comes back.** Once the figure always stands in its own
+  frame, "is the last coordinate small" is *true again* -- it is the original's
+  `CanShrink`, unchanged, and correct for the first time. The eigenvalues are
+  then needed only to maintain the frame, not to ask the question.
+
+What to watch when building it:
+
+* **Cost.** Covariance is O(n*d^2) and the Jacobi is on an 8x8; at the existing
+  25-iteration checkpoint that measured as free (the wall-clock ratios matched
+  the step ratios exactly). Do not put it in the per-step path.
+* **Continuity of the frame.** Eigenvectors come out in arbitrary sign and, on
+  degenerate eigenvalues, in arbitrary order within the degenerate block. Fix
+  the sign against the previous frame (choose the sign that makes the rotation
+  smaller) and keep the order stable, or the "continuous" alignment will still
+  flip. This is the one place the work actually is.
+* **It is a rotation of the stored coordinates.** Golden tests are about `.nod`
+  edge sets and the 1995 `.ply` data, not relaxed positions, so they are not
+  affected -- but run them, and check `tools/framehash.py` for what it says
+  about the picture.
+
+If this works, the branch table simplifies: `pca-shrink` stops being an
+alternative to the original's mechanism and becomes the thing that makes the
+original's own test honest.
+
 #### 4. `perspective`, parked
 
 Central projection for the *third* dimension: x, y and the ball radius divided
