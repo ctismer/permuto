@@ -578,6 +578,36 @@ things follow, and the successor should treat them separately:
   for a symmetric figure is degenerate by construction.
 * **The rounder shape** is the wanted part and should not be undone.
 
+**An idea in Punish's defence, from the author (2026-07-29, last thing before
+stopping), and it deserves to be tried before Punish is written off.** What was
+lost with Punish is the *stable pose*: pressing the flat direction onto the
+axes is also what made the figure come to rest the same way every run. So keep
+it -- weakened, as a stabiliser rather than a mechanism, and switchable -- and
+then **take its dent out again in the picture**: the layout computes with the
+slightly squashed axes, the display stretches them back.
+
+Two ways to do the stretching, and they differ in what they claim:
+
+* **Exact, and only of what Punish did.** Punish multiplies component i by a
+  known factor every step. Carry a per-axis debt vector alongside, and let the
+  projection divide by it (normalised, so nothing changes size overall). This
+  undoes Punish's *direct* effect exactly and leaves whatever the relaxation
+  did in answer to it -- which is honest, that part is the layout's own
+  physics. Cheap: one vector of eight numbers, one multiplication per node at
+  projection time.
+* **Empirical, via the principal axes.** Measure the axes (the machinery is
+  there now, `layout.principal_axes`) and scale them to equal length for
+  display -- a whitening. Simpler, and it hides *all* anisotropy, including a
+  graph that is genuinely oblong. That is a real loss of information and would
+  need to be a switch of its own.
+
+The first is the one to build. It would give: the familiar, reproducible pose;
+a figure that looks undented; the fast coordinate test back (so no eigenvalues
+in the hot loop at all, if that ever matters); and it makes the whole thing a
+switch rather than a fork in the code. If it works, `pca-shrink` and Punish
+stop being alternatives -- the principal axes stay the honest *test*, Punish
+becomes a stabiliser whose distortion never reaches the eye.
+
 An intermediate the author suggested and which was measured and *fails*: keep
 Punish but stop it once nothing falls any more. The drops are hundreds of steps
 apart (dome: 257, 392, 658, 875; S5: 441, 753, 855, **2229**), so any "quiet
