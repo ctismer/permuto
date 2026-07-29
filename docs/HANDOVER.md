@@ -578,6 +578,25 @@ things follow, and the successor should treat them separately:
   for a symmetric figure is degenerate by construction.
 * **The rounder shape** is the wanted part and should not be undone.
 
+**And a second one, minutes later: snap the view onto a principal axis.**
+There are several of them, and `align` already computes them all -- it only
+uses the smallest. Turned into a gesture ("look along principal axis k"), that
+gives what the stable pose was really wanted for: the axes belong to the
+*figure*, not to the run, so such a view is reproducible, one keystroke brings
+it back, and it means something -- the longest extent of the object, or the
+second. It would also make the arbitrary settled pose a non-problem: instead of
+hoping the figure comes to rest where it did last time, one asks for the view.
+
+Two things to know before building it. The eigenvectors are only determined up
+to sign, so a snap has to fix the sign by a convention (e.g. the node with the
+lowest number goes to the positive side) or the figure will flip about at
+random. And for a symmetric polytope the eigenvalues are *degenerate* -- 1.00,
+1.00, 1.00, 1.00 for a relaxed S5 -- so the frame is genuinely ambiguous and a
+snap will pick an arbitrary member of a family. That is the same degeneracy
+that makes the settled pose arbitrary in the first place; a snap does not
+remove it, but it does make it explicit and repeatable, which is the whole
+difference.
+
 **An idea in Punish's defence, from the author (2026-07-29, last thing before
 stopping), and it deserves to be tried before Punish is written off.** What was
 lost with Punish is the *stable pose*: pressing the flat direction onto the
