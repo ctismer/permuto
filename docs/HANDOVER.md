@@ -452,6 +452,160 @@ still flat discs. See below -- the cheap path (a small image per colour and
 size) and the real one (a lit sphere) are the same piece of work, and now there
 is a depth value to pick the image by.
 
+### The night of 2026-07-28/29: the fourth dimension, and what is unresolved
+
+Read this before touching anything the sections below describe. A lot was built
+in one sitting, three designs were tried and rejected *at the picture*, and two
+things are deliberately unfinished. The author's own summary at the end of it:
+"ich finde Drehebenen gut, aber ich muss sie komplett verstehen", and about the
+new relaxation: "der neue Algo bevorzugt keine Dimension. Er dreht irgendwie.
+Das alte Bild kommt nicht mehr."
+
+**Where things stand.** `main` is what is pushed and what was shown to Joachim
+on 2026-07-29. Three branches sit beside it, none merged, each green:
+
+| Branch | Head | What it carries |
+|---|---|---|
+| `main` | `e3e7259` | depth ramp, back-to-front sorting, the automatic (1,4) view turn |
+| `hyper4d` | `bf5f3d7` | + the pointer, the axis cross, the w-divide, and (merged in) `pca-shrink` |
+| `pca-shrink` | `bc2a25d` | Punish deleted, `can_shrink` asks the principal axes |
+| `perspective` | `3f75b12` | central projection for the third dimension (`scene.FOCAL`) |
+
+#### 1. Why a turn alone does not show a fourth dimension
+
+`project` shows components 1..3 and drops the rest, so two nodes differing only
+in w are the same pixel. Turning the view moves w into a visible axis, but each
+single frame is still an honest 3-D section in which *nothing* says how far a
+node lies in w -- a run of such frames reads as a 3-D figure being kneaded.
+What makes it read as four-dimensional is the **divide**: everything, marks
+included, scaled by the distance in w (`scene.HYPER_FOCAL`), so cells nest
+inside cells. That is the Schlegel picture.
+
+`HYPER_FOCAL` **= 2.5, decided at the picture**. It is a focal length: the
+angle of view is `2*arctan(1/f)`, so 2.5 is 43.6 degrees, the 45 mm normal
+lens, and `None` is the infinitely long one -- the parallel projection the
+original had. Shorter lenses are stronger in principle and weaker in practice
+because `hyper_reserve` takes the room out of the picture (1.09 at f=2.5, 1.81
+at f=1.2). That reserve assumes the figure fills the unit ball in w; it reaches
+0.55. **Deriving the reserve from the real extent is the one cheap improvement
+here**, and it would open the whole telephoto-to-wide-angle range as a control
+-- a dolly zoom, since the reserve keeps the figure the same size.
+
+#### 2. The pointer, and the rotation planes -- unresolved on purpose
+
+Four-space has six rotation planes and no rotation *axes*: in three dimensions
+every plane has one perpendicular axis ("about z"), in four the complement of a
+plane is another plane. A drag has two degrees of freedom. Three designs were
+built and judged:
+
+1. **Modifier keys** (shift-drag = the fourth dimension). Rejected: one has to
+   know them in advance, and the program has been keyboard-only since 1995 --
+   a second hidden input path is the wrong direction.
+2. **A 4x4 grid of planes**: click a cell (a pair of axes), horizontal drag
+   turns it, vertical turns its complement. Rejected at the picture: with x-z
+   chosen the complement is y-w, so pulling *down* turned the fourth dimension
+   while the hand expected the figure to tip. A grid also offers each plane
+   twice, mirrored, and one of the two feels backwards.
+3. **What is on `hyper4d` now**: the screen *is* x and y, so the horizontal
+   drag always turns x and the vertical always y; what one chooses is the third
+   axis they turn against (z, w, and on a deeper graph v, u, t, s -- one button
+   per axis the graph actually has). Four of the six planes are directly
+   draggable, and the other two are reachable by composition: x-z then x-w and
+   back leaves a rotation in z-w, x-z with y-z leaves one in x-y. Those four
+   generate SO(4).
+
+**The author is not happy with it yet**, and the reason is real: the axes are
+not equals. `x` and `y` are privileged because they are the screen, so the
+number of switch states is not the number of rotations, and two planes (`x-y`
+roll, `z-w`) cannot be dragged directly. Three ways out were sketched and none
+chosen:
+
+* **A** -- two partners instead of one: choose separately what the horizontal
+  drag turns against and what the vertical does. Makes the asymmetry complete
+  rather than hiding it, and `x-y` becomes reachable ("horizontal against y").
+  This is what the successor should propose first.
+* **B** -- back to choosing a plane outright, with a better rule for the
+  vertical drag than "the complement".
+* **C** -- no choosing at all: always turn against whatever is currently least
+  visible. Convenient, unpredictable.
+
+**Do not build a fourth variant before the author has said what he expects a
+drag to do.** Three were built in one evening because each was built before
+that question was asked; that is the mistake to avoid, not the designs.
+
+#### 3. Punish deleted -- measured, wanted, and still suspect
+
+`CanShrink` asked whether the *last coordinate* was small, which is the right
+question only if the figure lies along the axes. It does not: the relaxation
+flattens the dimensions the graph does not need in whatever direction it likes.
+Measured on a dome seeded at random in 8-D, the cloud is exactly
+three-dimensional after a few hundred steps -- its five other principal axes
+are 0.00 -- and the coordinate test never fires. **That is what Punish was
+for**: shrinking component i by (i+1)/400 a step does not rotate anything, it
+*presses* the flatness onto the axes until the coordinate test can see it. It
+works, and it costs the figure its shape.
+
+`pca-shrink` asks the figure instead: covariance, Jacobi, and the smallest
+principal axis against the largest. Measured, two seeds each, cap 6000 steps:
+
+| Graph | nodes | steps punish -> pca | seconds | smallest principal axis |
+|---|---|---|---|---|
+| dome f2 | 42 | 916 -> 51 (18x) | 0.48 -> 0.03 | 0.91 -> 0.90 |
+| dome f3 | 92 | 1110 -> 114 (9.8x) | 1.25 -> 0.14 | 0.89 -> 0.98 |
+| S5 permutohedron | 120 | 2170 -> 151 (14.4x) | 3.00 -> 0.23 | 0.65 -> 0.94 |
+| S6 permutohedron | 720 | 874 -> 251 (3.5x) | 8.91 -> 2.45 | **0.07 -> 0.76** |
+
+Left running, the figure settles perfectly isotropic (1.00) without Punish and
+gets *worse* with it (0.07 -> 0.01). The S6 number is why the larger
+permutohedra always looked like squashed drums.
+
+**And yet the author distrusts it, on a ground the measurements do not cover:**
+Punish pinned the flat direction to the coordinate axes, so the figure always
+came to rest in the *same* orientation, and the familiar picture returned every
+run. Without it, `align` turns the cloud into its own principal frame, which
+for a symmetric polytope is an arbitrary choice among symmetric alternatives --
+so the pose is different every time and the old picture never comes back. Three
+things follow, and the successor should treat them separately:
+
+* **The jump.** `align` rotates the whole cloud at the moment a dimension
+  falls, which reads as the figure suddenly turning. This is a defect, not a
+  decision, and it can be removed: rotate back afterwards so that the surviving
+  d-1 dimensions best match the pose they had (a Procrustes fit against the
+  previous frame). Do this first; it is probably most of what feels wrong.
+* **The unfamiliar pose.** Even without the jump, the settled orientation is no
+  longer canonical. If a canonical pose is wanted, it has to be *chosen* --
+  e.g. orient by the graph's own structure rather than by the covariance, which
+  for a symmetric figure is degenerate by construction.
+* **The rounder shape** is the wanted part and should not be undone.
+
+An intermediate the author suggested and which was measured and *fails*: keep
+Punish but stop it once nothing falls any more. The drops are hundreds of steps
+apart (dome: 257, 392, 658, 875; S5: 441, 753, 855, **2229**), so any "quiet
+for N steps" threshold stops the pressure inside a normal pause, and with the
+coordinate test blind without pressure, nothing ever falls again. "It fell
+nothing lately" is not a measurement of reducibility; the principal axes are.
+
+#### 4. `perspective`, parked
+
+Central projection for the *third* dimension: x, y and the ball radius divided
+by the distance to the eye, `scene.FOCAL`, `None` restoring the parallel
+projection exactly. Parked because it trades away what a mathematical figure is
+about: a parallel projection maps equal parallel edges to equal lengths, a
+central one does not, so a symmetric polytope comes out asymmetric. Worth
+keeping for the derivation of the frame reserve: the room a perspective needs
+is **`f / sqrt(f^2 - 1)`** for a figure in the unit ball -- the maximum of
+`f*sqrt(1-z^2)/(f-z)`, at `z = 1/f` -- not `perspective(NORM)`, which reserves
+for a node on the axis where growing moves it nowhere and costs a quarter of
+the window for nothing.
+
+#### 5. House rules learned the hard way
+
+* **Never switch branches in the author's working tree.** His viewer runs in
+  it. Twice in one evening the files changed under him and he reported features
+  "gone" that were simply on another branch. Use `git worktree add` for
+  anything that is not the branch he is on.
+* Ask what a gesture should *do* before building the control. See section 2.
+
 ### Wanted: smaller balls, cheaper balls, and real ones (author, 2026-07-27)
 
 Three things about the nodes, from looking at 40320 of them. They belong
